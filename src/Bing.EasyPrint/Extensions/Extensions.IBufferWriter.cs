@@ -12,10 +12,11 @@ namespace Bing.EasyPrint
         /// <summary>
         /// 转换为16进制
         /// </summary>
-        /// <param name="bufferWriter">缓冲区写入器</param>
-        public static string ToHex(this IBufferWriter bufferWriter)
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="writer">缓冲区写入器</param>
+        public static string ToHex<T>(this IBufferWriter<T> writer)
         {
-            var bytes = bufferWriter.GetBytes();
+            var bytes = writer.GetBytes();
             if (!bytes.Any())
                 return string.Empty;
             var result = new StringBuilder();
@@ -24,5 +25,12 @@ namespace Bing.EasyPrint
             return result.Replace("-", "").ToString();
         }
 
+        /// <summary>
+        /// 写入并换行
+        /// </summary>
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="writer">缓冲区写入器</param>
+        /// <param name="value">字符串</param>
+        public static T WriteLine<T>(this IBufferWriter<T> writer, string value) => writer.Write($"{value}\r\n");
     }
 }
