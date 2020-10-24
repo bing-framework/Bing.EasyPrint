@@ -51,5 +51,50 @@ namespace Bing.EasyPrint
         /// <param name="height">文字绘制区域高度(可以为0)</param>
         /// <param name="text">内容</param>
         public static T DrawTextArea<T>(this IPrintComponent<T> component, int x, int y, int width, int height, string text) where T : IPrintCommand<T> => component.DrawTextArea(x, y, width, height, text, FontSize.Size16, RotationAngle.None, TextStyle.None);
+
+        /// <summary>
+        /// 画条码。默认：CODE 128
+        /// </summary>
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="component">打印组件</param>
+        /// <param name="x">条码起始x坐标</param>
+        /// <param name="y">条码起始y坐标</param>
+        /// <param name="text">条码内容</param>
+        /// <param name="lineWidth">线宽</param>
+        /// <param name="height">高度</param>
+        public static T DrawBarcode<T>(this IPrintComponent<T> component, int x, int y, string text, int lineWidth,
+            int height) where T : IPrintCommand<T> => component.DrawBarcode1D(BarcodeType.Code128, x, y, text,
+            lineWidth, height, 1, RotationAngle.None);
+
+        /// <summary>
+        /// 画条码。默认：CODE 128
+        /// </summary>
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="component">打印组件</param>
+        /// <param name="x">条码起始x坐标</param>
+        /// <param name="y">条码起始y坐标</param>
+        /// <param name="text">条码内容</param>
+        /// <param name="lineWidth">线宽</param>
+        /// <param name="height">高度</param>
+        /// <param name="ratio">宽条与窄条的比率</param>
+        public static T DrawBarcode<T>(this IPrintComponent<T> component, int x, int y, string text, int lineWidth,
+            int height, int ratio) where T : IPrintCommand<T> => component.DrawBarcode1D(BarcodeType.Code128, x, y, text,
+            lineWidth, height, ratio, RotationAngle.None);
+
+        /// <summary>
+        /// 画条码。默认：CODE 128
+        /// </summary>
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="component">打印组件</param>
+        /// <param name="x">条码起始x坐标</param>
+        /// <param name="y">条码起始y坐标</param>
+        /// <param name="text">条码内容</param>
+        /// <param name="lineWidth">线宽</param>
+        /// <param name="height">高度</param>
+        /// <param name="ratio">宽条与窄条的比率</param>
+        /// <param name="rotation">旋转角度</param>
+        public static T DrawBarcode<T>(this IPrintComponent<T> component, int x, int y, string text, int lineWidth,
+            int height, int ratio, RotationAngle rotation) where T : IPrintCommand<T> => component.DrawBarcode1D(BarcodeType.Code128, x, y, text,
+            lineWidth, height, ratio, rotation);
     }
 }

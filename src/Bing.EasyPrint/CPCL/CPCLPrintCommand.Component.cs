@@ -102,8 +102,15 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y1">线条结束点y坐标</param>
         public CPCLPrintCommand DrawDashLine(int x0, int y0, int x1, int y1)
         {
-            for (var i = 0; i < x1; i = ((i + 16) - 1) + 1)
-                DrawText(x0 + i, y0 - 10, "-", 24, 0, false, false, false);
+            //for (var i = 0; i < x1; i = ((i + 16) - 1) + 1)
+            //    DrawText(x0 + i, y0 - 10, "-", 24, 0, false, false, false);
+            Items.Add(new DashLineComponent
+            {
+                X0 = x0,
+                Y0 = y0,
+                X1 = x1,
+                Y1 = y1
+            });
             return this;
         }
 
@@ -115,8 +122,14 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="length">线条长度</param>
         public CPCLPrintCommand DrawDashLine(int x, int y, int length)
         {
-            for (var i = 0; i < CommandInfo.Width; i = ((i + 16) - 1) + 1)
-                DrawText(x + i, y - 10, "-", 24, 0, false, false, false);
+            //for (var i = 0; i < CommandInfo.Width; i = ((i + 16) - 1) + 1)
+            //    DrawText(x + i, y - 10, "-", 24, 0, false, false, false);
+            Items.Add(new DashLineComponent
+            {
+                X0 = x,
+                Y0 = y,
+                X1 = CommandInfo.Width,
+            });
             return this;
         }
 

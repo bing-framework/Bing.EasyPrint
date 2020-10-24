@@ -13,7 +13,10 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="command">打印命令</param>
         public override void Build(CPCLPrintCommand command)
         {
-            
+            command.Writer.WriteLine("SETMAG 1 1");
+            for (var i = 0; i < X1; i = ((i + 16) - 1) + 1) 
+                command.Writer.WriteLine($"T 24 0 {X0 + i} {Y0 - 10} -");
+            command.Writer.WriteLine("SETMAG 0 0");
         }
     }
 }

@@ -45,9 +45,9 @@ namespace Bing.EasyPrint.CPCL
         public override void Build(CPCLPrintCommand command)
         {
             if (NewLine)
-                command.WriteRawLine(Raw);
+                command.Writer.WriteLine(Raw);
             else
-                command.WriteRaw(Raw);
+                command.Writer.Write(Raw);
         }
     }
 }
