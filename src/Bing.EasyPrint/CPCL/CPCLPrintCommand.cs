@@ -43,6 +43,19 @@ namespace Bing.EasyPrint.CPCL
         }
 
         /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <param name="width">宽度</param>
+        /// <param name="height">高度</param>
+        internal CPCLPrintCommand Init(int width, int height)
+        {
+            CommandInfo = new CPCLCommandInfo {Width = width, Height = height};
+            Items.Clear();
+            Writer.Clear();
+            return this;
+        }
+
+        /// <summary>
         /// 写入命令
         /// </summary>
         /// <param name="raw">命令</param>

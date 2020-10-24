@@ -46,14 +46,5 @@
         /// 纸张旋转角度
         /// </summary>
         public int PagerRotate { get; internal set; }
-
-        /// <summary>
-        /// 重置
-        /// </summary>
-        public void Rest()
-        {
-            HasBegin = false;
-            HasEnd = false;
-        }
     }
 }

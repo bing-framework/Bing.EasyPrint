@@ -18,7 +18,9 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="orientation">旋转角度</param>
         public CPCLPrintCommand SetPage(int width, int height, PrintOrientation orientation = PrintOrientation.None)
         {
-            throw new NotImplementedException();
+            Init(width, height);
+            CommandInfo.PagerRotate = (int)orientation;
+            return this;
         }
 
         /// <summary>
@@ -29,7 +31,9 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="orientation">旋转角度</param>
         public CPCLPrintCommand SetPage(int width, int height, int orientation = 0)
         {
-            throw new NotImplementedException();
+            Init(width, height);
+            CommandInfo.PagerRotate = orientation;
+            return this;
         }
 
         /// <summary>
@@ -38,7 +42,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="qty">打印标签数量</param>
         public CPCLPrintCommand SetQty(int qty)
         {
-            throw new NotImplementedException();
+            CommandInfo.Qty = qty < 1 ? 1 : qty > 1024 ? 1024 : qty;
+            return this;
         }
 
         /// <summary>
@@ -47,7 +52,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="offset">偏移量</param>
         public CPCLPrintCommand SetOffset(int offset)
         {
-            throw new NotImplementedException();
+            CommandInfo.Offset = offset < 0 ? 0 : offset;
+            return this;
         }
 
         /// <summary>
@@ -60,7 +66,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineWidth">线条宽度</param>
         public CPCLPrintCommand DrawLine(int x0, int y0, int x1, int y1, int lineWidth)
         {
-            throw new NotImplementedException();
+            Items.Add(new LineComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
+            return this;
         }
 
         /// <summary>
@@ -74,7 +81,16 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineStyle">线条样式</param>
         public CPCLPrintCommand DrawLine(int x0, int y0, int x1, int y1, int lineWidth, LineStyle lineStyle)
         {
-            throw new NotImplementedException();
+            switch (lineStyle)
+            {
+                case LineStyle.Full:
+                    DrawLine(x0, y0, x1, y1, lineWidth);
+                    break;
+                case LineStyle.Dotted:
+                    DrawDashLine(x0, y0, x1, y1);
+                    break;
+            }
+            return this;
         }
 
         /// <summary>
@@ -86,7 +102,9 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y1">线条结束点y坐标</param>
         public CPCLPrintCommand DrawDashLine(int x0, int y0, int x1, int y1)
         {
-            throw new NotImplementedException();
+            for (var i = 0; i < x1; i = ((i + 16) - 1) + 1)
+                DrawText(x0 + i, y0 - 10, "-", 24, 0, false, false, false);
+            return this;
         }
 
         /// <summary>
@@ -97,7 +115,9 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="length">线条长度</param>
         public CPCLPrintCommand DrawDashLine(int x, int y, int length)
         {
-            throw new NotImplementedException();
+            for (var i = 0; i < CommandInfo.Width; i = ((i + 16) - 1) + 1)
+                DrawText(x + i, y - 10, "-", 24, 0, false, false, false);
+            return this;
         }
 
         /// <summary>
@@ -110,7 +130,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineWidth">线条宽度</param>
         public CPCLPrintCommand DrawRect(int x0, int y0, int x1, int y1, int lineWidth)
         {
-            throw new NotImplementedException();
+            Items.Add(new BoxComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
+            return this;
         }
 
         /// <summary>
@@ -124,7 +145,16 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineStyle">线条样式</param>
         public CPCLPrintCommand DrawRect(int x0, int y0, int x1, int y1, int lineWidth, LineStyle lineStyle)
         {
-            throw new NotImplementedException();
+            switch (lineStyle)
+            {
+                case LineStyle.Full:
+                    DrawRectFill(x0, y0, x1, y1);
+                    break;
+                case LineStyle.Dotted:
+                    DrawRect(x0, y0, x1, y1, lineWidth);
+                    break;
+            }
+            return this;
         }
 
         /// <summary>
@@ -134,10 +164,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y0">矩形框左上角y坐标</param>
         /// <param name="x1">矩形框右下角x坐标</param>
         /// <param name="y1">矩形框右下角y坐标</param>
-        public CPCLPrintCommand DrawRectFill(int x0, int y0, int x1, int y1)
-        {
-            throw new NotImplementedException();
-        }
+        public CPCLPrintCommand DrawRectFill(int x0, int y0, int x1, int y1) => InverseLine(x0, y0, x1, y1, y1 - y0);
 
         /// <summary>
         /// 画一维条码
@@ -150,10 +177,10 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="height">条码高度</param>
         /// <param name="ratio">宽条与窄条的比率</param>
         /// <param name="rotation">旋转角度</param>
-        public CPCLPrintCommand DrawBarcode1D(string type, int x, int y, string text, int lineWidth, int height, int ratio,
-            int rotation)
+        public CPCLPrintCommand DrawBarcode1D(string type, int x, int y, string text, int lineWidth, int height, int ratio, int rotation)
         {
-            throw new NotImplementedException();
+            Items.Add(new Barcode1DComponent { Type = type, X = x, Y = y, Text = text, LineWidth = lineWidth, Height = height, Rotate = rotation, Ratio = ratio });
+            return this;
         }
 
         /// <summary>
@@ -169,7 +196,9 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="rotation">旋转角度</param>
         public CPCLPrintCommand DrawBarcode1D(int type, int x, int y, string text, int lineWidth, int height, int ratio, int rotation)
         {
-            throw new NotImplementedException();
+            if (!string.IsNullOrWhiteSpace(text))
+                DrawBarcode1D(Helper.ConvertBarcodeType((BarcodeType) type), x, y, text, lineWidth, height, ratio, rotation);
+            return this;
         }
 
         /// <summary>
@@ -183,10 +212,11 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="height">条码高度</param>
         /// <param name="ratio">宽条与窄条的比率</param>
         /// <param name="rotation">旋转角度</param>
-        public CPCLPrintCommand DrawBarcode1D(BarcodeType type, int x, int y, string text, int lineWidth, int height, int ratio,
-            RotationAngle rotation)
+        public CPCLPrintCommand DrawBarcode1D(BarcodeType type, int x, int y, string text, int lineWidth, int height, int ratio, RotationAngle rotation)
         {
-            throw new NotImplementedException();
+            if (!string.IsNullOrWhiteSpace(text))
+                DrawBarcode1D(Helper.ConvertBarcodeType(type), x, y, text, lineWidth, height, ratio, (int) rotation);
+            return this;
         }
 
         /// <summary>
@@ -198,10 +228,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="unitWidth">模块的单位宽度。(1-32)</param>
         /// <param name="errorLevel">二维码纠错级别</param>
         /// <param name="rotation">旋转角度</param>
-        public CPCLPrintCommand DrawQrCode(int x, int y, string text, int unitWidth, int errorLevel, int rotation)
-        {
-            throw new NotImplementedException();
-        }
+        public CPCLPrintCommand DrawQrCode(int x, int y, string text, int unitWidth, int errorLevel, int rotation) => DrawQrCode(x, y, text, unitWidth, Helper.ConvertErrorLevel(errorLevel), rotation);
 
         /// <summary>
         /// 画二维码
@@ -214,7 +241,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="rotation">旋转角度</param>
         public CPCLPrintCommand DrawQrCode(int x, int y, string text, int unitWidth, string errorLevel, int rotation)
         {
-            throw new NotImplementedException();
+            Items.Add(new QRCodeComponent {X = x, Y = y, Text = text, Size = unitWidth, ErrorLevel = errorLevel, Rotate = rotation});
+            return this;
         }
 
         /// <summary>
@@ -226,10 +254,11 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="unitWidth">模块的单位宽度。(1-32)</param>
         /// <param name="errorLevel">二维码纠错级别</param>
         /// <param name="rotation">旋转角度</param>
-        public CPCLPrintCommand DrawQrCode(int x, int y, string text, QrCodeUnitSize unitWidth, QrCodeCorrectionLevel errorLevel,
-            RotationAngle rotation)
+        public CPCLPrintCommand DrawQrCode(int x, int y, string text, QrCodeUnitSize unitWidth, QrCodeCorrectionLevel errorLevel, RotationAngle rotation)
         {
-            throw new NotImplementedException();
+            if (!string.IsNullOrWhiteSpace(text))
+                DrawQrCode(x, y, text, (int) unitWidth, (int) errorLevel, (int) rotation);
+            return this;
         }
 
         /// <summary>
@@ -240,7 +269,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="bitmap">图片数据</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, Bitmap bitmap)
         {
-            throw new NotImplementedException();
+            Items.Add(ImageComponent.CreateFromImage(bitmap).InitPosition(startX, startY));
+            return this;
         }
 
         /// <summary>
@@ -251,7 +281,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="imageUrl">图片地址</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, string imageUrl)
         {
-            throw new NotImplementedException();
+            Items.Add(ImageComponent.CreateFromFile(imageUrl).InitPosition(startX, startY));
+            return this;
         }
 
         /// <summary>
@@ -262,7 +293,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="bytes">图片数据</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, byte[] bytes)
         {
-            throw new NotImplementedException();
+            Items.Add(ImageComponent.CreateFromBytes(bytes).InitPosition(startX, startY));
+            return this;
         }
 
         /// <summary>
@@ -273,7 +305,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="stream">图片流</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, Stream stream)
         {
-            throw new NotImplementedException();
+            Items.Add(ImageComponent.CreateFromStream(stream).InitPosition(startX, startY));
+            return this;
         }
 
         /// <summary>
@@ -287,10 +320,15 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="bold">是否加粗</param>
         /// <param name="reverse">是否颠倒</param>
         /// <param name="underline">是否下划线</param>
-        public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, bool reverse,
-            bool underline)
+        public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, bool reverse, bool underline)
         {
-            throw new NotImplementedException();
+            Items.Add(new TextComponent
+            {
+                X = x, Y = y, Text = text, FontSize = fontSize, 
+                Rotate = rotation, Bold = bold, Reverse = reverse, 
+                Underline = underline
+            });
+            return this;
         }
 
         /// <summary>
@@ -301,26 +339,11 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="text">内容</param>
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
-        /// <param name="bold">是否加粗</param>
         /// <param name="style">样式</param>
-        public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, int style)
+        public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, int style)
         {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// 画文本
-        /// </summary>
-        /// <param name="x">文字起始x坐标</param>
-        /// <param name="y">文字起始y坐标</param>
-        /// <param name="text">内容</param>
-        /// <param name="fontSize">字体大小</param>
-        /// <param name="rotation">旋转角度</param>
-        /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, int textStyle, int color)
-        {
-            throw new NotImplementedException();
+            var styleResult = Helper.ConvertStyle(style);
+            return DrawText(x, y, text, fontSize, rotation, styleResult.bold, false, styleResult.underline);
         }
 
         /// <summary>
@@ -332,11 +355,51 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
         /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        public CPCLPrintCommand DrawText(int x, int y, string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle,
-            PrintColor color)
+        public CPCLPrintCommand DrawText(int x, int y, string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle) => DrawText(x, y, text, (int) fontSize, (int) rotation, (int) textStyle);
+
+        /// <summary>
+        /// 画文本区域
+        /// </summary>
+        /// <param name="x">文字起始x坐标</param>
+        /// <param name="y">文字起始y坐标</param>
+        /// <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+        /// <param name="height">文字绘制区域高度(可以为0)</param>
+        /// <param name="text">内容</param>
+        /// <param name="fontSize">字体大小</param>
+        /// <param name="rotation">旋转角度</param>
+        /// <param name="textStyle">字体样式</param>
+        public CPCLPrintCommand DrawTextArea(int x, int y, int width, int height, string text, int fontSize, int rotation, int textStyle)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(text))
+                return this;
+            if (width == 0 || height == 0)
+                throw new ArgumentException($"{nameof(width)} 或 {nameof(height)} 不能为0。");
+            var widthTmp = 0;
+            var startYTmp = y;
+            var textTmp = "";
+            foreach (var c in text.ToCharArray())
+            {
+                if (Helper.IsChinese(c))
+                    widthTmp = widthTmp + fontSize;
+                else
+                    widthTmp = widthTmp + fontSize / 2;
+                if (widthTmp >= width)
+                {
+                    textTmp += c;
+                    DrawText(x, startYTmp, textTmp, fontSize, rotation, textStyle);
+                    widthTmp = 0;
+                    startYTmp += fontSize + 2;
+                    textTmp = "";
+                }
+                else
+                {
+                    textTmp += c;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(textTmp))
+                DrawText(x, startYTmp, textTmp, fontSize, rotation, textStyle);
+            return this;
         }
 
         /// <summary>
@@ -350,29 +413,6 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
         /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        public CPCLPrintCommand DrawTextArea(int x, int y, int width, int height, string text, int fontSize, int rotation,
-            int textStyle, int color)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// 画文本区域
-        /// </summary>
-        /// <param name="x">文字起始x坐标</param>
-        /// <param name="y">文字起始y坐标</param>
-        /// <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
-        /// <param name="height">文字绘制区域高度(可以为0)</param>
-        /// <param name="text">内容</param>
-        /// <param name="fontSize">字体大小</param>
-        /// <param name="rotation">旋转角度</param>
-        /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        public CPCLPrintCommand DrawTextArea(int x, int y, int width, int height, string text, FontSize fontSize,
-            RotationAngle rotation, TextStyle textStyle, PrintColor color)
-        {
-            throw new NotImplementedException();
-        }
+        public CPCLPrintCommand DrawTextArea(int x, int y, int width, int height, string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle) => DrawTextArea(x, y, width, height, text, (int) fontSize, (int) rotation, (int) textStyle);
     }
 }

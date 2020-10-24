@@ -68,6 +68,18 @@ namespace Bing.EasyPrint.CPCL
         }
 
         /// <summary>
+        /// 初始化位置
+        /// </summary>
+        /// <param name="x">图片起始x坐标</param>
+        /// <param name="y">图片起始y坐标</param>
+        public ImageComponent InitPosition(int x, int y)
+        {
+            X = x;
+            Y = y;
+            return this;
+        }
+
+        /// <summary>
         /// 通过文件路径创建图片组件
         /// </summary>
         /// <param name="fileUrl">文件地址</param>

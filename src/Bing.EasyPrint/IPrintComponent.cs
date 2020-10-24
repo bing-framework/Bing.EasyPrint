@@ -230,21 +230,8 @@ namespace Bing.EasyPrint
         /// <param name="text">内容</param>
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
-        /// <param name="bold">是否加粗</param>
         /// <param name="style">样式</param>
-        T DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, int style);
-
-        /// <summary>
-        /// 画文本
-        /// </summary>
-        /// <param name="x">文字起始x坐标</param>
-        /// <param name="y">文字起始y坐标</param>
-        /// <param name="text">内容</param>
-        /// <param name="fontSize">字体大小</param>
-        /// <param name="rotation">旋转角度</param>
-        /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        T DrawText(int x, int y, string text, int fontSize, int rotation, int textStyle, int color);
+        T DrawText(int x, int y, string text, int fontSize, int rotation, int style);
 
         /// <summary>
         /// 画文本区域
@@ -255,8 +242,7 @@ namespace Bing.EasyPrint
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
         /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        T DrawText(int x, int y,string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle, PrintColor color);
+        T DrawText(int x, int y,string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle);
 
         /// <summary>
         /// 画文本区域
@@ -269,8 +255,7 @@ namespace Bing.EasyPrint
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
         /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        T DrawTextArea(int x, int y, int width, int height, string text, int fontSize, int rotation, int textStyle, int color);
+        T DrawTextArea(int x, int y, int width, int height, string text, int fontSize, int rotation, int textStyle);
 
         /// <summary>
         /// 画文本区域
@@ -283,7 +268,6 @@ namespace Bing.EasyPrint
         /// <param name="fontSize">字体大小</param>
         /// <param name="rotation">旋转角度</param>
         /// <param name="textStyle">字体样式</param>
-        /// <param name="color">文字颜色</param>
-        T DrawTextArea(int x, int y, int width, int height, string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle, PrintColor color);
+        T DrawTextArea(int x, int y, int width, int height, string text, FontSize fontSize, RotationAngle rotation, TextStyle textStyle);
     }
 }

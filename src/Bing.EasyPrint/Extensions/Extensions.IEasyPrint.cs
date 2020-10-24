@@ -4,7 +4,7 @@
 namespace Bing.EasyPrint
 {
     /// <summary>
-    /// 
+    /// 简单打印(<see cref="IEasyPrint"/>) 扩展
     /// </summary>
     public static class EasyPrintExtensions
     {
