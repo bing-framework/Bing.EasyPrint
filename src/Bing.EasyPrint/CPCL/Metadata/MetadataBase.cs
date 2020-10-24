@@ -14,7 +14,7 @@ namespace Bing.EasyPrint.CPCL
         /// <summary>
         /// 构建
         /// </summary>
-        /// <param name="writer">缓冲区写入器</param>
-        public abstract void Build(IBufferWriter writer);
+        /// <param name="command">打印命令</param>
+        public abstract void Build(CPCLPrintCommand command);
     }
 }

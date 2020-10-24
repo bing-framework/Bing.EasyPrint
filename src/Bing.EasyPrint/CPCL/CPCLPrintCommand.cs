@@ -9,7 +9,7 @@ namespace Bing.EasyPrint.CPCL
     /// CPCL 打印命令
     /// </summary>
     // ReSharper disable once InconsistentNaming
-    public partial class CPCLPrintCommand : IPrintCommand<CPCLPrintCommand>
+    public partial class CPCLPrintCommand : IPrintCommand<CPCLPrintCommand>, IPrintComponent<CPCLPrintCommand>
     {
         /// <summary>
         /// 缓冲区写入器
@@ -69,11 +69,11 @@ namespace Bing.EasyPrint.CPCL
         {
             if (Items.All(x => x.MetadataType == MetadataType.Raw))
             {
-                Items.ForEach(x => x.Build(Writer));
+                Items.ForEach(x => x.Build(this));
                 return Writer;
             }
             InitCommand(CommandInfo.Offset, CommandInfo.Width, CommandInfo.Height, CommandInfo.Qty);
-            Items.ForEach(x => x.Build(Writer));
+            Items.ForEach(x => x.Build(this));
             Print();
             return Writer;
         }

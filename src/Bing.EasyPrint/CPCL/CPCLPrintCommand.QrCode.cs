@@ -79,7 +79,7 @@
         /// <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
         /// <param name="data">提供生成 QR Code 所需的信息。需要录入二维自定义信息</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand QRCode(int x, int y, int model, int widthWithHeight, params string[] data)
+        public CPCLPrintCommand QRCodeRaw(int x, int y, int model, int widthWithHeight, params string[] data)
         {
             WriteRawLine($"B QR {x} {y} M {model} U {widthWithHeight}");
             foreach (var item in data)
@@ -97,7 +97,7 @@
         /// <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
         /// <param name="data">提供生成 QR Code 所需的信息。需要录入二维自定义信息</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand VQRCode(int x, int y, int model, int widthWithHeight, params string[] data)
+        public CPCLPrintCommand VQRCodeRaw(int x, int y, int model, int widthWithHeight, params string[] data)
         {
             WriteRawLine($"VB QR {x} {y} M {model} U {widthWithHeight}");
             foreach (var item in data)
@@ -117,7 +117,7 @@
         /// <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
         /// <param name="data">二维码信息</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand QRCode(int x, int y, int model, int widthWithHeight, char errorCorrectionLevel, int? maskNo, string data)
+        public CPCLPrintCommand QRCode(int x, int y, int model, int widthWithHeight, string errorCorrectionLevel, int? maskNo, string data)
         {
             WriteRawLine($"B QR {x} {y} M {model} U {widthWithHeight}");
             WriteRawLine($"{errorCorrectionLevel}{(maskNo == null ? string.Empty : maskNo.ToString())}A,{data}");
@@ -136,7 +136,7 @@
         /// <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
         /// <param name="data">二维码信息</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand VQRCode(int x, int y, int model, int widthWithHeight, char errorCorrectionLevel, int? maskNo, string data)
+        public CPCLPrintCommand VQRCode(int x, int y, int model, int widthWithHeight, string errorCorrectionLevel, int? maskNo, string data)
         {
             WriteRawLine($"VB QR {x} {y} M {model} U {widthWithHeight}");
             WriteRawLine($"{errorCorrectionLevel}{(maskNo == null ? string.Empty : maskNo.ToString())}A,{data}");
@@ -155,7 +155,7 @@
         /// <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
         /// <param name="param">参数：字符模式符(N、A、Bxxxx、K)）-数据</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand QRCodeManual(int x, int y, int model, int widthWithHeight, char errorCorrectionLevel, int? maskNo, params (string charMode, string data)[] param)
+        public CPCLPrintCommand QRCodeManual(int x, int y, int model, int widthWithHeight, string errorCorrectionLevel, int? maskNo, params (string charMode, string data)[] param)
         {
             WriteRawLine($"B QR {x} {y} M {model} U {widthWithHeight}");
             WriteRaw($"{errorCorrectionLevel}{(maskNo == null ? string.Empty : maskNo.ToString())}M");
@@ -177,7 +177,7 @@
         /// <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
         /// <param name="param">参数：字符模式符(N、A、Bxxxx、K)）-数据</param>
         // ReSharper disable once InconsistentNaming
-        public CPCLPrintCommand VQRCodeManual(int x, int y, int model, int widthWithHeight, char errorCorrectionLevel, int? maskNo, params (string charMode, string data)[] param)
+        public CPCLPrintCommand VQRCodeManual(int x, int y, int model, int widthWithHeight, string errorCorrectionLevel, int? maskNo, params (string charMode, string data)[] param)
         {
             WriteRawLine($"VB QR {x} {y} M {model} U {widthWithHeight}");
             WriteRaw($"{errorCorrectionLevel}{(maskNo == null ? string.Empty : maskNo.ToString())}M");

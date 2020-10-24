@@ -2,7 +2,7 @@
 namespace Bing.EasyPrint.CPCL
 {
     /// <summary>
-    /// 原始命令 - 元数据
+    /// 命令 - 元数据
     /// </summary>
     internal class RawMetadata : MetadataBase
     {
@@ -12,7 +12,7 @@ namespace Bing.EasyPrint.CPCL
         public override MetadataType MetadataType => MetadataType.Raw;
 
         /// <summary>
-        /// 原始命令
+        /// 命令
         /// </summary>
         public string Raw { get; }
 
@@ -30,7 +30,7 @@ namespace Bing.EasyPrint.CPCL
         /// <summary>
         /// 初始化一个<see cref="RawMetadata"/>类型的实例
         /// </summary>
-        /// <param name="raw">原始命令</param>
+        /// <param name="raw">命令</param>
         /// <param name="newLine">是否换行</param>
         public RawMetadata(string raw, bool newLine)
         {
@@ -41,13 +41,13 @@ namespace Bing.EasyPrint.CPCL
         /// <summary>
         /// 构建
         /// </summary>
-        /// <param name="writer">缓冲区写入器</param>
-        public override void Build(IBufferWriter writer)
+        /// <param name="command">打印命令</param>
+        public override void Build(CPCLPrintCommand command)
         {
             if (NewLine)
-                writer.WriteLine(Raw);
+                command.WriteRawLine(Raw);
             else
-                writer.Write(Raw);
+                command.WriteRaw(Raw);
         }
     }
 }

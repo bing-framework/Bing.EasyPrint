@@ -37,6 +37,17 @@
         /// <param name="y">纵向起始位置</param>
         /// <param name="data">要打印的文本</param>
         /// <remarks>逆时针旋转90度，横向打印文本。</remarks>
+        public CPCLPrintCommand Text90(int font, int size, int x, int y, string data) => WriteRawLine($"T90 {font} {size} {x} {y} {data}");
+
+        /// <summary>
+        /// TEXT90 命令
+        /// </summary>
+        /// <param name="font">字体名称/编号</param>
+        /// <param name="size">字体的大小标识</param>
+        /// <param name="x">横向起始位置</param>
+        /// <param name="y">纵向起始位置</param>
+        /// <param name="data">要打印的文本</param>
+        /// <remarks>逆时针旋转90度，横向打印文本。</remarks>
         public CPCLPrintCommand Text90(string font, int size, int x, int y, string data) => WriteRawLine($"T90 {font} {size} {x} {y} {data}");
 
         /// <summary>
@@ -48,7 +59,29 @@
         /// <param name="y">纵向起始位置</param>
         /// <param name="data">要打印的文本</param>
         /// <remarks>逆时针旋转180度，反转打印文本。</remarks>
+        public CPCLPrintCommand Text180(int font, int size, int x, int y, string data) => WriteRawLine($"T180 {font} {size} {x} {y} {data}");
+
+        /// <summary>
+        /// TEXT180 命令
+        /// </summary>
+        /// <param name="font">字体名称/编号</param>
+        /// <param name="size">字体的大小标识</param>
+        /// <param name="x">横向起始位置</param>
+        /// <param name="y">纵向起始位置</param>
+        /// <param name="data">要打印的文本</param>
+        /// <remarks>逆时针旋转180度，反转打印文本。</remarks>
         public CPCLPrintCommand Text180(string font, int size, int x, int y, string data) => WriteRawLine($"T180 {font} {size} {x} {y} {data}");
+
+        /// <summary>
+        /// TEXT270 命令
+        /// </summary>
+        /// <param name="font">字体名称/编号</param>
+        /// <param name="size">字体的大小标识</param>
+        /// <param name="x">横向起始位置</param>
+        /// <param name="y">纵向起始位置</param>
+        /// <param name="data">要打印的文本</param>
+        /// <remarks>逆时针旋转270度，纵向打印文本。</remarks>
+        public CPCLPrintCommand Text270(int font, int size, int x, int y, string data) => WriteRawLine($"T270 {font} {size} {x} {y} {data}");
 
         /// <summary>
         /// TEXT270 命令
@@ -280,5 +313,12 @@
         /// <param name="angle">旋转角度</param>
         /// <remarks>ROTATE 命令用于以指定角度旋转所有后续可缩放文本域。旋转方向为以文本中心点为中心逆时针。在发出下一个 ROTATE 命令前，前一个旋转一直有效。默认角度为零度。</remarks>
         public CPCLPrintCommand Rotate(int angle) => WriteRawLine($"R {angle}");
+
+        /// <summary>
+        /// SETBOLD 命令
+        /// </summary>
+        /// <param name="value">值。介于 0 到 5 之间的偏移量。</param>
+        /// <remarks>SETBOLD 命令可使文本加粗并且稍微加宽。SETBOLD 命令会采用一个操作数来设置文本变黑的程度。</remarks>
+        public CPCLPrintCommand SetBold(int value) => WriteRawLine($"SETBOLD {value}");
     }
 }
