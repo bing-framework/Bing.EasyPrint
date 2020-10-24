@@ -54,17 +54,8 @@ namespace Bing.EasyPrint.CPCL
         public override void Build(CPCLPrintCommand command)
         {
             var coordinate = Helper.GetBarcodeCoordinate(this);
-            switch (Rotate)
-            {
-                case 0:
-                case 180:
-                    command.Barcode(Type, LineWidth, Ratio, Height, coordinate.x, coordinate.y, Text);
-                    break;
-                case 90:
-                case 270:
-                    command.VBarcode(Type, LineWidth, Ratio, Height, coordinate.x, coordinate.y, Text);
-                    break;
-            }
+            var cmd = Helper.GetBarcodeRotateCommand(Rotate);
+            command.Writer.WriteLine($"{cmd} {Type} {LineWidth} {Ratio} {Height} {coordinate.x} {coordinate.y} {Text}");
         }
     }
 }

@@ -29,7 +29,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="width">宽度</param>
         /// <param name="height">高度</param>
         /// <param name="orientation">旋转角度</param>
-        public CPCLPrintCommand SetPage(int width, int height, int orientation = 0)
+        public CPCLPrintCommand SetPage(int width, int height, int orientation)
         {
             Init(width, height);
             CommandInfo.PagerRotate = orientation;

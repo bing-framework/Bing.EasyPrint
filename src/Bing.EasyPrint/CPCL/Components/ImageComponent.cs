@@ -54,17 +54,8 @@ namespace Bing.EasyPrint.CPCL
         {
             var byteCountW = (Width + 7) / 8;
             var data = ToHex(Data);
-            switch (Rotate)
-            {
-                case 0:
-                case 180:
-                    command.ExpandedGraphics(byteCountW, Height, X, Y, data);
-                    break;
-                case 90:
-                case 270:
-                    command.VExpandedGraphics(byteCountW, Height, X, Y, data);
-                    break;
-            }
+            var cmd = Helper.GetImageRotateCommand(Rotate);
+            command.Writer.WriteLine($"{cmd} {byteCountW} {Height} {X} {Y} {data}");
         }
 
         /// <summary>

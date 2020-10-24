@@ -62,13 +62,13 @@ namespace Bing.EasyPrint.CPCL
             AddBold(command, true);
 
             var computeFontSizeResult = Helper.ComputeFontSize(FontSize);
-            command.SetMag(computeFontSizeResult.scale, computeFontSizeResult.scale);
+            command.Writer.WriteLine($"SETMAG {computeFontSizeResult.scale} {computeFontSizeResult.scale}");
 
             AddText(command, computeFontSizeResult.font, computeFontSizeResult.size);
             AddInverseLine(command, computeFontSizeResult.size);
             AddBold(command, false);
             AddUnderline(command, false);
-            command.SetMag(0, 0);
+            command.Writer.WriteLine($"SETMAG 0 0");
         }
 
         /// <summary>
@@ -82,10 +82,10 @@ namespace Bing.EasyPrint.CPCL
                 return;
             if (isOpen)
             {
-                command.UnderlineOn();
+                command.Writer.WriteLine("UNDERLINE ON");
                 return;
             }
-            command.UnderlineOff();
+            command.Writer.WriteLine("UNDERLINE OFF");
         }
 
         /// <summary>
@@ -99,10 +99,10 @@ namespace Bing.EasyPrint.CPCL
                 return;
             if (isOpen)
             {
-                command.SetBold(1);
+                command.Writer.WriteLine("SETBOLD 1");
                 return;
             }
-            command.SetBold(0);
+            command.Writer.WriteLine("SETBOLD 0");
         }
 
         /// <summary>
@@ -113,24 +113,8 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="size">字体大小</param>
         private void AddText(CPCLPrintCommand command, int font, int size)
         {
-            switch (Rotate)
-            {
-                case 0:
-                    command.Text(font, size, X, Y, Text);
-                    break;
-                case 90:
-                    command.Text90(font, size, X, Y, Text);
-                    break;
-                case 180:
-                    command.Text180(font, size, X, Y, Text);
-                    break;
-                case 270:
-                    command.Text270(font, size, X, Y, Text);
-                    break;
-                default:
-                    command.Text(font, size, X, Y, Text);
-                    break;
-            }
+            var cmd = Helper.GetTextRotateCommand(Rotate);
+            command.Writer.WriteLine($"{cmd} {font} {size} {X} {Y} {Text}");
         }
 
         /// <summary>
@@ -142,7 +126,7 @@ namespace Bing.EasyPrint.CPCL
         {
             if (!Reverse)
                 return;
-            command.InverseLine(X, Y, X + size / 2 * Text.Length, Y, size);
+            command.Writer.WriteLine($"IL {X} {Y} {X + size / 2 * Text.Length} {Y} {size}");
         }
     }
 }

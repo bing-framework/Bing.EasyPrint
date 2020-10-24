@@ -239,5 +239,24 @@ namespace Bing.EasyPrint.CPCL
             }
             throw new NotImplementedException($"未实现条码类型 {type.ToString()} ");
         }
+
+        /// <summary>
+        /// 获取图片旋转命令
+        /// </summary>
+        /// <param name="rotate">旋转角度</param>
+        public static string GetImageRotateCommand(int rotate)
+        {
+            switch (rotate)
+            {
+                case 0:
+                case 180:
+                    return "EG";
+                case 90:
+                case 270:
+                    return "VEG";
+                default:
+                    return "EG";
+            }
+        }
     }
 }

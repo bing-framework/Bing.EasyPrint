@@ -85,9 +85,11 @@ namespace Bing.EasyPrint.CPCL
                 Items.ForEach(x => x.Build(this));
                 return Writer;
             }
-            InitCommand(CommandInfo.Offset, CommandInfo.Width, CommandInfo.Height, CommandInfo.Qty);
+
+            Writer.WriteLine($"! {CommandInfo.Offset} 200 200 {CommandInfo.Height} {CommandInfo.Qty}");
+            Writer.WriteLine($"PAGE-WIDTH {CommandInfo.Width}");
             Items.ForEach(x => x.Build(this));
-            Print();
+            Writer.WriteLine("PRINT");
             return Writer;
         }
     }

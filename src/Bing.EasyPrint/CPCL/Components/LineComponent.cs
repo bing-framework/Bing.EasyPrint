@@ -36,6 +36,6 @@ namespace Bing.EasyPrint.CPCL
         /// 构建
         /// </summary>
         /// <param name="command">打印命令</param>
-        public override void Build(CPCLPrintCommand command) => command.Line(X0, Y0, X1, Y1, Width);
+        public override void Build(CPCLPrintCommand command) => command.Writer.WriteLine($"LINE {X0} {Y0} {X1} {Y1} {Width}");
     }
 }

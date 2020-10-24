@@ -45,17 +45,10 @@ namespace Bing.EasyPrint.CPCL
         public override void Build(CPCLPrintCommand command)
         {
             var coordinate = Helper.GetBarcodeCoordinate(this);
-            switch (Rotate)
-            {
-                case 0:
-                case 180:
-                    command.QRCode(coordinate.x, coordinate.y, 2, Size, ErrorLevel, null, Text);
-                    break;
-                case 90:
-                case 270:
-                    command.VQRCode(coordinate.x, coordinate.y, 2, Size, ErrorLevel, null, Text);
-                    break;
-            }
+            var cmd = Helper.GetBarcodeRotateCommand(Rotate);
+            command.Writer.WriteLine($"{cmd} QR {coordinate.x} {coordinate.y} M 2 U {Size}");
+            command.Writer.WriteLine($"{ErrorLevel}A,{Text}");
+            command.Writer.WriteLine("ENDQR");
         }
     }
 }
