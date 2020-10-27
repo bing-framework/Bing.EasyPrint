@@ -96,5 +96,16 @@ namespace Bing.EasyPrint
         public static T DrawBarcode<T>(this IPrintComponent<T> component, int x, int y, string text, int lineWidth,
             int height, int ratio, RotationAngle rotation) where T : IPrintCommand<T> => component.DrawBarcode1D(BarcodeType.Code128, x, y, text,
             lineWidth, height, ratio, rotation);
+
+        /// <summary>
+        /// 画线
+        /// </summary>
+        /// <typeparam name="T">类型</typeparam>
+        /// <param name="component">打印组件</param>
+        /// <param name="x0">线条起始点x坐标</param>
+        /// <param name="y0">线条起始点y坐标</param>
+        /// <param name="x1">线条结束点x坐标</param>
+        /// <param name="y1">线条结束点y坐标</param>
+        public static T DrawLine<T>(this IPrintComponent<T> component, int x0, int y0, int x1, int y1) where T : IPrintCommand<T> => component.DrawLine(x0, y0, x1, y1, 1, LineStyle.Full);
     }
 }

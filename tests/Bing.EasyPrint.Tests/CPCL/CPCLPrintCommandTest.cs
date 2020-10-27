@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Bing.EasyPrint.CPCL;
+﻿using Bing.EasyPrint.CPCL;
 using Xunit.Abstractions;
 
 namespace Bing.EasyPrint.Tests.CPCL
@@ -38,7 +35,7 @@ namespace Bing.EasyPrint.Tests.CPCL
             Output.WriteLine("----------------------------- 调试命令-十六进制 ---------------------------------------");
             Output.WriteLine(result.ToHex());
             Output.WriteLine("----------------------------- 执行命令 ---------------------------------------");
-            //Print(result.GetBytes());
+            Print(result.GetBytes());
         }
     }
 }
