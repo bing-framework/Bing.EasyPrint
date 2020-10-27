@@ -1,0 +1,2754 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Bing.EasyPrint</name>
+    </assembly>
+    <members>
+        <member name="T:Bing.EasyPrint.Core.BufferWriter">
+            <summary>
+            缓冲区写入器
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._buffer">
+            <summary>
+            字节缓冲区
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._sources">
+            <summary>
+            原始命令
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._encoding">
+            <summary>
+            字符编码
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.#ctor(System.Text.Encoding)">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.Core.BufferWriter"/>类型的实例
+            </summary>
+            <param name="encoding">字符编码</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.Byte[])">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字节数组</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.String)">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字符串</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Clear">
+            <summary>
+            清空内容
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.GetBytes">
+            <summary>
+            获取二进制数组
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.ToString">
+            <summary>
+            输出字符串
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.Barcode1DComponent">
+            <summary>
+            一维条码组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.LineWidth">
+            <summary>
+            窄条的单位宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Ratio">
+            <summary>
+            宽条与窄条的比率
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Rotate">
+            <summary>
+            旋转角度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Text">
+            <summary>
+            条码内容
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Type">
+            <summary>
+            条码类型
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.X">
+            <summary>
+            条码起始x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.Barcode1DComponent.Y">
+            <summary>
+            条码起始y坐标
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Barcode1DComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.BoxComponent">
+            <summary>
+            矩形组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.BoxComponent.Width">
+            <summary>
+            线条宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.BoxComponent.X0">
+            <summary>
+            矩形框左上角x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.BoxComponent.X1">
+            <summary>
+            矩形框右下角x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.BoxComponent.Y0">
+            <summary>
+            矩形框左上角y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.BoxComponent.Y1">
+            <summary>
+            矩形框右下角y坐标
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.BoxComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.DashLineComponent">
+            <summary>
+            虚线组件
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.DashLineComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.ImageComponent">
+            <summary>
+            图片组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.Rotate">
+            <summary>
+            旋转角度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.X">
+            <summary>
+            图片起始x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.Y">
+            <summary>
+            图片起始y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.Data">
+            <summary>
+            图片数据
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ImageComponent.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.#ctor">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.ImageComponent"/>类型的实例
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.InitPosition(System.Int32,System.Int32)">
+            <summary>
+            初始化位置
+            </summary>
+            <param name="x">图片起始x坐标</param>
+            <param name="y">图片起始y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromFile(System.String)">
+            <summary>
+            通过文件路径创建图片组件
+            </summary>
+            <param name="fileUrl">文件地址</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromStream(System.IO.Stream)">
+            <summary>
+            通过流创建图片组件
+            </summary>
+            <param name="stream">流</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromBytes(System.Byte[])">
+            <summary>
+            通过字节数组创建图片组件
+            </summary>
+            <param name="bytes">字节数组</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromImage(System.Drawing.Image)">
+            <summary>
+            通过图片创建图片组件
+            </summary>
+            <param name="image">图片</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.GetImageData(System.Drawing.Image)">
+            <summary>
+            获取图片数据
+            </summary>
+            <param name="image">图片</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ToHex(System.Byte[])">
+            <summary>
+            转换为16进制
+            </summary>
+            <param name="data">数</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.LineComponent">
+            <summary>
+            线条组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.LineComponent.Width">
+            <summary>
+            线条宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.LineComponent.X0">
+            <summary>
+            线条起始点x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.LineComponent.X1">
+            <summary>
+            线条结束点x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.LineComponent.Y0">
+            <summary>
+            线条起始点y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.LineComponent.Y1">
+            <summary>
+            线条结束点y坐标
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.LineComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.QRCodeComponent">
+            <summary>
+            二维码组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.ErrorLevel">
+            <summary>
+            二维码纠错级别
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.Rotate">
+            <summary>
+            旋转角度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.Size">
+            <summary>
+            尺寸
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.X">
+            <summary>
+            二维码起始x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.Y">
+            <summary>
+            二维码起始y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.QRCodeComponent.Text">
+            <summary>
+            二维码内容
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.QRCodeComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.TextComponent">
+            <summary>
+            文本组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Bold">
+            <summary>
+            是否加粗
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.FontSize">
+            <summary>
+            字体大小
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.FontZoom">
+            <summary>
+            字体缩放
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Reverse">
+            <summary>
+            是否反显
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Rotate">
+            <summary>
+            旋转角度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Text">
+            <summary>
+            内容
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.X">
+            <summary>
+            文字起始x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Y">
+            <summary>
+            文字起始y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.TextComponent.Underline">
+            <summary>
+            是否下划线
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.TextComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.TextComponent.AddUnderline(Bing.EasyPrint.CPCL.CPCLPrintCommand,System.Boolean)">
+            <summary>
+            添加下划线
+            </summary>
+            <param name="command">打印命令</param>
+            <param name="isOpen">是否开标签</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.TextComponent.AddBold(Bing.EasyPrint.CPCL.CPCLPrintCommand,System.Boolean)">
+            <summary>
+            添加粗体
+            </summary>
+            <param name="command">打印命令</param>
+            <param name="isOpen">是否开标签</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.TextComponent.AddText(Bing.EasyPrint.CPCL.CPCLPrintCommand,System.Int32,System.Int32)">
+            <summary>
+            添加文本
+            </summary>
+            <param name="command">打印命令</param>
+            <param name="font">字体</param>
+            <param name="size">字体大小</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.TextComponent.AddInverseLine(Bing.EasyPrint.CPCL.CPCLPrintCommand,System.Int32)">
+            <summary>
+            添加黑白反显
+            </summary>
+            <param name="command">打印命令</param>
+            <param name="size">大小</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.CPCLCommandInfo">
+            <summary>
+            CPCL命令信息
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.HasBegin">
+            <summary>
+            是否已设置初始化页面信息
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.HasEnd">
+            <summary>
+            是否设置结尾信息。如：PRINT
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.Offset">
+            <summary>
+            偏移量。整个标签的横向偏移值
+            </summary>
+            <remarks>此值可以使所有域以指定的单位数量进行横向偏移</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.Height">
+            <summary>
+            高度。标签的最大高度。
+            </summary>
+            <remarks>
+            标签最大高度的计算方法是，先测出从第 1 个黑条（或标签间隙）底部到下一个黑条（或标签间隙）顶部之间的距离。
+            然后从中减去 1/16 英寸（1.5 毫米），所得结果即大高度。（以点为单位时：对于 203 d.p.i 打印机，减去 12 点；对于 306 d.p.i. 打印机，减去 18 点）
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.Qty">
+            <summary>
+            标签数量。打印标签数量
+            </summary>
+            <remarks>最大值 = 1024</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLCommandInfo.PagerRotate">
+            <summary>
+            纸张旋转角度
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.CPCLPrintCommand">
+            <summary>
+            CPCL 打印命令 - 高级指令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 条码指令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 基础指令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 组件
+            </summary>
+            <summary>
+            CPCL 打印命令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 图形指令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 二维条码指令
+            </summary>
+            <summary>
+            CPCL 打印命令 - 文本指令
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Contrast(System.Int32)">
+            <summary>
+            CONTRAST 命令
+            </summary>
+            <param name="level">对比度级别。<br />
+            0 - 默认值<br />
+            1 - 中<br />
+            2 - 暗<br />
+            3 - 非常暗
+            </param>
+            <remarks>CONTRAST 命令用于指定整个标签的打印黑度。亮的打印输出为对比度级别 0。暗的对比度级别为 3。打印 机在开机时的默认对比度级别为 0。必须为每个标签文件指定对比度级别。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Tone(System.Int32)">
+            <summary>
+            TONE 命令
+            </summary>
+            <param name="level">色调级别。选择介于 -99 到 200 之间的值</param>
+            <remarks>TONE 命令可用于替代 CONTRAST 命令来指定所有标签的打印黑度。亮的打印输出为色调级别 -99。暗的 色调级别为 200。打印机在开机时的默认色调级别为 0。色调级别设置在更改前对所有打印任务保持有效。TONE 和 CONTRAST 命令不能彼此组合使用。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Center(System.Nullable{System.Int32})">
+            <summary>
+            对齐命令 - 居中对齐
+            </summary>
+            <param name="end">对齐的结束点。如果未输入参数，则对于横向打印，对齐命令将使用打印头的宽度；而对于纵向打印，对 齐命令将使用零（页头）。 </param>
+            <remarks>使用对齐命令可以控制字段的对齐方式。默认情况下，打印机将左对齐所有字段。对齐命令将对所有后续字段保持 有效，直至指定了其他对齐命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Left">
+            <summary>
+            对齐命令 - 左对齐
+            </summary>
+            <remarks>使用对齐命令可以控制字段的对齐方式。默认情况下，打印机将左对齐所有字段。对齐命令将对所有后续字段保持 有效，直至指定了其他对齐命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Right(System.Nullable{System.Int32})">
+            <summary>
+            对齐命令 - 右对齐
+            </summary>
+            <param name="end">对齐的结束点。如果未输入参数，则对于横向打印，对齐命令将使用打印头的宽度；而对于纵向打印，对 齐命令将使用零（页头）。 </param>
+            <remarks>使用对齐命令可以控制字段的对齐方式。默认情况下，打印机将左对齐所有字段。对齐命令将对所有后续字段保持 有效，直至指定了其他对齐命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PageWidth(System.Int32)">
+            <summary>
+            PAGE-WIDTH 命令
+            </summary>
+            <param name="width">页面的单位宽度</param>
+            <remarks>打印机假定页面宽度为打印机的完整宽度。打印会话的大高度由页面宽度和可用打印内存决定。如果页面宽度小 于打印机的完整宽度，则用户可以通过指定页面宽度来增加大页面高度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Pace">
+            <summary>
+            PACE 命令
+            </summary>
+            <remarks>此命令可以与批量打印一起使用。在激活 PACE 后，用户必须按下打印机的 FEED（送纸）键才能打印其他标签， 直至完成批次数量。默认情况下，开机时定步功能处于禁用状态。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PaceAuto">
+            <summary>
+            AUTO-PACE 命令
+            </summary>
+            <remarks>此命令可用于指示配备了标签存在传感器的打印机延迟打印，直至取走了之前打印的标签。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PaceNo">
+            <summary>
+            NO-PACE 命令
+            </summary>
+            <remarks>如果打印机已处于 PACE 或 AUTO-PACE 模式，则此命令可取消 PACE 和 AUTO-PACE 模式。打印机在开机时默 认为 NO-PACE 模式。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Wait(System.Int32)">
+            <summary>
+            WAIT 命令
+            </summary>
+            <param name="delayTime">延迟时间。以 1/8 秒为单位</param>
+            <remarks>此命令用于在打印一个标签后引入一段延迟。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.RewindOn">
+            <summary>
+            REWIND 命令（开启）
+            </summary>
+            <remarks>此命令用于打开或关闭回卷（或卷纸）电机。打印机在开机时默认为 REWIND-ON。如果打印机没有配备电机驱动 的回卷机制，则将忽略 REWIND 命令。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.RewindOff">
+            <summary>
+            REWIND 命令（关闭）
+            </summary>
+            <remarks>此命令用于打开或关闭回卷（或卷纸）电机。打印机在开机时默认为 REWIND-ON。如果打印机没有配备电机驱动 的回卷机制，则将忽略 REWIND 命令。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.TensionPre(System.Int32)">
+            <summary>
+            TENSION 命令（打印标签之前）
+            </summary>
+            <param name="length">回卷电机用于收紧衬纸张力的单位长度。当张力调整到位后，回卷电机将滑动（不会为下一个打印周期 用尽所有调整余地）。</param>
+            <remarks>TENSION 命令用于在打印标签之前和/或之后，通过按预先指定的长度运行回卷电机来调整衬纸张力。对于配备 电机驱动的回卷机制的打印机，此调整操作可以改善剥离器的性能。如果打印机没有配备电机驱动的回卷机制，则将 忽略 TENSION 命令。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.TensionPost(System.Int32)">
+            <summary>
+            TENSION 命令（打印标签之后）
+            </summary>
+            <param name="length">回卷电机用于收紧衬纸张力的单位长度。当张力调整到位后，回卷电机将滑动（不会为下一个打印周期 用尽所有调整余地）。</param>
+            <remarks>TENSION 命令用于在打印标签之前和/或之后，通过按预先指定的长度运行回卷电机来调整衬纸张力。对于配备 电机驱动的回卷机制的打印机，此调整操作可以改善剥离器的性能。如果打印机没有配备电机驱动的回卷机制，则将 忽略 TENSION 命令。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Speed(System.Int32)">
+            <summary>
+            SPEED 命令
+            </summary>
+            <param name="level">电机的最高速度级别。一个介于 0 到 5 之间的数字，0 表示低速度。</param>
+            <remarks>此命令用于设置电机的高速度级别。每一款打印机型号都设置了低和高极限速度。SPEED 命令可以在 0 到 5 的范围内选择速度级别，0 表示低速度。为每一款打印机型号设置的高速度仅可在理想条件下达到。电池或供 电电压、材料厚度、打印黑度、是否使用贴标机、是否使用剥离器以及标签长度等诸多因素均会影响大极限打印速度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetSp(System.Int32)">
+            <summary>
+            SETSP 命令
+            </summary>
+            <param name="spacing">字符间的单位尺寸。间距的默认值为零。请注意，此命令受单位命令设置的影响。 </param>
+            <remarks>SETSP 命令用于更改文本字符之间的间距。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.UnderlineOn">
+            <summary>
+            UNDERLINE 命令（开启）
+            </summary>
+            <remarks>UNDERLINE 命令用于给文本加下划线。仅当所使用的字体支持下划线时，此命令才会起作用。如果所使用的字体不支 持 UNDERLINE，则将忽略此命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.UnderlineOff">
+            <summary>
+            UNDERLINE 命令（关闭）
+            </summary>
+            <remarks>UNDERLINE 命令用于给文本加下划线。仅当所使用的字体支持下划线时，此命令才会起作用。如果所使用的字体不支 持 UNDERLINE，则将忽略此命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.OnOutOfPaper(System.String,System.Int32)">
+            <summary>
+            ON-OUT-OF-PAPER 命令
+            </summary>
+            <param name="action">遇到错误操作。<br />
+            PURGE：当遇到打印错误时，在尝试指定的次数之后丢弃标签。<br />
+            WAIT：当遇到打印错误时不丢弃标签。在此模式下，打印机将等待更正错误，更正后才会执行下一打印尝试
+            </param>
+            <param name="retries">指定打印机应尝试打印标签的次数。</param>
+            <remarks>可以发出此命令来指示打印机在打印标签期间遇到错误（例如，纸张用完）时要采取的操作。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.OnFeed(System.String)">
+            <summary>
+            ON-FEED 命令
+            </summary>
+            <param name="action">遇到换页符(0x0c)或FEED(送纸)键操作。<br />
+            IGNORE：当按下 FEED（送纸）键或收到换页符时，不采取任何操作。<br />
+            FEED：当按下 FEED（送纸）键或收到换页符时，切换至下一页顶部。<br />
+            REPRINT：当按下 FEED（送纸）键或收到换页符时，重新打印上一标签。
+            </param>
+            <remarks>当按下 FEED（送纸）键或打印机收到换页符 (0x0c) 时，打印机可配置为忽略、换页或重新打印上一标签。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PreFeed(System.Int32)">
+            <summary>
+            PREFEED 命令
+            </summary>
+            <param name="length">打印机在打印之前将介质向前移动的单位长度</param>
+            <remarks>PREFEED 命令指示打印机在打印之前将介质向前移动指定长度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PostFeed(System.Int32)">
+            <summary>
+            POSTFEED 命令
+            </summary>
+            <param name="length">打印机在打印之后将介质向前移动的单位长度</param>
+            <remarks>POSTFEED 命令指示打印机在打印之后将介质向前移动指定长度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PreSentAt(System.Int32,System.Int32)">
+            <summary>
+            PRESEND-AT 命令
+            </summary>
+            <param name="length">打印之后介质向前移动以及打印下一标签之前介质回退的单位长度，以点行为单位</param>
+            <param name="delay">打印标签之后打印机在向前移动介质前等待的时间间隔。以 1/8 秒为单位递增。延迟“1”等价于 1/8 秒。延迟“4”等价于 1/2 秒，以此类推。</param>
+            <remarks>PRESENT-AT 命令可用于将介质定位到打印机的撕纸杆处或者操作人员可以轻松取走打印后的标签的位置。发出 PRESENT-AT 命令后，打印机将打印标签，然后在延迟一段时间后，将介质向前移动指定的距离。在开始新的打印作 业之前，打印机会将介质回退相同的距离。 “delay”参数用于在执行批量打印作业时，避免不必要的向前/回退操作。PRESENT-AT 命令可在标签文件中发 出，也可在实用工具命令会话(!UTILITIES…PRINT) 中发出。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Country(System.String)">
+            <summary>
+            COUNTRY 命令
+            </summary>
+            <param name="name">国家/地区名称</param>
+            <remarks>使用 COUNTRY 控制命令可以针对指定的国家/地区替代适当的字符集。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DefineFormat(System.String,System.String[])">
+            <summary>
+            DEFINE-FORMAT 命令
+            </summary>
+            <param name="name">格式文件名称。格式文件名可由不超过 8 个的字母或数字组成，格式文件扩展名可由不超过 3 个的字母或数字组成。格式文件名 或扩展名中的所有小写字母将转换为大写字母。</param>
+            <param name="data">数据</param>
+            <remarks>DEFINE-FORMAT 和 USE-FORMAT 命令分别用于标识格式和数据。 使用格式文件可以避免为打印的每个标签重新发送相同的格式信息。通过使用预加载的格式，只需向打印机发送 变量数据（例如描述、价格等）<br />
+            使用“\\”（双反斜杠）作为数据的占位符。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.UseFormat(System.String,System.Object[])">
+            <summary>
+            USE-FORMAT 命令
+            </summary>
+            <param name="name">格式文件名称。格式文件名可由不超过 8 个的字母或数字组成，格式文件扩展名可由不超过 3 个的字母或数字组成。格式文件名 或扩展名中的所有小写字母将转换为大写字母。</param>
+            <param name="data">变量数据</param>
+            <remarks>USE-FORMAT（或 UF）命令指示打印机使用指定的格式文件。   将使用该格式文件以及 USE-FORMAT 命令后面 提供的数据创建标签。在访问指定的格式文件后，打印机将使用所提供的数据替代“\\”分隔符，从而生成所需的标签。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Beep(System.Int32)">
+            <summary>
+            BEEP 命令
+            </summary>
+            <param name="length">蜂鸣持续时间，以 1/8 秒为单位递增指定。 </param>
+            <remarks>此命令用于指示打印机让蜂鸣器发出给定时间长度的声音。未配备蜂鸣器的打印机将忽略此命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Cut">
+            <summary>
+            CUT 命令
+            </summary>
+            <remarks>在配备有切纸器的打印机上，使用此命令可在打印标签之后裁切标签。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.PartialCut">
+            <summary>
+            PARTIAL-CUT 命令
+            </summary>
+            <remarks>在配备有切纸器的打印机上，使用此命令可在打印标签之后裁切标签，保留部分标签不进行裁切以便可以轻松撕 开标签剩余部分。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.CutAt(System.Int32)">
+            <summary>
+            CUT-AT 命令
+            </summary>
+            <param name="length">在执行裁切或部分裁切操作之后，纸张应回退的单位长度。</param>
+            <remarks>在配备有切纸器的打印机上，此命令与 CUT 或 PARTIAL-CUT 命令结合使用。此命令可指示打印机按指定长度回 退纸张。未配备切纸器的打印机将忽略此命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Barcode(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            BARCODE 命令（横向）
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="width">窄条的单位宽度</param>
+            <param name="ratio">宽度与窄条的比率</param>
+            <param name="height">条码的单位高度</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">条码数据</param>
+            <remarks>BARCODE 命令能够以指定的宽度和高度纵向和横向打印条码。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VBarcode(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            VBARCODE 命令（纵向）
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="width">窄条的单位宽度</param>
+            <param name="ratio">宽度与窄条的比率</param>
+            <param name="height">条码的单位高度</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">条码数据</param>
+            <remarks>BARCODE 命令能够以指定的宽度和高度纵向和横向打印条码。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.BarcodeText(System.String,System.Int32,System.Int32)">
+            <summary>
+            BARCODE-TEXT 命令（开启）
+            </summary>
+            <param name="font">注释条码时要使用的字体号</param>
+            <param name="size">注释条码时要使用的字体大小</param>
+            <param name="offset">文本距离条码的单位偏移量</param>
+            <remarks>
+            BARCODE-TEXT 命令用于通过创建条码时所用的相同数据来标记条码。这项命令避免了使用单独文本命令注释 条码的必要。文本位于条码下方的中间位置。<br />
+            使用 BARCODE-TEXT OFF（或 BT OFF）可以禁用它。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.BarcodeTextOff">
+            <summary>
+            BARCODE-TEXT 命令（关闭）
+            </summary>
+            <remarks>
+            BARCODE-TEXT 命令用于通过创建条码时所用的相同数据来标记条码。这项命令避免了使用单独文本命令注释 条码的必要。文本位于条码下方的中间位置。<br />
+            使用 BARCODE-TEXT OFF（或 BT OFF）可以禁用它。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.BarcodeRss(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.String)">
+            <summary>
+            BARCODE-RSS 命令
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="width">最窄元素的单位宽度</param>
+            <param name="linHeight">条码线性部分的高度</param>
+            <param name="sepHeight">分隔符的高度</param>
+            <param name="segments">每行的段数</param>
+            <param name="subType">RSS/复合子类型</param>
+            <param name="dataLine">线性数据</param>
+            <param name="data2D">2D数据</param>
+            <remarks>缩减码型(RSS) 涵盖一系列线性符号，旨在为用户解决特定空间限制和应用需求提供相应功能。RSS 多支持 74 个数据字符的编码。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.InitCommand(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            初始化命令
+            </summary>
+            <param name="offset">标签横向偏移量</param>
+            <param name="width">标签宽度</param>
+            <param name="height">标签高度</param>
+            <param name="qty">打印标签数量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Print">
+            <summary>
+            PRINT 命令
+            </summary>
+            <remarks>PRINT 命令作为整个命令集的结束命令，将会启动文件打印。在任何情况下（行式打印模式除外），这项命令都必 须是后一条命令。执行 PRINT 命令时，打印机将从控制会话中退出。确保使用回车和换行字符结束此项及所有命令。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Encoding(System.String)">
+            <summary>
+            ENCODING 命令
+            </summary>
+            <param name="encoding">编码。<br/>
+            ASCII<br/>
+            UTF-8<br/>
+            GB18030
+            </param>
+            <remarks>ENCODING 控制命令可以指定要发送到打印机的数据的编码形式。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Form">
+            <summary>
+            FORM 命令
+            </summary>
+            <remarks>FORM 命令可以指示打印机在一页打印结束后切换至下一页顶部。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Journal">
+            <summary>
+            JOURNAL 命令
+            </summary>
+            <remarks>默认情况下，如果在打印周期期间（LABEL 模式）发现明显标记（介质背面的黑色水平条），则打印机会检查介质对 齐情况是否正确。必要时，可以使用  JOURNAL 命令禁用自动校正功能。用户程序负责在 JOURNAL 模式下进行检 查并确保有纸。有关检查缺纸条件的详细信息，请参阅状态询问命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetPage(System.Int32,System.Int32,Bing.EasyPrint.PrintOrientation)">
+            <summary>
+            设置纸张
+            </summary>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+            <param name="orientation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetPage(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            设置纸张
+            </summary>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+            <param name="orientation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetQty(System.Int32)">
+            <summary>
+            设置打印标签数
+            </summary>
+            <param name="qty">打印标签数量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetOffset(System.Int32)">
+            <summary>
+            设置标签横向偏移量
+            </summary>
+            <param name="offset">偏移量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.LineStyle)">
+            <summary>
+            画线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+            <param name="lineStyle">线条样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawDashLine(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画虚线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawDashLine(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画虚线
+            </summary>
+            <param name="x">线条点x坐标</param>
+            <param name="y">线条点y坐标</param>
+            <param name="length">线条长度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画矩形
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.LineStyle)">
+            <summary>
+            画矩形
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+            <param name="lineStyle">线条样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawRectFill(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画矩形（填充）
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawBarcode1D(System.String,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawBarcode1D(System.Int32,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawBarcode1D(Bing.EasyPrint.BarcodeType,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.RotationAngle)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,System.String,System.Int32)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawQrCode(System.Int32,System.Int32,System.String,Bing.EasyPrint.QrCodeUnitSize,Bing.EasyPrint.QrCodeCorrectionLevel,Bing.EasyPrint.RotationAngle)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,System.Drawing.Bitmap)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="bitmap">图片数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,System.String)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="imageUrl">图片地址</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,System.Byte[])">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="bytes">图片数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,System.IO.Stream)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="stream">图片流</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            画文字
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="bold">是否加粗</param>
+            <param name="reverse">是否颠倒</param>
+            <param name="underline">是否下划线</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画文字
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="style">样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawText(System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize,Bing.EasyPrint.RotationAngle,Bing.EasyPrint.TextStyle)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawTextArea(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+            <param name="height">文字绘制区域高度(可以为0)</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawTextArea(System.Int32,System.Int32,System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize,Bing.EasyPrint.RotationAngle,Bing.EasyPrint.TextStyle)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+            <param name="height">文字绘制区域高度(可以为0)</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.Writer">
+            <summary>
+            缓冲区写入器
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.Items">
+            <summary>
+            元数据列表
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.CommandInfo">
+            <summary>
+            CPCL命令信息
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.#ctor">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.CPCLPrintCommand"/>类型的实例
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.#ctor(System.Text.Encoding)">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.CPCLPrintCommand"/>类型的实例
+            </summary>
+            <param name="encoding">编码方式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Init(System.Int32,System.Int32)">
+            <summary>
+            初始化
+            </summary>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.WriteRaw(System.String)">
+            <summary>
+            写入命令
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.WriteRawLine(System.String)">
+            <summary>
+            写入命令并换行
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Build">
+            <summary>
+            构建命令
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            BOX 命令
+            </summary>
+            <param name="x0">左上角的 X 坐标</param>
+            <param name="y0">左上角的 Y 坐标</param>
+            <param name="x1">右下角的 X 坐标</param>
+            <param name="y1">右下角的 Y 坐标</param>
+            <param name="width">形成矩形框的线条的单位宽度。</param>
+            <remarks>用户可以使用 BOX 命令生成具有指定线条宽度的矩形。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            LINE 命令
+            </summary>
+            <param name="x0">左上角的 X 坐标</param>
+            <param name="y0">左上角的 Y 坐标</param>
+            <param name="x1">水平轴的右上角、垂直轴的左下角</param>
+            <param name="y1">水平轴的右上角、垂直轴的左下角</param>
+            <param name="width">线条的单位宽度</param>
+            <remarks>使用 LINE 命令可以绘制任何长度、宽度和角度方向的线条。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.InverseLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            INVERSE-LINE 命令
+            </summary>
+            <param name="x0">左上角的 X 坐标</param>
+            <param name="y0">左上角的 Y 坐标</param>
+            <param name="x1">水平轴的右上角、垂直轴的左下角</param>
+            <param name="y1">水平轴的右上角、垂直轴的左下角</param>
+            <param name="width">反转线的单位宽度</param>
+            <remarks>
+            INVERSE-LINE 命令的语法与 LINE 命令相同。
+            位于 INVERSE-LINE 命令所定义区域内的以前创建的对象的黑色区域将重绘为白色，白色区域将重绘为黑色。<br />
+            这些对象可以包括文本、条码和/或图形（包括下载的.pcx 文件）。<br />
+            INVERSE-LINE 对在其之后创建的对象不起作用，即使这些对象位于该命令的覆盖区域内也是如此。<br />
+            在示例 INVERSE2.LBL 中，在 INVERSE-LINE 命令之后创建的文本字段部分仍然为黑色，因此不可见，即使被放置在 INVERSE-LINE 区域内也是如此。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Pattern(System.Int32)">
+            <summary>
+            PATTERN 命令
+            </summary>
+            <param name="number">填充模式。<br/>
+            100 - 填充（实心黑色/默认模式）<br/>
+            101 - 水平线<br/>
+            102 - 垂直线<br/>
+            103 - 向右上升的对角线<br/>
+            104 - 向左上升的对角线<br/>
+            105 - 正方形图案<br/>
+            106 - 剖面线图案<br/>
+            </param>
+            <returns></returns>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.ExpandedGraphics(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            图形命令 - EXPANDED-GRAPHICS（横向打印扩展图形）
+            </summary>
+            <param name="width">图像的宽度（以字节为单位）</param>
+            <param name="height">图形的高度（以点位单位）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">图形数据</param>
+            <remarks>
+            可以使用图形命令打印位映射图形。扩展图形数据使用 ASCII 十六进制字符来表示（参见示例）。通过对十六进制 数据的等效二进制字符使用 COMPRESSED-GRAPHICS 命令，可以将数据大小减半。如果使用 CG，对于每 8 位图 形数据，将会发送一个 8 位字符。如果使用 EG，将使用两个字符（16 位）来传输 8 位图形数据，因此 EG 的效率会 减半。   但是由于该数据是字符数据，因此比二进制数据更容易处理和传输。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VExpandedGraphics(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            图形命令 - VEXPANDED-GRAPHICS（纵向打印扩展图形）
+            </summary>
+            <param name="width">图像的宽度（以字节为单位）</param>
+            <param name="height">图形的高度（以点位单位）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">图形数据</param>
+            <remarks>
+            可以使用图形命令打印位映射图形。扩展图形数据使用 ASCII 十六进制字符来表示（参见示例）。通过对十六进制 数据的等效二进制字符使用 COMPRESSED-GRAPHICS 命令，可以将数据大小减半。如果使用 CG，对于每 8 位图 形数据，将会发送一个 8 位字符。如果使用 EG，将使用两个字符（16 位）来传输 8 位图形数据，因此 EG 的效率会 减半。   但是由于该数据是字符数据，因此比二进制数据更容易处理和传输。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.CompressedGraphics(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            图形命令 - COMPRESSED-GRAPHICS（横向打印压缩图形）
+            </summary>
+            <param name="width">图像的宽度（以字节为单位）</param>
+            <param name="height">图形的高度（以点位单位）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">图形数据</param>
+            <remarks>
+            可以使用图形命令打印位映射图形。扩展图形数据使用 ASCII 十六进制字符来表示（参见示例）。通过对十六进制 数据的等效二进制字符使用 COMPRESSED-GRAPHICS 命令，可以将数据大小减半。如果使用 CG，对于每 8 位图 形数据，将会发送一个 8 位字符。如果使用 EG，将使用两个字符（16 位）来传输 8 位图形数据，因此 EG 的效率会 减半。   但是由于该数据是字符数据，因此比二进制数据更容易处理和传输。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VCompressedGraphics(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            图形命令 - VCOMPRESSED-GRAPHICS（横向打印压缩图形）
+            </summary>
+            <param name="width">图像的宽度（以字节为单位）</param>
+            <param name="height">图形的高度（以点位单位）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">图形数据</param>
+            <remarks>
+            可以使用图形命令打印位映射图形。扩展图形数据使用 ASCII 十六进制字符来表示（参见示例）。通过对十六进制 数据的等效二进制字符使用 COMPRESSED-GRAPHICS 命令，可以将数据大小减半。如果使用 CG，对于每 8 位图 形数据，将会发送一个 8 位字符。如果使用 EG，将使用两个字符（16 位）来传输 8 位图形数据，因此 EG 的效率会 减半。   但是由于该数据是字符数据，因此比二进制数据更容易处理和传输。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Pdf417(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 PDF417（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="width">窄元素的单位宽度。范围介于 1 至 32 之间，默认值为 2。</param>
+            <param name="height">窄元素的单位高度。范围介于 1 至 32 之间，默认值为 6。</param>
+            <param name="col">要使用的列数。数据列不包括起始/终止字符和左/右指示符。范围介于 1 至 30 之间，默认值为 3</param>
+            <param name="safeLevel">安全级别，指示要检测和/或纠正的大错误量。范围介于 0 至 8 之间，默认值为 1。</param>
+            <param name="data">条码数据</param>
+            <remarks>
+            PDF417 条码是一种二维条码，这种条码可以在狭小的空间里包含数量巨大的数据。
+            仔细观察 PDF417 条码，您会 发现其实它是由较小的条码堆叠而成。
+            堆叠的数量和高度由用户控制。这类条码可以包含整个 ASCII 255 字符集，并能使用不同的编码方案和不同的纠错安全级别。大数据编码量为 2725 个字符
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VPdf417(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 PDF417（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="width">窄元素的单位宽度。范围介于 1 至 32 之间，默认值为 2。</param>
+            <param name="height">窄元素的单位高度。范围介于 1 至 32 之间，默认值为 6。</param>
+            <param name="col">要使用的列数。数据列不包括起始/终止字符和左/右指示符。范围介于 1 至 30 之间，默认值为 3</param>
+            <param name="safeLevel">安全级别，指示要检测和/或纠正的大错误量。范围介于 0 至 8 之间，默认值为 1。</param>
+            <param name="data">条码数据</param>
+            <remarks>
+            PDF417 条码是一种二维条码，这种条码可以在狭小的空间里包含数量巨大的数据。
+            仔细观察 PDF417 条码，您会 发现其实它是由较小的条码堆叠而成。
+            堆叠的数量和高度由用户控制。这类条码可以包含整个 ASCII 255 字符集，并能使用不同的编码方案和不同的纠错安全级别。大数据编码量为 2725 个字符
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Maxicode(System.Int32,System.Int32,System.ValueTuple{System.String,System.String}[])">
+            <summary>
+            二维条码命令 MAXICODE
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数：标签-数据</param>
+            <remarks>Maxicode 条码现在可以处理 UPS 定义的所有符号以及标准代码支持的基本字段。Maxicode 支持所有标准的可 打印字符，并能够自动将次级消息中的所有小写字母转换为大写字母。本修订版手册仅介绍了 Mode 2 条码。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.QRCodeRaw(System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 QRCode（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="data">提供生成 QR Code 所需的信息。需要录入二维自定义信息</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VQRCodeRaw(System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 QRCode（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="data">提供生成 QR Code 所需的信息。需要录入二维自定义信息</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.QRCode(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Nullable{System.Int32},System.String)">
+            <summary>
+            二维条码命令 QRCode（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="errorCorrectionLevel">纠错级别。如：H、Q、M、L</param>
+            <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
+            <param name="data">二维码信息</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VQRCode(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Nullable{System.Int32},System.String)">
+            <summary>
+            二维条码命令 QRCode（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="errorCorrectionLevel">纠错级别。如：H、Q、M、L</param>
+            <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
+            <param name="data">二维码信息</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.QRCodeManual(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Nullable{System.Int32},System.ValueTuple{System.String,System.String}[])">
+            <summary>
+            二维条码命令 QRCode（横向）手动
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="errorCorrectionLevel">纠错级别。如：H、Q、M、L</param>
+            <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
+            <param name="param">参数：字符模式符(N、A、Bxxxx、K)）-数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VQRCodeManual(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Nullable{System.Int32},System.ValueTuple{System.String,System.String}[])">
+            <summary>
+            二维条码命令 QRCode（纵向）手动
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="model">QR Code规范编号。选项是 1 或 2。QR Code Model 1 是原始规范，而 QR Code Model 2 则是该符号 的经过增强后的形式。Model 2 提供了附加功能，而且可以自动与 Model 1 进行区分。Model 2 为推荐规范，是 默认值。</param>
+            <param name="widthWithHeight">模块的单位宽度/单位高度。范围是 1 至 32。默认值为 6。</param>
+            <param name="errorCorrectionLevel">纠错级别。如：H、Q、M、L</param>
+            <param name="maskNo">掩码号。可能会省略，也可能具有一个值（介于 0 至 8 之间）</param>
+            <param name="param">参数：字符模式符(N、A、Bxxxx、K)）-数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Aztec(System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 Aztec（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="width">最窄元素的单位宽度（以点位单位）。默认值为 6。</param>
+            <param name="errorCorrectionPercentage">纠错参数（0-99）。默认值为 0（默认纠错百分比）。</param>
+            <param name="data">条码数据</param>
+            <returns></returns>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VAztec(System.Int32,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            二维条码命令 Aztec（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="width">最窄元素的单位宽度（以点位单位）。默认值为 6。</param>
+            <param name="errorCorrectionPercentage">纠错参数（0-99）。默认值为 0（默认纠错百分比）。</param>
+            <param name="data">条码数据</param>
+            <returns></returns>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>横向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text(System.String,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>横向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text90(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT90 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转90度，横向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text90(System.String,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT90 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转90度，横向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text180(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT180 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转180度，反转打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text180(System.String,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT180 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转180度，反转打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text270(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT270 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转270度，纵向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text270(System.String,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            TEXT270 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转270度，纵向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VText(System.String,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            VTEXT 命令
+            </summary>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>逆时针旋转90度，纵向打印文本。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.FontGroup(System.Int32,System.ValueTuple{System.String,System.Int32}[])">
+            <summary>
+            FONT-GROUP 命令
+            </summary>
+            <param name="fg">字体组编号。最多可指定10个字体组。有效字体组范围是0至9.</param>
+            <param name="param">字体名称/编号-字体的大小标识</param>
+            <remarks>字体组。
+            使用  FG 命令，用户可以将多 10 个预缩放字体文件分至一个组。然后，用户可在 TEXT 命令中指定字体组。如果 文本命令中使用了字体组，则打印机将使用字体组中指定的大字体，这将生成所需的文本数据，并仍保留在文本 标签的可用宽度范围内。在 TEXT 命令中进行指定时，{font} 参数将指定为 FG，而 {size} 参数则指定为 {fg}。请注 意，用户还可以在 CONCAT/ENCONCAT 命令中指定 FG 命令。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Concat(System.Int32,System.Int32,System.String[])">
+            <summary>
+            CONCAT 文本串联命令（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数格式：字体名称-字体大小-偏移量-文本</param>
+            <remarks>使用文本串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。这项命令可以与可缩 放字体组合使用。请参见可缩放串联命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Concat(System.Int32,System.Int32,System.ValueTuple{System.String,System.Int32,System.Int32,System.String}[])">
+            <summary>
+            CONCAT 文本串联命令（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数格式：字体名称-字体大小-偏移量-文本</param>
+            <remarks>使用文本串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。这项命令可以与可缩 放字体组合使用。请参见可缩放串联命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VConcat(System.Int32,System.Int32,System.String[])">
+            <summary>
+            VCONCAT 文本串联命令（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数格式：字体名称-字体大小-偏移量-文本</param>
+            <remarks>使用文本串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。这项命令可以与可缩 放字体组合使用。请参见可缩放串联命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VConcat(System.Int32,System.Int32,System.ValueTuple{System.String,System.Int32,System.Int32,System.String}[])">
+            <summary>
+            VCONCAT 文本串联命令（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数格式：字体名称-字体大小-偏移量-文本</param>
+            <remarks>使用文本串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。这项命令可以与可缩 放字体组合使用。请参见可缩放串联命令。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.MultiLine(System.Int32,System.String,System.String,System.Int32,System.Int32,System.Int32,System.String[])">
+            <summary>
+            MULTILINE 命令
+            </summary>
+            <param name="height">每行文本的单位高度</param>
+            <param name="textCmd">文本命令，TEXT、VTEXT</param>
+            <param name="font">字体名称/编号</param>
+            <param name="size">字体的大小标识</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>使用 MULTILINE (ML)，可以以相同字体和行高打印多行文本。 </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Count(System.Int32)">
+            <summary>
+            COUNT 命令
+            </summary>
+            <param name="count">递增值。任何整数值都不能超过20个字符。如果希望减小 TEXT/BARCODE 值，则可以在值前添加“-”符号。输出结果中将保值前导零。</param>
+            <remarks>
+            COUNT 命令可以用于打印多个标签，其中条码中编码的数字文本域或数字数据将针对每个标签依次递增或者递减。TEXT/BARCODE 命令字符串必须包含此数字数据，将其作为字符串的后若干字符。数字数据部分多可以包 含 20 个字符，且可以以‘-’符号作为前缀。增加或减少数字数据时不能以‘0’为增量或减量。前导零将予以保留。一个标签文件中多可使用三个 COUNT 命令。 递增/递减的数字数据包含在 TEXT 或 BARCODE 命令中，后面紧跟 COUNT 命令。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetMag(System.Int32,System.Int32)">
+            <summary>
+            SETMAG 命令。设置字体放大倍数
+            </summary>
+            <param name="w">字体的宽度放大倍数。有效放大倍数为1到16。</param>
+            <param name="h">字体的高度放大倍数。有效放大倍数为1到16。</param>
+            <remarks>
+            SETMAG 命令可将常驻字体放大指定的放大倍数。<br/>
+            SETMAG 命令在标签打印后仍保持有效。这意味着要打印的下一标签将使用近设置的 SETMAG 值。要取消 SETMAG 值并使打印机可以 使用默认字体大小，请使用 SETMAG 命令，且放大倍数为 0,0。 
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.ScalableText(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            SCALABLE-TEXT 命令（横向）
+            </summary>
+            <param name="name">字体名称。缩放字体</param>
+            <param name="width">字体宽度（点大小）</param>
+            <param name="height">字体高度（点大小）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>使用可缩放文本，用户可以打印任何字体大小的文本。通过指定 X 和 Y 两个方向上的字体大小，可以生成宽度或 高度经过“缩放”的字符。指定的字体大小和生成的文本将以 72 点，即 1 英寸（25.4 毫米）打印出来</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VScalableText(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            VSCALABLE-TEXT 命令（纵向）
+            </summary>
+            <param name="name">字体名称。缩放字体</param>
+            <param name="width">字体宽度（点大小）</param>
+            <param name="height">字体高度（点大小）</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>使用可缩放文本，用户可以打印任何字体大小的文本。通过指定 X 和 Y 两个方向上的字体大小，可以生成宽度或 高度经过“缩放”的字符。指定的字体大小和生成的文本将以 72 点，即 1 英寸（25.4 毫米）打印出来</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.ScaleToFit(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            SCALE-TO-FIT 命令（横向）
+            </summary>
+            <param name="name">字体名称。缩放字体</param>
+            <param name="width">窗口的单位宽度</param>
+            <param name="height">窗口的单位高度</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>SCALE-TO-FIT 命令可自动计算文本的比例，确保文本不超出窗口范围。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VScaleToFit(System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            SCALE-TO-FIT 命令（纵向）
+            </summary>
+            <param name="name">字体名称。缩放字体</param>
+            <param name="width">窗口的单位宽度</param>
+            <param name="height">窗口的单位高度</param>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="data">要打印的文本</param>
+            <remarks>SCALE-TO-FIT 命令可自动计算文本的比例，确保文本不超出窗口范围。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.ScalableConcat(System.Int32,System.Int32,System.ValueTuple{System.String,System.Int32,System.Int32,System.Int32,System.String}[])">
+            <summary>
+            SCALABLE-CONCATENATION 命令（横向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数：字体名称-字体宽度-字体高度-偏移量-文本</param>
+            <remarks>使用可缩放串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。可缩放和位图文本 组合到 CONCAT/ENCONCAT 命令中</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.VScalableConcat(System.Int32,System.Int32,System.ValueTuple{System.String,System.Int32,System.Int32,System.Int32,System.String}[])">
+            <summary>
+            SCALABLE-CONCATENATION 命令（纵向）
+            </summary>
+            <param name="x">横向起始位置</param>
+            <param name="y">纵向起始位置</param>
+            <param name="param">参数：字体名称-字体宽度-字体高度-偏移量-文本</param>
+            <remarks>使用可缩放串联，可以为字符串分配不同的字符样式，在同一文本行上使用统一间距进行打印。可缩放和位图文本 组合到 CONCAT/ENCONCAT 命令中</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Rotate(System.Int32)">
+            <summary>
+            ROTATE 命令
+            </summary>
+            <param name="angle">旋转角度</param>
+            <remarks>ROTATE 命令用于以指定角度旋转所有后续可缩放文本域。旋转方向为以文本中心点为中心逆时针。在发出下一个 ROTATE 命令前，前一个旋转一直有效。默认角度为零度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.SetBold(System.Int32)">
+            <summary>
+            SETBOLD 命令
+            </summary>
+            <param name="value">值。介于 0 到 5 之间的偏移量。</param>
+            <remarks>SETBOLD 命令可使文本加粗并且稍微加宽。SETBOLD 命令会采用一个操作数来设置文本变黑的程度。</remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.Helper">
+            <summary>
+            命令生成辅助操作
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetTextRotateCommand(System.Int32)">
+            <summary>
+            获取文本旋转命令
+            </summary>
+            <param name="rotate">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.ComputeFontSize(System.Int32)">
+            <summary>
+            计算字体大小
+            </summary>
+            <param name="fontSize">字体大小</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.ConvertStyle(System.Int32)">
+            <summary>
+            转换样式
+            </summary>
+            <param name="style">样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetBarcodeRotateCommand(System.Int32)">
+            <summary>
+            获取条码旋转命令
+            </summary>
+            <param name="rotate">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetBarcodeCoordinate(Bing.EasyPrint.CPCL.Barcode1DComponent)">
+            <summary>
+            获取条码起始坐标
+            </summary>
+            <param name="item">条码明细</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetBarcodeCoordinate(Bing.EasyPrint.CPCL.QRCodeComponent)">
+            <summary>
+            获取条码起始坐标
+            </summary>
+            <param name="item">二维码明细</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetBarcodeCoordinate(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            获取条码起始坐标
+            </summary>
+            <param name="rotate">旋转角度</param>
+            <param name="x">x轴起始坐标</param>
+            <param name="y">y轴起始坐标</param>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.ConvertErrorLevel(System.Int32)">
+            <summary>
+            转换二维码纠错级别
+            </summary>
+            <param name="level">二维码纠错级别</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.IsChinese(System.Char)">
+            <summary>
+            是否中文字符串
+            </summary>
+            <param name="value">值</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.ConvertBarcodeType(Bing.EasyPrint.BarcodeType)">
+            <summary>
+            转换条码类型
+            </summary>
+            <param name="type">条码类型</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetImageRotateCommand(System.Int32)">
+            <summary>
+            获取图片旋转命令
+            </summary>
+            <param name="rotate">旋转角度</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.ComponentMetadata">
+            <summary>
+            组件 - 元数据
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.ComponentMetadata.MetadataType">
+            <summary>
+            元数据类型
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.MetadataBase">
+            <summary>
+            元数据基类
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.MetadataBase.MetadataType">
+            <summary>
+            元数据类型
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.MetadataBase.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.MetadataType">
+            <summary>
+            元数据类型
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.CPCL.MetadataType.Raw">
+            <summary>
+            命令
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.CPCL.MetadataType.Component">
+            <summary>
+            组件
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.RawMetadata">
+            <summary>
+            命令 - 元数据
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.RawMetadata.MetadataType">
+            <summary>
+            元数据类型
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.RawMetadata.Raw">
+            <summary>
+            命令
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.RawMetadata.NewLine">
+            <summary>
+            是否换行
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.RawMetadata.#ctor(System.String)">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.RawMetadata"/>类型的实例
+            </summary>
+            <param name="raw">原始命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.RawMetadata.#ctor(System.String,System.Boolean)">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.RawMetadata"/>类型的实例
+            </summary>
+            <param name="raw">命令</param>
+            <param name="newLine">是否换行</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.RawMetadata.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.DefaultEasyPrint">
+            <summary>
+            默认简单打印
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.DefaultEasyPrint.CreateCommand``1">
+            <summary>
+            创建打印命令
+            </summary>
+            <typeparam name="T">打印命令类型</typeparam>
+        </member>
+        <member name="T:Bing.EasyPrint.BarcodeType">
+            <summary>
+            条码类型
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code128">
+            <summary>
+            CODE 128
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code39">
+            <summary>
+            CODE 39
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code93">
+            <summary>
+            CODE 93
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Codabar">
+            <summary>
+            Codabar
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Ean8">
+            <summary>
+            EAN-8
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Ean13">
+            <summary>
+            EAN-13
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.UpcA">
+            <summary>
+            UPC-A
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.UpcE">
+            <summary>
+            UPC-E
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.I2OF5">
+            <summary>
+            I2OF5
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.I2OF5C">
+            <summary>
+            I2OF5C
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.I2OF5G">
+            <summary>
+            I2OF5G
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.UccEan128">
+            <summary>
+            UCCEAN128
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Msi">
+            <summary>
+            MSI
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Postnet">
+            <summary>
+            POSTNET
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Fim">
+            <summary>
+            FIM
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.FontSize">
+            <summary>
+            字体大小
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size16">
+            <summary>
+            16号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size24">
+            <summary>
+            24号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size32">
+            <summary>
+            32号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size48">
+            <summary>
+            48号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size64">
+            <summary>
+            64号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size72">
+            <summary>
+            72号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size80">
+            <summary>
+            80号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size96">
+            <summary>
+            96号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size112">
+            <summary>
+            112号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size120">
+            <summary>
+            120号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size128">
+            <summary>
+            128号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size144">
+            <summary>
+            144号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size160">
+            <summary>
+            160号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size168">
+            <summary>
+            168号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size176">
+            <summary>
+            176号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size192">
+            <summary>
+            192号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size208">
+            <summary>
+            208号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size216">
+            <summary>
+            216号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size224">
+            <summary>
+            224号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size240">
+            <summary>
+            240号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size256">
+            <summary>
+            256号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size264">
+            <summary>
+            264号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size288">
+            <summary>
+            288号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size312">
+            <summary>
+            312号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size336">
+            <summary>
+            336号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size360">
+            <summary>
+            360号字体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.FontSize.Size384">
+            <summary>
+            384号字体
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.LineStyle">
+            <summary>
+            线条样式
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.LineStyle.Full">
+            <summary>
+            实线
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.LineStyle.Dotted">
+            <summary>
+            虚线
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintColor">
+            <summary>
+            打印颜色
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintColor.Black">
+            <summary>
+            黑字白底
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintColor.White">
+            <summary>
+            白字黑底
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintOrientation">
+            <summary>
+            打印方向
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintOrientation.None">
+            <summary>
+            正常
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintOrientation.Down">
+            <summary>
+            下
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintOrientation.Left">
+            <summary>
+            左
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintOrientation.Right">
+            <summary>
+            右
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.QrCodeCorrectionLevel">
+            <summary>
+            二维码纠错级别
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeCorrectionLevel.L">
+            <summary>
+            7%的字码可被修正
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeCorrectionLevel.M">
+            <summary>
+            15%的字码可被修正
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeCorrectionLevel.Q">
+            <summary>
+            25%的字码可被修正
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeCorrectionLevel.H">
+            <summary>
+            30%的字码可被修正
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.QrCodeUnitSize">
+            <summary>
+            二维码单位尺寸
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size1">
+            <summary>
+            尺寸(1 x 1)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size2">
+            <summary>
+            尺寸(2 x 2)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size3">
+            <summary>
+            尺寸(3 x 3)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size4">
+            <summary>
+            尺寸(4 x 4)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size5">
+            <summary>
+            尺寸(5 x 5)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size6">
+            <summary>
+            尺寸(6 x 6)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size7">
+            <summary>
+            尺寸(7 x 7)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size8">
+            <summary>
+            尺寸(8 x 8)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size9">
+            <summary>
+            尺寸(9 x 9)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size10">
+            <summary>
+            尺寸(10 x 10)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size11">
+            <summary>
+            尺寸(11 x 11)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size12">
+            <summary>
+            尺寸(12 x 12)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size13">
+            <summary>
+            尺寸(13 x 13)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size14">
+            <summary>
+            尺寸(14 x 14)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size15">
+            <summary>
+            尺寸(15 x 15)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size16">
+            <summary>
+            尺寸(16 x 16)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size17">
+            <summary>
+            尺寸(17 x 17)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size18">
+            <summary>
+            尺寸(18 x 18)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size19">
+            <summary>
+            尺寸(19 x 19)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size20">
+            <summary>
+            尺寸(20 x 20)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size21">
+            <summary>
+            尺寸(21 x 21)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size22">
+            <summary>
+            尺寸(22 x 22)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size23">
+            <summary>
+            尺寸(23 x 23)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size24">
+            <summary>
+            尺寸(24 x 24)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size25">
+            <summary>
+            尺寸(25 x 25)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size26">
+            <summary>
+            尺寸(26 x 26)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size27">
+            <summary>
+            尺寸(27 x 27)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size28">
+            <summary>
+            尺寸(28 x 28)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size29">
+            <summary>
+            尺寸(29 x 29)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size30">
+            <summary>
+            尺寸(30 x 30)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size31">
+            <summary>
+            尺寸(31 x 31)
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.QrCodeUnitSize.Size32">
+            <summary>
+            尺寸(32 x 32)
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.RotationAngle">
+            <summary>
+            旋转角度
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.RotationAngle.None">
+            <summary>
+            正常
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.RotationAngle.Rotate90">
+            <summary>
+            旋转90°
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.RotationAngle.Rotate180">
+            <summary>
+            旋转180°
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.RotationAngle.Rotate270">
+            <summary>
+            旋转270°
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.TextStyle">
+            <summary>
+            文字样式
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.TextStyle.None">
+            <summary>
+            正常
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.TextStyle.Bold">
+            <summary>
+            粗体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.TextStyle.Italic">
+            <summary>
+            斜体
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.TextStyle.Underline">
+            <summary>
+            下划线
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.BufferWriterExtensions">
+            <summary>
+            缓冲区写入器(<see cref="T:Bing.EasyPrint.IBufferWriter"/>) 扩展
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.BufferWriterExtensions.ToHex``1(Bing.EasyPrint.IBufferWriter{``0})">
+            <summary>
+            转换为16进制
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="writer">缓冲区写入器</param>
+        </member>
+        <member name="M:Bing.EasyPrint.BufferWriterExtensions.WriteLine``1(Bing.EasyPrint.IBufferWriter{``0},System.String)">
+            <summary>
+            写入并换行
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="writer">缓冲区写入器</param>
+            <param name="value">字符串</param>
+        </member>
+        <member name="T:Bing.EasyPrint.EasyPrintExtensions">
+            <summary>
+            简单打印(<see cref="T:Bing.EasyPrint.IEasyPrint"/>) 扩展
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.EasyPrintExtensions.CreateCPCLCommand(Bing.EasyPrint.IEasyPrint)">
+            <summary>
+            创建CPCL打印命令
+            </summary>
+            <param name="print"></param>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintComponentExtensions">
+            <summary>
+            打印组件(<see cref="T:Bing.EasyPrint.IPrintComponent`1"/>) 扩展
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawText``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String)">
+            <summary>
+            画文本
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawText``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize)">
+            <summary>
+            画文本
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawText``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize,Bing.EasyPrint.TextStyle)">
+            <summary>
+            画文本
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawTextArea``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            画文本区域
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+            <param name="height">文字绘制区域高度(可以为0)</param>
+            <param name="text">内容</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawBarcode``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>
+            画条码。默认：CODE 128
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">线宽</param>
+            <param name="height">高度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawBarcode``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画条码。默认：CODE 128
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">线宽</param>
+            <param name="height">高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawBarcode``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.RotationAngle)">
+            <summary>
+            画条码。默认：CODE 128
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">线宽</param>
+            <param name="height">高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintComponentExtensions.DrawLine``1(Bing.EasyPrint.IPrintComponent{``0},System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画线
+            </summary>
+            <typeparam name="T">类型</typeparam>
+            <param name="component">打印组件</param>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+        </member>
+        <member name="T:Bing.EasyPrint.IBufferWriter`1">
+            <summary>
+            缓冲区写入器
+            </summary>
+            <typeparam name="T">类型</typeparam>
+        </member>
+        <member name="M:Bing.EasyPrint.IBufferWriter`1.Write(System.Byte[])">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字节数组</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IBufferWriter`1.Write(System.String)">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字符串</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IBufferWriter`1.Clear">
+            <summary>
+            清空内容
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IBufferWriter`1.GetBytes">
+            <summary>
+            获取二进制数组
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.IBufferWriter">
+            <summary>
+            缓冲区写入器
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.IEasyPrint">
+            <summary>
+            简单打印
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IEasyPrint.CreateCommand``1">
+            <summary>
+            创建打印命令
+            </summary>
+            <typeparam name="T">打印命令类型</typeparam>
+        </member>
+        <member name="T:Bing.EasyPrint.IPrintCommand`1">
+            <summary>
+            打印命令
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintCommand`1.WriteRaw(System.String)">
+            <summary>
+            写入命令
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintCommand`1.WriteRawLine(System.String)">
+            <summary>
+            写入命令并换行
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintCommand`1.Build">
+            <summary>
+            构建命令
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.IPrintComponent`1">
+            <summary>
+            打印组件
+            </summary>
+            <typeparam name="T">打印组件</typeparam>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.SetPage(System.Int32,System.Int32,Bing.EasyPrint.PrintOrientation)">
+            <summary>
+            设置纸张
+            </summary>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+            <param name="orientation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.SetPage(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            设置纸张
+            </summary>
+            <param name="width">宽度</param>
+            <param name="height">高度</param>
+            <param name="orientation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.SetQty(System.Int32)">
+            <summary>
+            设置打印标签数
+            </summary>
+            <param name="qty">打印标签数量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.SetOffset(System.Int32)">
+            <summary>
+            设置标签横向偏移量
+            </summary>
+            <param name="offset">偏移量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.LineStyle)">
+            <summary>
+            画线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+            <param name="lineStyle">线条样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawDashLine(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画虚线
+            </summary>
+            <param name="x0">线条起始点x坐标</param>
+            <param name="y0">线条起始点y坐标</param>
+            <param name="x1">线条结束点x坐标</param>
+            <param name="y1">线条结束点y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawDashLine(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画虚线
+            </summary>
+            <param name="x">线条点x坐标</param>
+            <param name="y">线条点y坐标</param>
+            <param name="length">线条长度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画矩形
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.LineStyle)">
+            <summary>
+            画矩形
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+            <param name="lineWidth">线条宽度</param>
+            <param name="lineStyle">线条样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawRectFill(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画矩形（填充）
+            </summary>
+            <param name="x0">矩形框左上角x坐标</param>
+            <param name="y0">矩形框左上角y坐标</param>
+            <param name="x1">矩形框右下角x坐标</param>
+            <param name="y1">矩形框右下角y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawBarcode1D(System.String,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawBarcode1D(System.Int32,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawBarcode1D(Bing.EasyPrint.BarcodeType,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,Bing.EasyPrint.RotationAngle)">
+            <summary>
+            画一维条码
+            </summary>
+            <param name="type">条码类型</param>
+            <param name="x">条码起始x坐标</param>
+            <param name="y">条码起始y坐标</param>
+            <param name="text">条码内容</param>
+            <param name="lineWidth">条码线条宽度</param>
+            <param name="height">条码高度</param>
+            <param name="ratio">宽条与窄条的比率</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,System.String,System.Int32)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawQrCode(System.Int32,System.Int32,System.String,Bing.EasyPrint.QrCodeUnitSize,Bing.EasyPrint.QrCodeCorrectionLevel,Bing.EasyPrint.RotationAngle)">
+            <summary>
+            画二维码
+            </summary>
+            <param name="x">二维码起始x坐标</param>
+            <param name="y">二维码起始y坐标</param>
+            <param name="text">二维码内容</param>
+            <param name="unitWidth">模块的单位宽度。(1-32)</param>
+            <param name="errorLevel">二维码纠错级别</param>
+            <param name="rotation">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,System.Drawing.Bitmap)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="bitmap">图片数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,System.String)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="imageUrl">图片地址</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,System.Byte[])">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="bytes">图片数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,System.IO.Stream)">
+            <summary>
+            画图片
+            </summary>
+            <param name="startX">图片起始x坐标</param>
+            <param name="startY">图片起始y坐标</param>
+            <param name="stream">图片流</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            画文字
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="bold">是否加粗</param>
+            <param name="reverse">是否颠倒</param>
+            <param name="underline">是否下划线</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画文字
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="style">样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawText(System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize,Bing.EasyPrint.RotationAngle,Bing.EasyPrint.TextStyle)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawTextArea(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+            <param name="height">文字绘制区域高度(可以为0)</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawTextArea(System.Int32,System.Int32,System.Int32,System.Int32,System.String,Bing.EasyPrint.FontSize,Bing.EasyPrint.RotationAngle,Bing.EasyPrint.TextStyle)">
+            <summary>
+            画文本区域
+            </summary>
+            <param name="x">文字起始x坐标</param>
+            <param name="y">文字起始y坐标</param>
+            <param name="width">文字绘制区域宽度(可以为0，不为0的时候文字需要根据宽度自动换行)</param>
+            <param name="height">文字绘制区域高度(可以为0)</param>
+            <param name="text">内容</param>
+            <param name="fontSize">字体大小</param>
+            <param name="rotation">旋转角度</param>
+            <param name="textStyle">字体样式</param>
+        </member>
+    </members>
+</doc>

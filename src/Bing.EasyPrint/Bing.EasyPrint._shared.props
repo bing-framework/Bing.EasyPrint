@@ -1,0 +1,12 @@
+﻿<Project>
+  <PropertyGroup>
+    <AssemblyName>Bing.EasyPrint</AssemblyName>
+    <PackageId>Bing.EasyPrint</PackageId>
+    <Description>Bing.EasyPrint是Bing应用框架的小票打印命令生成库。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="4.7.0" />
+  </ItemGroup>
+
+</Project>
