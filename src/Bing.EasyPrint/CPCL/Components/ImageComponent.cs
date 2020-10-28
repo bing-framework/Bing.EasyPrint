@@ -156,10 +156,15 @@ namespace Bing.EasyPrint.CPCL
 
                 // 读取时需要反向读取每行字节实现上下翻转的效果，打印机打印顺序需要这样读取。
                 for (var i = 0; i < height; i++)
-                    Array.Copy(dstBuffer, bfOffBits + (srcBmp.Height - 1 - i) * rowSize, result, i * rowRealBytesCount, rowRealBytesCount);
+                    Array.Copy(dstBuffer, bfOffBits + (srcBmp.Height - 1 - i) * rowSize, result, i * rowRealBytesCount,
+                        rowRealBytesCount);
                 // 结果数据处理
                 for (var i = 0; i < result.Length; i++)
                     result[i] ^= 0xFF;
+            }
+            catch(Exception ex)
+            {
+                throw ex;
             }
             finally
             {
