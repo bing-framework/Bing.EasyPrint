@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using Bing.EasyPrint.CPCL;
 using Bing.EasyPrint.Tests.Biz.Label;
 using Xunit;
@@ -209,6 +210,138 @@ namespace Bing.EasyPrint.Tests.Biz
         }
 
 
+
+        /// <summary>
+        /// 测试打印云到家运单标签
+        /// </summary>
+        [Fact]
+        public void Test_PriceLomWaybillLabel()
+        {
+            var totalPage = 2;
+            for (var i = 1; i <= totalPage; i++)
+            {
+                BuildLomWaybillLabel(GetLomWaybillLabel(), i, totalPage);
+                Build();
+            }
+        }
+
+
+        /// <summary>
+        /// 构建云到家运单标签
+        /// </summary>
+        /// <param name="lomWaybill"></param>
+        /// <param name="currentPage"></param>
+        /// <param name="totalPage"></param>
+        private void BuildLomWaybillLabel(LomWaybillLabel lomWaybill, int currentPage, int totalPage)
+        {
+            var xMargin = 15;
+            var yMargin = 20;
+            var y = 0;
+
+            var pageWidth = 580;
+            var pageHeight = 820;
+            var fontSize1 = (int)FontSize.Size24;
+            var fontSize2 = (int)FontSize.Size32;
+
+            // 设置打印页
+            Command.SetPage(pageWidth, pageHeight);
+
+            // 打印长度超出限制500 无法使用多标签打印
+            //.SetQty(totalPage);
+            //y += yMargin;
+            //Command.DrawText(xMargin, y, "1", fontSize2, 0, true, false, false);
+            //Command.Count(1);
+            //Command.DrawText(xMargin + fontSize2, y, $"/2", fontSize2, 0, true, false, false);
+
+            //顶部页码
+            Command.DrawText(xMargin, y, $"{currentPage}/{totalPage}", 48, 0, true, false, false);
+            y = yMargin + fontSize2;
+
+            //顶部logo
+            var logo1 = new Bitmap("./Biz/Images/utopa.jpg");
+            int logo1Width = logo1.Width;
+            var logo1Text = "更省！更快！";
+            int logo1TextWidth = logo1Text.Length * fontSize1 + xMargin;
+            int logo1MarginLeft = (pageWidth - logo1Width - logo1TextWidth) / 2;
+            Command.DrawImage(logo1MarginLeft, y, logo1);
+            int logo1TextY = y + (logo1.Height - fontSize1) / 2;
+            Command.DrawText(logo1MarginLeft + logo1Width + xMargin, logo1TextY, "更省！更快！", fontSize1, 0, true, false, false);
+            y = y + yMargin + logo1.Height;
+
+            //条形码
+            Command.DrawBarcode1D("128", xMargin + 5, y, lomWaybill.Sheet, 3, 100, 3, 1);
+            y = y + yMargin + 100;
+            //全英文数字宽度减半
+            int sheetTextWidth = lomWaybill.Sheet.Length * fontSize1 / 2;
+            int sheetTextMarginLeft = (pageWidth - sheetTextWidth - xMargin) / 2;
+            Command.DrawText(sheetTextMarginLeft, y, lomWaybill.Sheet, fontSize1, 0, true, false, false);
+            y += yMargin + fontSize1;
+
+            //中部配送信息
+            int x1 = xMargin;
+            int x2 = x1 + (fontSize2 * 4) + xMargin;
+            DrawItem(Command, ref y, yMargin, x1, x2, "订单号", lomWaybill.SourceSheet, fontSize2);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送中心", lomWaybill.ShippingPointName, fontSize2, true);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送片区", lomWaybill.ShippingZoningName, fontSize2, false);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送时段", $"{lomWaybill.DeliveryTimeBegin:yyyy-MM-dd HH:mm} ~ {lomWaybill.DeliveryTimeEnd:HH:mm}", fontSize2, true);
+
+
+            //收件人信息
+            Command.DrawTextArea(x1, y, pageWidth - xMargin * 2, fontSize2 * 2, lomWaybill.ConsigneeStreet, fontSize2, 0, 0);
+            y += yMargin + fontSize2 * 2;
+            Command.DrawText(x1, y, lomWaybill.ConsigneePhone, fontSize2, 0, false, false, false);
+            y += yMargin + fontSize2;
+            Command.DrawText(x1, y, lomWaybill.ConsigneeName, fontSize2, 0, false, false, false);
+            y += yMargin + fontSize2;
+
+            Command.DrawDashLine(xMargin, y, pageWidth - xMargin * 2);
+            y += yMargin;
+
+            //底部logo
+            var logo2 = new Bitmap("./Biz/Images/utopalom.jpg");
+            int logo2Width = logo2.Width;
+            int logo2MarginLeft = (pageWidth - logo2Width) / 2;
+            Command.DrawImage(logo2MarginLeft, y, logo2);
+        }
+
+
+        /// <summary>
+        /// 画项
+        /// </summary>
+        /// <param name="command"></param>
+        /// <param name="y"></param>
+        /// <param name="yMargin"></param>
+        /// <param name="leftX"></param>
+        /// <param name="rightX"></param>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <param name="fontSize"></param>
+        /// <param name="rightBold"></param>
+        private void DrawItem(CPCLPrintCommand command, ref int y, int yMargin, int leftX, int rightX, string left, string right, int fontSize, bool rightBold = false)
+        {
+            int x1 = leftX;
+            int x2 = rightX;
+            command.DrawText(x1, y, left, fontSize, 0, false, false, false);
+            command.DrawText(x2, y, right, fontSize, 0, rightBold, false, false);
+            y += yMargin + fontSize;
+        }
+
+        private LomWaybillLabel GetLomWaybillLabel()
+        {
+            return new LomWaybillLabel
+            {
+                BagQty = 3,
+                ConsigneeName = "张三三",
+                ConsigneePhone = "13800138000",
+                ConsigneeStreet = "广东 广州 越秀 水均大街小区 水均大街小区 水均大街小区 2号703",
+                DeliveryTimeBegin = DateTime.Parse("2020-10-10 10:10"),
+                DeliveryTimeEnd = DateTime.Parse("2020-10-10 12:10"),
+                Sheet = "Y20201026000245",
+                ShippingPointName = "优托邦高志店",
+                ShippingZoningName = "花城广场",
+                SourceSheet = "30122020102600008408551340"
+            };
+        }
     }
 
     /// <summary>
