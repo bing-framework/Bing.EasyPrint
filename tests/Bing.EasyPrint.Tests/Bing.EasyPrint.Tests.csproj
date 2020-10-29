@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netcoreapp3.1;netcoreapp2.2;</TargetFrameworks>
@@ -18,6 +18,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Bing.EasyPrint\Bing.EasyPrint.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Biz\Images\logo.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

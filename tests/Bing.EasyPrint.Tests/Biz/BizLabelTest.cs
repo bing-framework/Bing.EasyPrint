@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using Bing.EasyPrint.CPCL;
 using Bing.EasyPrint.Tests.Biz.Label;
 using Xunit;
@@ -84,11 +87,12 @@ namespace Bing.EasyPrint.Tests.Biz
         /// <param name="shelfLife">保质期</param>
         /// <param name="barcode">条形码</param>
         /// <param name="qrCode">二维码</param>
-        private void BuildGoodsLabel(string title, string specification, string unit, string packingDate, int shelfLife, string barcode, string qrCode)
+        private void BuildGoodsLabel(string title, string specification, string unit, string packingDate, int shelfLife,
+            string barcode, string qrCode)
         {
             var leftMargin = 0;
             Command.SetPage(560, 420)
-                .DrawTextArea(leftMargin,24,550,60,title,FontSize.Size32,RotationAngle.None,TextStyle.Bold)
+                .DrawTextArea(leftMargin, 24, 550, 60, title, FontSize.Size32, RotationAngle.None, TextStyle.Bold)
                 .DrawText(leftMargin, 130, $"规格：{specification}", FontSize.Size24)
                 .DrawText(leftMargin, 170, $"计价单位：{unit}", FontSize.Size24)
                 .DrawText(leftMargin, 210, $"包装日期：{packingDate}", FontSize.Size24)
@@ -96,7 +100,7 @@ namespace Bing.EasyPrint.Tests.Biz
                 .DrawText(leftMargin, 290, $"条码：{barcode}", FontSize.Size24)
                 .DrawQrCode(358, 160, qrCode, QrCodeUnitSize.Size8, QrCodeCorrectionLevel.L, RotationAngle.None);
         }
-        
+
         /// <summary>
         /// 测试 - 价格标签
         /// </summary>
@@ -131,14 +135,16 @@ namespace Bing.EasyPrint.Tests.Biz
         /// <param name="unit">单位</param>
         /// <param name="barcode">条形码</param>
         /// <param name="qrCode">二维码</param>
-        private void BuildPriceLabel(string title, decimal? originalPrice, decimal actualPrice, string specification, string unit, string barcode, string qrCode)
+        private void BuildPriceLabel(string title, decimal? originalPrice, decimal actualPrice, string specification,
+            string unit, string barcode, string qrCode)
         {
             var xMargin = 30;
             var yMargin = 30;
             // 设置打印页
             Command.SetPage(540, 300);
             // 打印标题
-            Command.DrawTextArea(30 - xMargin, 49 - yMargin, 480, 66, title, FontSize.Size24, RotationAngle.None, TextStyle.None);
+            Command.DrawTextArea(30 - xMargin, 49 - yMargin, 480, 66, title, FontSize.Size24, RotationAngle.None,
+                TextStyle.None);
             if (originalPrice == null)
             {
                 // 打印正价
@@ -151,8 +157,10 @@ namespace Bing.EasyPrint.Tests.Biz
                 var originalPriceStr = $"原价：{originalPrice.Value:F}";
                 var width = ((originalPriceStr.Length + 3) * 16) / 2;
                 Command.DrawLine(30 - xMargin, 110 - yMargin + 8, 30 - xMargin + width, 110 - yMargin + 8);
-                Command.BilingualLabel(30 - xMargin, 110 - yMargin, originalPriceStr, "Price", 6, zhCnFontSize: FontSize.Size16);
-                Command.BilingualLabel(30 - xMargin, 154 - yMargin, $"优惠价：", "On sale", 6, zhCnFontSize: FontSize.Size16);
+                Command.BilingualLabel(30 - xMargin, 110 - yMargin, originalPriceStr, "Price", 6,
+                    zhCnFontSize: FontSize.Size16);
+                Command.BilingualLabel(30 - xMargin, 154 - yMargin, $"优惠价：", "On sale", 6,
+                    zhCnFontSize: FontSize.Size16);
                 Command.GoodsPriceLabel(98 - xMargin, 199 - yMargin, actualPrice, unit);
             }
 
@@ -163,7 +171,8 @@ namespace Bing.EasyPrint.Tests.Biz
             Command.BilingualLabel(30 - xMargin, 252 - yMargin, $"条码：{barcode}", "Barcode", 6);
 
             // 二维码
-            Command.DrawQrCode(390 - xMargin, 115 - yMargin, qrCode, QrCodeUnitSize.Size6, QrCodeCorrectionLevel.L, RotationAngle.None);
+            Command.DrawQrCode(390 - xMargin, 115 - yMargin, qrCode, QrCodeUnitSize.Size6, QrCodeCorrectionLevel.L,
+                RotationAngle.None);
 
             // 监管电话
             Command.BilingualLabel(358 - xMargin, 251 - yMargin, $"监管电话：12358", "Complaints Hotline", 6);
@@ -209,6 +218,284 @@ namespace Bing.EasyPrint.Tests.Biz
         }
 
 
+
+
+        /// <summary>
+        /// 测试打印配送面单
+        /// </summary>
+        [Fact]
+        public void Test_PriceShippingLabel()
+        {
+            var totalPage = 2;
+            for (var i = 1; i <= totalPage; i++)
+            {
+                BuildShippingLabel(GetShippingLabel(), i, totalPage);
+                Build();
+            }
+        }
+
+
+        /// <summary>
+        /// 构建配送面单
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="currentPage"></param>
+        /// <param name="totalPage"></param>
+        private void BuildShippingLabel(ShippingLabel data, int currentPage, int totalPage)
+        {
+            var xMargin = 15;
+            var yMargin = 20;
+            var y = 0;
+
+            var pageWidth = 580;
+            var pageHeight = 860;
+            var fontSize1 = (int) FontSize.Size24;
+            var fontSize2 = (int) FontSize.Size32;
+
+            // 设置打印页
+            Command.SetPage(pageWidth, pageHeight);
+
+            // 打印长度超出限制500 无法使用多标签打印
+            //.SetQty(totalPage);
+            //y += yMargin;
+            //Command.DrawText(xMargin, y, "1", fontSize2, 0, true, false, false);
+            //Command.Count(1);
+            //Command.DrawText(xMargin + fontSize2, y, $"/2", fontSize2, 0, true, false, false);
+
+            //顶部页码
+            Command.DrawText(xMargin, y, $"{currentPage}/{totalPage}", 48, 0, true, false, false);
+            y = yMargin + fontSize2;
+
+            //顶部logo
+            var logo1 = new Bitmap("./Biz/Images/logo.jpg");
+            int logo1Width = logo1.Width;
+            var logo1Text = "此处应有广告语！";
+            int logo1TextWidth = logo1Text.Length * fontSize1 + xMargin;
+            int logo1MarginLeft = (pageWidth - logo1Width - logo1TextWidth) / 2;
+            Command.DrawImage(logo1MarginLeft, y, logo1);
+            int logo1TextY = y + (logo1.Height - fontSize1) / 2;
+            Command.DrawText(logo1MarginLeft + logo1Width + xMargin, logo1TextY, "此处应有广告语！", fontSize1, 0, true, false,
+                false);
+            y = y + yMargin + logo1.Height;
+
+            //条形码
+            Command.DrawBarcode1D("128", xMargin + 5, y, data.Sheet, 3, 100, 3, 1);
+            y = y + yMargin + 100;
+            //全英文数字宽度减半
+            int sheetTextWidth = data.Sheet.Length * fontSize1 / 2;
+            int sheetTextMarginLeft = (pageWidth - sheetTextWidth - xMargin) / 2;
+            Command.DrawText(sheetTextMarginLeft, y, data.Sheet, fontSize1, 0, true, false, false);
+            y += yMargin + fontSize1;
+
+            //中部配送信息
+            int x1 = xMargin;
+            int x2 = x1 + (fontSize2 * 4) + xMargin;
+            DrawItem(Command, ref y, yMargin, x1, x2, "订单号", data.SourceSheet, fontSize2);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送中心", data.ShippingPointName, fontSize2, true);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送片区", data.ShippingZoningName, fontSize2, false);
+            DrawItem(Command, ref y, yMargin, x1, x2, "配送时段",
+                $"{data.DeliveryTimeBegin:yyyy-MM-dd HH:mm} ~ {data.DeliveryTimeEnd:HH:mm}", fontSize2,
+                true);
+
+
+            //收件人信息
+            Command.DrawTextArea(x1, y, pageWidth - xMargin * 2, fontSize2 * 2, data.ConsigneeStreet, fontSize2,
+                0, 0);
+            y += yMargin + fontSize2 * 2;
+            Command.DrawText(x1, y, data.ConsigneePhone, fontSize2, 0, false, false, false);
+            y += yMargin + fontSize2;
+            Command.DrawText(x1, y, data.ConsigneeName, fontSize2, 0, false, false, false);
+            y += yMargin + fontSize2;
+
+            Command.DrawDashLine(xMargin, y, pageWidth - xMargin * 2);
+            y += yMargin;
+
+            //底部logo
+            var logo2 = new Bitmap("./Biz/Images/logo.jpg");
+            int logo2Width = logo2.Width;
+            int logo2MarginLeft = (pageWidth - logo2Width) / 2;
+            Command.DrawImage(logo2MarginLeft, y, logo2);
+        }
+
+
+        /// <summary>
+        /// 画标题内容项
+        /// </summary>
+        /// <param name="command"></param>
+        /// <param name="y"></param>
+        /// <param name="yMargin"></param>
+        /// <param name="leftX"></param>
+        /// <param name="rightX"></param>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <param name="fontSize"></param>
+        /// <param name="rightBold"></param>
+        private void DrawItem(CPCLPrintCommand command, ref int y, int yMargin, int leftX, int rightX, string left,
+            string right, int fontSize, bool rightBold = false)
+        {
+            int x1 = leftX;
+            int x2 = rightX;
+            command.DrawText(x1, y, left, fontSize, 0, false, false, false);
+            command.DrawText(x2, y, right, fontSize, 0, rightBold, false, false);
+            y += yMargin + fontSize;
+        }
+
+        /// <summary>
+        /// 测试打印配送详情面单
+        /// </summary>
+        [Fact]
+        public void Test_PriceShippingDetailLabel()
+        {
+            BuildShippingDetailLabel(GetShippingLabel());
+            Build();
+        }
+
+        /// <summary>
+        /// 构建配送详情面单
+        /// </summary>
+        /// <param name="data"></param>
+        private void BuildShippingDetailLabel(ShippingLabel data)
+        {
+            var xMargin = 15;
+            var yMargin = 20;
+            var y = 0;
+
+            var pageWidth = 580;
+
+            var fontSize1 = (int) FontSize.Size24;
+            var fontSize2 = (int) FontSize.Size32;
+            var pageHeight = 720 + data.CargoList.Count * (fontSize1 * 2 + yMargin * 2);
+
+            // 设置打印页
+            Command.SetPage(pageWidth, pageHeight);
+
+            //顶部logo
+            var logo1 = new Bitmap("./Biz/Images/utopa.jpg");
+            int logo1Width = logo1.Width;
+            var logo1Text = "此处应有广告语！";
+            int logo1TextWidth = logo1Text.Length * fontSize1 + xMargin;
+            int logo1MarginLeft = (pageWidth - logo1Width - logo1TextWidth) / 2;
+            Command.DrawImage(logo1MarginLeft, y, logo1);
+            int logo1TextY = y + (logo1.Height - fontSize1) / 2;
+            Command.DrawText(logo1MarginLeft + logo1Width + xMargin, logo1TextY, "此处应有广告语！", fontSize1, 0, true, false,
+                false);
+            y = y + yMargin + logo1.Height;
+
+            //条形码
+            Command.DrawBarcode1D("128", xMargin + 5, y, data.Sheet, 3, 100, 3, 1);
+            y = y + yMargin + 100;
+            //全英文数字宽度减半
+            int sheetTextWidth = data.Sheet.Length * fontSize1 / 2;
+            int sheetTextMarginLeft = (pageWidth - sheetTextWidth - xMargin) / 2;
+            Command.DrawText(sheetTextMarginLeft, y, data.Sheet, fontSize1, 0, false, false, false);
+            y += yMargin + fontSize1;
+
+            //中部配送信息
+            int x1 = xMargin;
+            int x2 = x1 + (fontSize2 * 4) + xMargin;
+            DrawItem(Command, ref y, yMargin, x1, x2, "订单号", data.SourceSheet, fontSize1);
+            DrawItem(Command, ref y, yMargin, x1, x2, "收货人", data.ConsigneeName, fontSize1, false);
+            DrawItem(Command, ref y, yMargin, x1, x2, "联系电话", data.ConsigneePhone, fontSize1, false);
+            //DrawItem(Command, ref y, yMargin, x1, x2, "收货地址", lomWaybill.ConsigneeStreet, fontSize1, false);
+
+            Command.DrawText(x1, y, "收货地址", fontSize1, 0, false, false, false);
+            Command.DrawTextArea(x2, y, pageWidth - x2 - xMargin, fontSize1 * 2, data.ConsigneeStreet, fontSize1,
+                0, 0);
+            y += yMargin + fontSize2 * 2;
+
+            Command.DrawDashLine(xMargin, y, pageWidth - xMargin * 2);
+            y += yMargin;
+
+            //商品列表
+            int cx1 = xMargin;
+            int cargoNameWidth = 200;
+            int cx2 = cx1 + cargoNameWidth;
+            int cx3 = cx2 + 150;
+            int cx4 = cx3 + 150;
+
+
+
+            Command.DrawText(cx1, y, "商品名称", fontSize1, 0, false, false, false);
+            Command.DrawText(cx2, y, "数量", fontSize1, 0, false, false, false);
+            Command.DrawText(cx3, y, "单价", fontSize1, 0, false, false, false);
+            Command.DrawText(cx4, y, "合计", fontSize1, 0, false, false, false);
+
+            y += fontSize1 + yMargin;
+            data.CargoList.ForEach(t =>
+            {
+                var tmpY = y;
+                Command.DrawText(cx1, tmpY, $"{t.CargoCode} {t.CargoName}", fontSize1, 0, false, false, false);
+                tmpY += yMargin + fontSize1;
+                Command.DrawText(cx2, tmpY, t.CargoQty.ToString("F"), fontSize1, 0, false, false, false);
+                Command.DrawText(cx3, tmpY, t.CargoPrice.ToString("F"), fontSize1, 0, false, false, false);
+                Command.DrawText(cx4, tmpY, $"{(t.CargoPrice * t.CargoQty):F}", fontSize1, 0, false, false, false);
+                y = tmpY + fontSize1 + yMargin;
+            });
+
+            Command.DrawDashLine(xMargin, y, pageWidth - xMargin * 2);
+
+            y += yMargin;
+
+            Command.DrawText(cx1, y, "合计", fontSize1, 0, false, false, false);
+            Command.DrawText(cx2, y, $"{data.CargoList.Sum(x => x.CargoQty)}", fontSize1, 0, false, false, false);
+            Command.DrawText(cx4, y, $"{data.CargoList.Sum(x => x.CargoPrice * x.CargoQty):F}", fontSize1, 0,
+                false, false, false);
+
+            y += fontSize1 + yMargin;
+
+            Command.DrawDashLine(xMargin, y, pageWidth - xMargin * 2);
+
+            y += yMargin;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private ShippingLabel GetShippingLabel()
+        {
+            return new ShippingLabel
+            {
+                BagQty = 3,
+                ConsigneeName = "张三三",
+                ConsigneePhone = "13800138000",
+                ConsigneeStreet = "广东 广州 黄埔 菜鸟驿站广州黄埔下沙大街14号店 菜鸟驿站",
+                DeliveryTimeBegin = DateTime.Parse("2020-10-10 10:00"),
+                DeliveryTimeEnd = DateTime.Parse("2020-10-10 12:00"),
+                Sheet = "Y20201026000245",
+                ShippingPointName = "广州黄埔店",
+                ShippingZoningName = "下沙大街",
+                SourceSheet = "30122020102600008408551340",
+                CargoList = new List<Cargo>
+                {
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "乐肴居烧肉米汉堡（蜜椒味）150g", CargoPrice = 3.42M, CargoQty = 1
+                    },
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "达利园瑞士卷(巧克力)240g", CargoPrice = 3.42M, CargoQty = 2
+                    },
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "怡泉+C柠檬味汽水400ml", CargoPrice = 4.37M, CargoQty = 3
+                    },
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "统一红茶1000ml", CargoPrice = 3.42M, CargoQty = 4
+                    },
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "喜之郎果肉果冻单杯装（什锦）200g", CargoPrice = 3.42M, CargoQty = 3
+                    },
+                    new Cargo
+                    {
+                        CargoCode = "13800138000", CargoName = "大成巴黎塔脆骨盐酥鸡280g", CargoPrice = 27.93M, CargoQty = 1
+                    },
+                }
+            };
+        }
     }
 
     /// <summary>

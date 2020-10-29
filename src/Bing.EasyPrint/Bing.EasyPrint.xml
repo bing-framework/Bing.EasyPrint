@@ -238,6 +238,13 @@
             </summary>
             <param name="image">图片</param>
         </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.BitmapTo1Bpp(System.Drawing.Bitmap)">
+            <summary>
+            转换为1位位图
+            </summary>
+            <param name="img"></param>
+            <returns></returns>
+        </member>
         <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ToHex(System.Byte[])">
             <summary>
             转换为16进制
