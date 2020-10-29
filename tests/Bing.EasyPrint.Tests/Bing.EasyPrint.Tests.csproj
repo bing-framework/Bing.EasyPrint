@@ -20,6 +20,10 @@
     <ProjectReference Include="..\..\src\Bing.EasyPrint\Bing.EasyPrint.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp2.2' ">
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="4.5.1" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="Biz\Images\logo.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

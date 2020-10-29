@@ -217,9 +217,6 @@ namespace Bing.EasyPrint.Tests.Biz
             };
         }
 
-
-
-
         /// <summary>
         /// 测试打印配送面单
         /// </summary>
@@ -234,6 +231,16 @@ namespace Bing.EasyPrint.Tests.Biz
             }
         }
 
+        /// <summary>
+        /// 测试打印配送面单
+        /// </summary>
+        [Fact]
+        public void Test_PriceShippingLabel_1()
+        {
+            var totalPage = 2;
+            BuildShippingLabel(GetShippingLabel(), 1, totalPage);
+            Build();
+        }
 
         /// <summary>
         /// 构建配送面单
@@ -256,7 +263,7 @@ namespace Bing.EasyPrint.Tests.Biz
             Command.SetPage(pageWidth, pageHeight);
 
             // 打印长度超出限制500 无法使用多标签打印
-            //.SetQty(totalPage);
+            //Command.SetQty(totalPage);
             //y += yMargin;
             //Command.DrawText(xMargin, y, "1", fontSize2, 0, true, false, false);
             //Command.Count(1);
