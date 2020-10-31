@@ -147,7 +147,7 @@ namespace Bing.EasyPrint.CPCL
 
             try
             {
-                dstBmp = srcBmp.Clone(new Rectangle(0, 0, width, height), PixelFormat.Format1bppIndexed);
+                dstBmp = BitmapTo1Bpp(srcBmp);// srcBmp.Clone(new Rectangle(0, 0, width, height), PixelFormat.Format1bppIndexed);
                 dstBmp.Save(dstStream, ImageFormat.Bmp);
                 var dstBuffer = dstStream.ToArray();
 
@@ -156,10 +156,15 @@ namespace Bing.EasyPrint.CPCL
 
                 // 读取时需要反向读取每行字节实现上下翻转的效果，打印机打印顺序需要这样读取。
                 for (var i = 0; i < height; i++)
-                    Array.Copy(dstBuffer, bfOffBits + (srcBmp.Height - 1 - i) * rowSize, result, i * rowRealBytesCount, rowRealBytesCount);
+                    Array.Copy(dstBuffer, bfOffBits + (srcBmp.Height - 1 - i) * rowSize, result, i * rowRealBytesCount,
+                        rowRealBytesCount);
                 // 结果数据处理
                 for (var i = 0; i < result.Length; i++)
                     result[i] ^= 0xFF;
+            }
+            catch(Exception ex)
+            {
+                throw ex;
             }
             finally
             {
@@ -168,6 +173,33 @@ namespace Bing.EasyPrint.CPCL
                 dstBmp?.Dispose();
             }
             return result;
+        }
+
+
+        /// <summary>
+        /// 转换为1位位图
+        /// </summary>
+        /// <param name="img"></param>
+        /// <returns></returns>
+        private static Bitmap BitmapTo1Bpp(Bitmap img)
+        {
+            int w = img.Width;
+            int h = img.Height;
+            Bitmap bmp = new Bitmap(w, h, PixelFormat.Format1bppIndexed);
+            BitmapData data = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadWrite, PixelFormat.Format1bppIndexed);
+            byte[] scan = new byte[(w + 7) / 8];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (x % 8 == 0) scan[x / 8] = 0;
+                    Color c = img.GetPixel(x, y);
+                    if (c.GetBrightness() >= 0.5) scan[x / 8] |= (byte)(0x80 >> (x % 8));
+                }
+                System.Runtime.InteropServices.Marshal.Copy(scan, 0, (IntPtr)((long)data.Scan0 + data.Stride * y), scan.Length);
+            }
+            bmp.UnlockBits(data);
+            return bmp;
         }
 
         /// <summary>

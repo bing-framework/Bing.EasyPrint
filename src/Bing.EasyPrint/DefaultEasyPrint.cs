@@ -3,7 +3,7 @@
     /// <summary>
     /// 默认简单打印
     /// </summary>
-    internal class DefaultEasyPrint : IEasyPrint
+    public class DefaultEasyPrint : IEasyPrint
     {
         /// <summary>
         /// 创建打印命令

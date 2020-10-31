@@ -3,9 +3,26 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30523.141
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bing.EasyPrint", "src\Bing.EasyPrint\Bing.EasyPrint.csproj", "{A202D824-3223-4E7B-A79B-96303192CAEB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bing.EasyPrint", "src\Bing.EasyPrint\Bing.EasyPrint.csproj", "{A202D824-3223-4E7B-A79B-96303192CAEB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bing.EasyPrint.Tests", "tests\Bing.EasyPrint.Tests\Bing.EasyPrint.Tests.csproj", "{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bing.EasyPrint.Tests", "tests\Bing.EasyPrint.Tests\Bing.EasyPrint.Tests.csproj", "{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_SolutionItems", "_SolutionItems", "{814AC42F-7E98-49C3-8ADD-FB14BE172923}"
+	ProjectSection(SolutionItems) = preProject
+		common.props = common.props
+		LICENSE = LICENSE
+		Publish.bat = Publish.bat
+		README.md = README.md
+		version.props = version.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "asset", "asset", "{9F52451E-CCA8-45DD-BA5D-C2CACA07CF77}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "props", "props", "{3C915628-5110-495E-B561-63C8BCEF3240}"
+	ProjectSection(SolutionItems) = preProject
+		asset\props\misc.props = asset\props\misc.props
+		asset\props\package.props = asset\props\package.props
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,6 +41,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9F52451E-CCA8-45DD-BA5D-C2CACA07CF77} = {814AC42F-7E98-49C3-8ADD-FB14BE172923}
+		{3C915628-5110-495E-B561-63C8BCEF3240} = {9F52451E-CCA8-45DD-BA5D-C2CACA07CF77}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01422DBE-8356-4DFA-9C0B-4A15E1B0A46F}
