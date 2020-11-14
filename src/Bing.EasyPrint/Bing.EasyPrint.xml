@@ -2424,6 +2424,19 @@
             <param name="x1">线条结束点x坐标</param>
             <param name="y1">线条结束点y坐标</param>
         </member>
+        <member name="M:Bing.EasyPrint.Extensions.AddEasyPrint(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            注册EasyPrint
+            </summary>
+            <param name="services">服务集合</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Extensions.AddEasyPrint``1(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            注册EasyPrint
+            </summary>
+            <typeparam name="TEasyPrint">简单打印实现类型</typeparam>
+            <param name="services">服务集合</param>
+        </member>
         <member name="T:Bing.EasyPrint.IBufferWriter`1">
             <summary>
             缓冲区写入器
