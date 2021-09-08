@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.IO;
 
+// ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint.CPCL
 {
     /// <summary>
@@ -102,8 +103,6 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y1">线条结束点y坐标</param>
         public CPCLPrintCommand DrawDashLine(int x0, int y0, int x1, int y1)
         {
-            //for (var i = 0; i < x1; i = ((i + 16) - 1) + 1)
-            //    DrawText(x0 + i, y0 - 10, "-", 24, 0, false, false, false);
             Items.Add(new DashLineComponent
             {
                 X0 = x0,
@@ -122,13 +121,43 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="length">线条长度</param>
         public CPCLPrintCommand DrawDashLine(int x, int y, int length)
         {
-            //for (var i = 0; i < CommandInfo.Width; i = ((i + 16) - 1) + 1)
-            //    DrawText(x + i, y - 10, "-", 24, 0, false, false, false);
             Items.Add(new DashLineComponent
             {
                 X0 = x,
                 Y0 = y,
                 X1 = CommandInfo.Width,
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// 画分割线
+        /// </summary>
+        /// <param name="x">线条起始x坐标</param>
+        /// <param name="y">线条起始y坐标</param>
+        public CPCLPrintCommand DrawSplitLine(int x, int y)
+        {
+            Items.Add(new SplitLineComponent
+            {
+                X = x,
+                Y = y
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// 画分割线
+        /// </summary>
+        /// <param name="x">线条起始x坐标</param>
+        /// <param name="y">线条起始y坐标</param>
+        /// <param name="symbol">分割符</param>
+        public CPCLPrintCommand DrawSplitLine(int x, int y,char symbol)
+        {
+            Items.Add(new SplitLineComponent
+            {
+                X = x,
+                Y = y,
+                Symbol = symbol
             });
             return this;
         }

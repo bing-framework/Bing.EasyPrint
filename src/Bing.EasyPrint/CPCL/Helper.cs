@@ -258,5 +258,13 @@ namespace Bing.EasyPrint.CPCL
                     return "EG";
             }
         }
+
+        /// <summary>
+        /// 获取一行最大字符数。
+        /// 58mm票据打印机：一行可打印16个汉字，32个字符；80mm票据打印机，一行可打印24个汉字，48个字符；421D标签打印机，一行可打印34个汉字，69个字符。
+        /// </summary>
+        /// <param name="width">宽度</param>
+        /// <param name="fontSize">字体大小</param>
+        public static int GetLineMaxLength(int width, int fontSize) => width / fontSize;
     }
 }

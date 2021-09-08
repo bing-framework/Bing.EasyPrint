@@ -328,6 +328,32 @@
             </summary>
             <param name="command">打印命令</param>
         </member>
+        <member name="T:Bing.EasyPrint.CPCL.SplitLineComponent">
+            <summary>
+            分割线组件
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.SplitLineComponent.X">
+            <summary>
+            线条起始x坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.SplitLineComponent.Y">
+            <summary>
+            线条起始y坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.CPCL.SplitLineComponent.Symbol">
+            <summary>
+            分割符
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.SplitLineComponent.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">打印命令</param>
+        </member>
         <member name="T:Bing.EasyPrint.CPCL.TextComponent">
             <summary>
             文本组件
@@ -869,6 +895,21 @@
             <param name="x">线条点x坐标</param>
             <param name="y">线条点y坐标</param>
             <param name="length">线条长度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawSplitLine(System.Int32,System.Int32)">
+            <summary>
+            画分割线
+            </summary>
+            <param name="x">线条起始x坐标</param>
+            <param name="y">线条起始y坐标</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawSplitLine(System.Int32,System.Int32,System.Char)">
+            <summary>
+            画分割线
+            </summary>
+            <param name="x">线条起始x坐标</param>
+            <param name="y">线条起始y坐标</param>
+            <param name="symbol">分割符</param>
         </member>
         <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawRect(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
@@ -1686,6 +1727,14 @@
             获取图片旋转命令
             </summary>
             <param name="rotate">旋转角度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.Helper.GetLineMaxLength(System.Int32,System.Int32)">
+            <summary>
+            获取一行最大字符数。
+            58mm票据打印机：一行可打印16个汉字，32个字符；80mm票据打印机，一行可打印24个汉字，48个字符；421D标签打印机，一行可打印34个汉字，69个字符。
+            </summary>
+            <param name="width">宽度</param>
+            <param name="fontSize">字体大小</param>
         </member>
         <member name="T:Bing.EasyPrint.CPCL.ComponentMetadata">
             <summary>

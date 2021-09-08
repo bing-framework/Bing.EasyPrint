@@ -41,6 +41,61 @@ namespace Bing.EasyPrint.Tests.CPCL
         }
 
         /// <summary>
+        /// 测试 - 画虚线
+        /// </summary>
+        [Fact]
+        public void Test_DrawDashLine_2()
+        {
+            Command.SetPage(600, 200)
+                .DrawDashLine(50, 10, 595, 5);
+            Build();
+        }
+
+        /// <summary>
+        /// 测试 - 画分割线
+        /// </summary>
+        [Fact]
+        public void Test_DrawSplitLine_1()
+        {
+            Command.SetPage(76 * 8, 200)
+                .DrawSplitLine(0, 10);
+            Build();
+        }
+
+        /// <summary>
+        /// 测试 - 画分割线
+        /// </summary>
+        [Fact]
+        public void Test_DrawSplitLine_2()
+        {
+            Command.SetPage(76 * 8, 200)
+                .DrawSplitLine(0, 10, '.');
+            Build();
+        }
+
+        /// <summary>
+        /// 测试 - 画分割线
+        /// </summary>
+        [Fact]
+        public void Test_DrawSplitLine_3()
+        {
+            Command.SetPage(76 * 8, 200)
+                .DrawSplitLine(0, 10, '★');
+            Build();
+        }
+
+        /// <summary>
+        /// 测试 - 画分割线
+        /// </summary>
+        [Fact]
+        public void Test_DrawSplitLine_4()
+        {
+            Command.SetPage(76 * 8, 200)
+                .DrawSplitLine(0, 10, '糟');
+            Build();
+        }
+
+        /// <summary>
         /// 测试 - 画矩形
         /// </summary>
         [Fact]

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using Bing.EasyPrint.Core;
 
+// ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint.CPCL
 {
     /// <summary>
