@@ -24,6 +24,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "props", "props", "{3C915628
 		asset\props\package.props = asset\props\package.props
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bing.EasyPrint.Templates", "src\Bing.EasyPrint.Templates\Bing.EasyPrint.Templates.csproj", "{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}.Release|Any CPU.Build.0 = Release|Any CPU
+		{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

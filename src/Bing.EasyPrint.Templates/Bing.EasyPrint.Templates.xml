@@ -1,0 +1,442 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Bing.EasyPrint.Templates</name>
+    </assembly>
+    <members>
+        <member name="T:Bing.EasyPrint.Elements.BpBarcodeElement">
+            <summary>
+            条码元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Elements.BpElement">
+            <summary>
+            最小显示元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElement.Type">
+            <summary>
+            类型
+            </summary>
+            <remarks>1=文字；2=图片；3=二维码；4=条形码</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElement.Field">
+            <summary>
+            显示的属性信息
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElement.Margin">
+            <summary>
+            元素显示间距
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElement.StartCoordinate">
+            <summary>
+            左上角起始坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElement.EndCoordinate">
+            <summary>
+            右下角终止坐标
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Elements.BpElementAll">
+            <summary>
+            显示元素扩展。便于存储元素所有属性信息，只有其中一个不为空
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElementAll.ImageElement">
+            <summary>
+            图片显示元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElementAll.FontElement">
+            <summary>
+            文字显示元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElementAll.QrCodeElement">
+            <summary>
+            二维码显示元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpElementAll.BarcodeElement">
+            <summary>
+            条码显示元素
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Elements.BpFontElement">
+            <summary>
+            文字显示元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.FontSize">
+            <summary>
+            字体大小
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.FontStyle">
+            <summary>
+            字体风格
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.FontName">
+            <summary>
+            字体名称
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.Bold">
+            <summary>
+            字体加粗
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Elements.BpImageElement">
+            <summary>
+            图片元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpImageElement.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpImageElement.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpImageElement.IsCompress">
+            <summary>
+            是否压缩
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Elements.BpQrCodeElement">
+            <summary>
+            二维码元素
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpQrCodeElement.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpQrCodeElement.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BgField">
+            <summary>
+            字段
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.Title">
+            <summary>
+            标题
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.Name">
+            <summary>
+            字段属性名
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.Value">
+            <summary>
+            属性值
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.NeedFeedLine">
+            <summary>
+            是否自动换行
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.Fit">
+            <summary>
+            是否自适应宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BgField.ValueFunc">
+            <summary>
+            属性取值函数
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpBorder">
+            <summary>
+            边框样式
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpBorder.TopStyle">
+            <summary>
+            顶部线条类型。
+            </summary>
+            <remarks>1=实线；2=虚线</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpBorder.RightStyle">
+            <summary>
+            右部线条类型。
+            </summary>
+            <remarks>1=实线；2=虚线</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpBorder.LeftStyle">
+            <summary>
+            左部线条类型。
+            </summary>
+            <remarks>1=实线；2=虚线</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpBorder.BottomStyle">
+            <summary>
+            下部线条线条类型。
+            </summary>
+            <remarks>1=实线；2=虚线</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpBorder.Color">
+            <summary>
+            背景颜色
+            </summary>
+            <remarks>1=白色；2=黑色；3=黄色</remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpCell">
+            <summary>
+            单元格
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCell.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCell.Border">
+            <summary>
+            边框样式
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCell.Rows">
+            <summary>
+            单元行列表。列拆行
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCell.Elements">
+            <summary>
+            显示的元素列表
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCell.ElementAlls">
+            <summary>
+            显示的元素，便于存储显示元素全量信息（只用于前端和存储，不参与运算逻辑）
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpCoordinate">
+            <summary>
+            坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCoordinate.X">
+            <summary>
+            X轴坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpCoordinate.Y">
+            <summary>
+            Y轴坐标
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpFont">
+            <summary>
+            字体
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.FontSize">
+            <summary>
+            字体大小
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.FontStyle">
+            <summary>
+            字体风格
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.FontName">
+            <summary>
+            字体名称
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.Bold">
+            <summary>
+            字体加粗
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.Mag">
+            <summary>
+            字体放大
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.NeedFeedLine">
+            <summary>
+            是否自动换行
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.Fit">
+            <summary>
+            是否自适应宽度
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpMargin">
+            <summary>
+            间距
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpMargin.Top">
+            <summary>
+            上间距
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpMargin.Left">
+            <summary>
+            左间距
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpMargin.Right">
+            <summary>
+            右间距
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpMargin.Bottom">
+            <summary>
+            下间距
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpRange">
+            <summary>
+            范围
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpRange.StartCoordinate">
+            <summary>
+            左上角起始坐标
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpRange.EndCoordinate">
+            <summary>
+            右下角终止坐标
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpRow">
+            <summary>
+            单元行
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpRow.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpRow.Border">
+            <summary>
+            边框类型
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpRow.Cells">
+            <summary>
+            单元格列表
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpTemplate">
+            <summary>
+            模板
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.PaperType">
+            <summary>
+            纸张类型
+            </summary>
+            <remarks>1=A4</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.Width">
+            <summary>
+            宽度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.Color">
+            <summary>
+            背景颜色
+            </summary>
+            <remarks>1=白色；2=黑色；3=黄色</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.Border">
+            <summary>
+            边框颜色
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpTemplate.Rows">
+            <summary>
+            单元行列表
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpText">
+            <summary>
+            文本
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpText.Size">
+            <summary>
+            文字大小
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpText.Type">
+            <summary>
+            文字类型
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpText.Style">
+            <summary>
+            文字风格
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.FeedLine">
+            <summary>
+            分割线
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.FeedLine.Line">
+            <summary>
+            行
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.FeedLine.Height">
+            <summary>
+            高度
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.PrintBatchParam`1">
+            <summary>
+            打印批量参数
+            </summary>
+            <typeparam name="T">类型</typeparam>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.PrintBatchParam`1.Template">
+            <summary>
+            模板
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.PrintBatchParam`1.Params">
+            <summary>
+            打印主数据。注：属性值不支持List,Map,类对象
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,7 @@
+﻿<Project>
+	<PropertyGroup>
+		<AssemblyName>Bing.EasyPrint.Templates</AssemblyName>
+		<PackageId>Bing.EasyPrint.Templates</PackageId>
+		<Description>Bing.EasyPrint.Templates是Bing应用框架的小票打印命令生成库支持模板的方式。</Description>
+	</PropertyGroup>
+</Project>
