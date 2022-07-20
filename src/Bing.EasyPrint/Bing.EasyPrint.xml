@@ -4,58 +4,120 @@
         <name>Bing.EasyPrint</name>
     </assembly>
     <members>
-        <member name="T:Bing.EasyPrint.Core.BufferWriter">
+        <member name="T:Bing.EasyPrint.CPCL.PrintCommandStruct">
             <summary>
-            缓冲区写入器
+            打印命令结构
             </summary>
         </member>
-        <member name="F:Bing.EasyPrint.Core.BufferWriter._buffer">
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.#ctor">
             <summary>
-            字节缓冲区
+            初始化一个<see cref="T:Bing.EasyPrint.CPCL.PrintCommandStruct"/>类型的实例
             </summary>
         </member>
-        <member name="F:Bing.EasyPrint.Core.BufferWriter._sources">
+        <member name="P:Bing.EasyPrint.CPCL.PrintCommandStruct.Begin">
             <summary>
-            原始命令
+            开始命令
             </summary>
         </member>
-        <member name="F:Bing.EasyPrint.Core.BufferWriter._encoding">
+        <member name="P:Bing.EasyPrint.CPCL.PrintCommandStruct.PageWidth">
             <summary>
-            字符编码
+            页宽命令
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.#ctor(System.Text.Encoding)">
+        <member name="P:Bing.EasyPrint.CPCL.PrintCommandStruct.Content">
             <summary>
-            初始化一个<see cref="T:Bing.EasyPrint.Core.BufferWriter"/>类型的实例
-            </summary>
-            <param name="encoding">字符编码</param>
-        </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.Byte[])">
-            <summary>
-            写入
-            </summary>
-            <param name="value">字节数组</param>
-        </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.String)">
-            <summary>
-            写入
-            </summary>
-            <param name="value">字符串</param>
-        </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.Clear">
-            <summary>
-            清空内容
+            命令内容
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.GetBytes">
+        <member name="P:Bing.EasyPrint.CPCL.PrintCommandStruct.End">
             <summary>
-            获取二进制数组
+            结束命令
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Core.BufferWriter.ToString">
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.Add(Bing.EasyPrint.CPCL.MetadataBase)">
             <summary>
-            输出字符串
+            添加
             </summary>
+            <param name="metadata">元数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.Add(Bing.EasyPrint.CPCL.RawMetadata)">
+            <summary>
+            添加
+            </summary>
+            <param name="rawMetadata">命令 - 元数据</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.AddRaw(System.String)">
+            <summary>
+            添加命令
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.AddRawLine(System.String)">
+            <summary>
+            添加命令并换行
+            </summary>
+            <param name="raw">命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.AddRaw(System.String,System.Boolean)">
+            <summary>
+            添加命令
+            </summary>
+            <param name="raw">命令</param>
+            <param name="newLine">是否换行</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.CheckBeginCommand(System.String)">
+            <summary>
+            检查开始命令
+            </summary>
+            <param name="raw">原文</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.CheckEndCommand(System.String)">
+            <summary>
+            检查结束命令
+            </summary>
+            <param name="raw">原文</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.CheckPageWidthCommand(System.String)">
+            <summary>
+            检查页宽命令
+            </summary>
+            <param name="raw">原文</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.Clear">
+            <summary>
+            清空
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.SafeInit(Bing.EasyPrint.CPCL.CPCLCommandInfo)">
+            <summary>
+            安全初始化
+            </summary>
+            <param name="info">CPCL命令信息</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.InitBeginCommand(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            初始化开始命令
+            </summary>
+            <param name="offset">偏移量。整个标签的横向偏移值</param>
+            <param name="height">高度。标签的最大高度。</param>
+            <param name="qty">标签数量。打印标签数量</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.InitPageWidth(System.Int32)">
+            <summary>
+            初始化页宽命令
+            </summary>
+            <param name="width">宽度</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.InitEndCommand">
+            <summary>
+            初始化结束命令
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.Build(Bing.EasyPrint.CPCL.CPCLPrintCommand)">
+            <summary>
+            构建
+            </summary>
+            <param name="command">CPCL打印命令</param>
         </member>
         <member name="T:Bing.EasyPrint.CPCL.Barcode1DComponent">
             <summary>
@@ -1111,9 +1173,9 @@
             缓冲区写入器
             </summary>
         </member>
-        <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.Items">
+        <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.Content">
             <summary>
-            元数据列表
+            命令内容
             </summary>
         </member>
         <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.CommandInfo">
@@ -1815,6 +1877,123 @@
             构建
             </summary>
             <param name="command">打印命令</param>
+        </member>
+        <member name="T:Bing.EasyPrint.IPrintValue">
+            <summary>
+            打印值
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.IPrintValue.Data">
+            <summary>
+            数据
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValue.GetString">
+            <summary>
+            获取字符串
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValue.GetString(System.Text.Encoding)">
+            <summary>
+            获取字符串
+            </summary>
+            <param name="encoding">字符编码</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValue.GetHexString">
+            <summary>
+            获取16进制字符串
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValue.GetHexString(System.Boolean)">
+            <summary>
+            获取16进制字符串
+            </summary>
+            <param name="uppercase">是否大写字母</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValue.GetBase64String">
+            <summary>
+            获取Base64字符串
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.IPrintValueDescriptor">
+            <summary>
+            打印值描述符
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValueDescriptor.GetString">
+            <summary>
+            获取字符串
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValueDescriptor.GetString(System.Text.Encoding)">
+            <summary>
+            获取字符串
+            </summary>
+            <param name="encoding">字符编码</param>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValueDescriptor.GetHexString">
+            <summary>
+            获取16进制字符串
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IPrintValueDescriptor.GetHexString(System.Boolean)">
+            <summary>
+            获取16进制字符串
+            </summary>
+            <param name="uppercase">是否大写字母</param>
+        </member>
+        <member name="T:Bing.EasyPrint.Core.BufferWriter">
+            <summary>
+            缓冲区写入器
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._buffer">
+            <summary>
+            字节缓冲区
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._sources">
+            <summary>
+            原始命令
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._encoding">
+            <summary>
+            字符编码
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.#ctor(System.Text.Encoding)">
+            <summary>
+            初始化一个<see cref="T:Bing.EasyPrint.Core.BufferWriter"/>类型的实例
+            </summary>
+            <param name="encoding">字符编码</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.Byte[])">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字节数组</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Write(System.String)">
+            <summary>
+            写入
+            </summary>
+            <param name="value">字符串</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.Clear">
+            <summary>
+            清空内容
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.GetBytes">
+            <summary>
+            获取二进制数组
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BufferWriter.ToString">
+            <summary>
+            输出字符串
+            </summary>
         </member>
         <member name="T:Bing.EasyPrint.DefaultEasyPrint">
             <summary>

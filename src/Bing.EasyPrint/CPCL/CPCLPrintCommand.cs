@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Bing.EasyPrint.Core;
 
@@ -18,9 +17,9 @@ namespace Bing.EasyPrint.CPCL
         internal IBufferWriter Writer { get; private set; }
 
         /// <summary>
-        /// 元数据列表
+        /// 命令内容
         /// </summary>
-        internal List<MetadataBase> Items { get; set; }
+        internal PrintCommandStruct Content { get; }
 
         /// <summary>
         /// CPCL命令信息
@@ -40,7 +39,7 @@ namespace Bing.EasyPrint.CPCL
         {
             Writer = new BufferWriter(encoding);
             CommandInfo = new CPCLCommandInfo();
-            Items = new List<MetadataBase>();
+            Content = new PrintCommandStruct();
         }
 
         /// <summary>
@@ -51,8 +50,8 @@ namespace Bing.EasyPrint.CPCL
         internal CPCLPrintCommand Init(int width, int height)
         {
             CommandInfo = new CPCLCommandInfo {Width = width, Height = height};
-            Items.Clear();
             Writer.Clear();
+            Content.Clear();
             return this;
         }
 
@@ -62,7 +61,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="raw">命令</param>
         public CPCLPrintCommand WriteRaw(string raw)
         {
-            Items.Add(new RawMetadata(raw));
+            Content.AddRaw(raw);
             return this;
         }
 
@@ -72,7 +71,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="raw">命令</param>
         public CPCLPrintCommand WriteRawLine(string raw)
         {
-            Items.Add(new RawMetadata(raw, true));
+            Content.AddRawLine(raw);
             return this;
         }
 
@@ -81,16 +80,8 @@ namespace Bing.EasyPrint.CPCL
         /// </summary>
         public IBufferWriter Build()
         {
-            if (Items.All(x => x.MetadataType == MetadataType.Raw))
-            {
-                Items.ForEach(x => x.Build(this));
-                return Writer;
-            }
-
-            Writer.WriteLine($"! {CommandInfo.Offset} 200 200 {CommandInfo.Height} {CommandInfo.Qty}");
-            Writer.WriteLine($"PAGE-WIDTH {CommandInfo.Width}");
-            Items.ForEach(x => x.Build(this));
-            Writer.WriteLine("PRINT");
+            Content.SafeInit(CommandInfo);
+            Content.Build(this);
             return Writer;
         }
     }

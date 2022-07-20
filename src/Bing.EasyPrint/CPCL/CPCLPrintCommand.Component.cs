@@ -67,7 +67,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineWidth">线条宽度</param>
         public CPCLPrintCommand DrawLine(int x0, int y0, int x1, int y1, int lineWidth)
         {
-            Items.Add(new LineComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
+            Content.Add(new LineComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
             return this;
         }
 
@@ -103,7 +103,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y1">线条结束点y坐标</param>
         public CPCLPrintCommand DrawDashLine(int x0, int y0, int x1, int y1)
         {
-            Items.Add(new DashLineComponent
+            Content.Add(new DashLineComponent
             {
                 X0 = x0,
                 Y0 = y0,
@@ -121,7 +121,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="length">线条长度</param>
         public CPCLPrintCommand DrawDashLine(int x, int y, int length)
         {
-            Items.Add(new DashLineComponent
+            Content.Add(new DashLineComponent
             {
                 X0 = x,
                 Y0 = y,
@@ -137,7 +137,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="y">线条起始y坐标</param>
         public CPCLPrintCommand DrawSplitLine(int x, int y)
         {
-            Items.Add(new SplitLineComponent
+            Content.Add(new SplitLineComponent
             {
                 X = x,
                 Y = y
@@ -153,7 +153,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="symbol">分割符</param>
         public CPCLPrintCommand DrawSplitLine(int x, int y,char symbol)
         {
-            Items.Add(new SplitLineComponent
+            Content.Add(new SplitLineComponent
             {
                 X = x,
                 Y = y,
@@ -172,7 +172,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="lineWidth">线条宽度</param>
         public CPCLPrintCommand DrawRect(int x0, int y0, int x1, int y1, int lineWidth)
         {
-            Items.Add(new BoxComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
+            Content.Add(new BoxComponent { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Width = lineWidth });
             return this;
         }
 
@@ -221,7 +221,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="rotation">旋转角度</param>
         public CPCLPrintCommand DrawBarcode1D(string type, int x, int y, string text, int lineWidth, int height, int ratio, int rotation)
         {
-            Items.Add(new Barcode1DComponent { Type = type, X = x, Y = y, Text = text, LineWidth = lineWidth, Height = height, Rotate = rotation, Ratio = ratio });
+            Content.Add(new Barcode1DComponent { Type = type, X = x, Y = y, Text = text, LineWidth = lineWidth, Height = height, Rotate = rotation, Ratio = ratio });
             return this;
         }
 
@@ -283,7 +283,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="rotation">旋转角度</param>
         public CPCLPrintCommand DrawQrCode(int x, int y, string text, int unitWidth, string errorLevel, int rotation)
         {
-            Items.Add(new QRCodeComponent {X = x, Y = y, Text = text, Size = unitWidth, ErrorLevel = errorLevel, Rotate = rotation});
+            Content.Add(new QRCodeComponent {X = x, Y = y, Text = text, Size = unitWidth, ErrorLevel = errorLevel, Rotate = rotation});
             return this;
         }
 
@@ -311,7 +311,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="bitmap">图片数据</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, Bitmap bitmap)
         {
-            Items.Add(ImageComponent.CreateFromImage(bitmap).InitPosition(startX, startY));
+            Content.Add(ImageComponent.CreateFromImage(bitmap).InitPosition(startX, startY));
             return this;
         }
 
@@ -323,7 +323,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="imageUrl">图片地址</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, string imageUrl)
         {
-            Items.Add(ImageComponent.CreateFromFile(imageUrl).InitPosition(startX, startY));
+            Content.Add(ImageComponent.CreateFromFile(imageUrl).InitPosition(startX, startY));
             return this;
         }
 
@@ -335,7 +335,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="bytes">图片数据</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, byte[] bytes)
         {
-            Items.Add(ImageComponent.CreateFromBytes(bytes).InitPosition(startX, startY));
+            Content.Add(ImageComponent.CreateFromBytes(bytes).InitPosition(startX, startY));
             return this;
         }
 
@@ -347,7 +347,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="stream">图片流</param>
         public CPCLPrintCommand DrawImage(int startX, int startY, Stream stream)
         {
-            Items.Add(ImageComponent.CreateFromStream(stream).InitPosition(startX, startY));
+            Content.Add(ImageComponent.CreateFromStream(stream).InitPosition(startX, startY));
             return this;
         }
 
@@ -364,7 +364,7 @@ namespace Bing.EasyPrint.CPCL
         /// <param name="underline">是否下划线</param>
         public CPCLPrintCommand DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, bool reverse, bool underline)
         {
-            Items.Add(new TextComponent
+            Content.Add(new TextComponent
             {
                 X = x, Y = y, Text = text, FontSize = fontSize, 
                 Rotate = rotation, Bold = bold, Reverse = reverse, 
