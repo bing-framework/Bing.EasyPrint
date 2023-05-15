@@ -288,24 +288,17 @@
             </summary>
             <param name="bytes">字节数组</param>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromImage(System.Drawing.Image)">
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.CreateFromImage(SixLabors.ImageSharp.Image)">
             <summary>
             通过图片创建图片组件
             </summary>
             <param name="image">图片</param>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.GetImageData(System.Drawing.Image)">
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.GetImageData(SixLabors.ImageSharp.Image)">
             <summary>
             获取图片数据
             </summary>
             <param name="image">图片</param>
-        </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.BitmapTo1Bpp(System.Drawing.Bitmap)">
-            <summary>
-            转换为1位位图
-            </summary>
-            <param name="img"></param>
-            <returns></returns>
         </member>
         <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ToHex(System.Byte[])">
             <summary>
@@ -1075,7 +1068,7 @@
             <param name="errorLevel">二维码纠错级别</param>
             <param name="rotation">旋转角度</param>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,System.Drawing.Bitmap)">
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.DrawImage(System.Int32,System.Int32,SixLabors.ImageSharp.Image)">
             <summary>
             画图片
             </summary>
@@ -2905,7 +2898,7 @@
             <param name="errorLevel">二维码纠错级别</param>
             <param name="rotation">旋转角度</param>
         </member>
-        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,System.Drawing.Bitmap)">
+        <member name="M:Bing.EasyPrint.IPrintComponent`1.DrawImage(System.Int32,System.Int32,SixLabors.ImageSharp.Image)">
             <summary>
             画图片
             </summary>

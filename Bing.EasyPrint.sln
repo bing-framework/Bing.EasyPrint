@@ -1,20 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30523.141
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33530.505
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bing.EasyPrint", "src\Bing.EasyPrint\Bing.EasyPrint.csproj", "{A202D824-3223-4E7B-A79B-96303192CAEB}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bing.EasyPrint.Tests", "tests\Bing.EasyPrint.Tests\Bing.EasyPrint.Tests.csproj", "{FE2CAB1A-E0EF-4775-AF4C-901314DF2939}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_SolutionItems", "_SolutionItems", "{814AC42F-7E98-49C3-8ADD-FB14BE172923}"
-	ProjectSection(SolutionItems) = preProject
-		common.props = common.props
-		LICENSE = LICENSE
-		Publish.bat = Publish.bat
-		README.md = README.md
-		version.props = version.props
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "asset", "asset", "{9F52451E-CCA8-45DD-BA5D-C2CACA07CF77}"
 EndProject
@@ -22,9 +15,35 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "props", "props", "{3C915628
 	ProjectSection(SolutionItems) = preProject
 		asset\props\misc.props = asset\props\misc.props
 		asset\props\package.props = asset\props\package.props
+		asset\props\sourcelink.env.props = asset\props\sourcelink.env.props
+		asset\props\target.feature.props = asset\props\target.feature.props
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bing.EasyPrint.Templates", "src\Bing.EasyPrint.Templates\Bing.EasyPrint.Templates.csproj", "{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bing.EasyPrint.Templates", "src\Bing.EasyPrint.Templates\Bing.EasyPrint.Templates.csproj", "{441B45FB-76F8-4E61-9CA4-0E5BAB44B64F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{8D7519A2-B1A1-4E91-B18E-32B3DA392DE5}"
+	ProjectSection(SolutionItems) = preProject
+		asset\images\icon.png = asset\images\icon.png
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{2757A100-98D6-443E-ACB0-EA6065A7BE88}"
+	ProjectSection(SolutionItems) = preProject
+		Publish.bat = Publish.bat
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "solution", "solution", "{6F0DFB0A-D54A-4992-873F-73E16A2FB258}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		common.props = common.props
+		common.tests.props = common.tests.props
+		LICENSE = LICENSE
+		version.props = version.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{58F59A06-E35F-476A-8A8B-E6E315926B68}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +70,10 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{9F52451E-CCA8-45DD-BA5D-C2CACA07CF77} = {814AC42F-7E98-49C3-8ADD-FB14BE172923}
 		{3C915628-5110-495E-B561-63C8BCEF3240} = {9F52451E-CCA8-45DD-BA5D-C2CACA07CF77}
+		{8D7519A2-B1A1-4E91-B18E-32B3DA392DE5} = {9F52451E-CCA8-45DD-BA5D-C2CACA07CF77}
+		{2757A100-98D6-443E-ACB0-EA6065A7BE88} = {814AC42F-7E98-49C3-8ADD-FB14BE172923}
+		{6F0DFB0A-D54A-4992-873F-73E16A2FB258} = {814AC42F-7E98-49C3-8ADD-FB14BE172923}
+		{58F59A06-E35F-476A-8A8B-E6E315926B68} = {814AC42F-7E98-49C3-8ADD-FB14BE172923}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01422DBE-8356-4DFA-9C0B-4A15E1B0A46F}
