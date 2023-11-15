@@ -1,30 +1,30 @@
 <Project>
-  <PropertyGroup>
-    <TargetFrameworks>net7.0;net6.0;net5.0;netcoreapp3.1;netstandard2.0;netstandard2.1;</TargetFrameworks>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFrameworks>net7.0;net6.0;netcoreapp3.1;netstandard2.0;netstandard2.1;</TargetFrameworks>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <RootNamespace/>
-    <LangVersion>latest</LangVersion>
+	<PropertyGroup>
+		<RootNamespace/>
+		<LangVersion>latest</LangVersion>
 		<NoWarn Condition=" '$(Configuration)' == 'Debug' ">$(NoWarn);CS1591;NETSDK1138</NoWarn>
-    <NoWarn Condition=" '$(Configuration)' == 'Release' ">$(NoWarn);CS1591;NETSDK1138</NoWarn>
-  </PropertyGroup>
+		<NoWarn Condition=" '$(Configuration)' == 'Release' ">$(NoWarn);CS1591;NETSDK1138</NoWarn>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <OutputPath>$(MSBuildThisFileDirectory)/output/debug/</OutputPath>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<OutputPath>$(MSBuildThisFileDirectory)/output/debug/</OutputPath>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>$(MSBuildThisFileDirectory)/output/release/</OutputPath>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<OutputPath>$(MSBuildThisFileDirectory)/output/release/</OutputPath>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DocumentationFile>$(AssemblyName).xml</DocumentationFile>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<DocumentationFile>$(AssemblyName).xml</DocumentationFile>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DocumentationFile>$(AssemblyName).xml</DocumentationFile>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<DocumentationFile>$(AssemblyName).xml</DocumentationFile>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<!--移除Xml、DotSettings-->
@@ -38,7 +38,7 @@
 
 	<Import Project="asset/props/package.props"/>
 
-  <Import Project="asset/props/misc.props"/>
+	<Import Project="asset/props/misc.props"/>
 
-  <Import Project="./version.props"/>
+	<Import Project="./version.props"/>
 </Project>
