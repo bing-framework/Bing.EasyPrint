@@ -1,39 +1,36 @@
-﻿// ReSharper disable once CheckNamespace
+// ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 矩形组件
+/// 表示输出矩形边框的 CPCL 打印组件。
 /// </summary>
 internal class BoxComponent : ComponentMetadata
 {
     /// <summary>
-    /// 线条宽度
+    /// 获取或设置矩形边框线宽，单位为打印点。
     /// </summary>
     public int Width { get; set; }
 
     /// <summary>
-    /// 矩形框左上角x坐标
+    /// 获取或设置矩形左上角的横坐标。
     /// </summary>
     public int X0 { get; set; }
 
     /// <summary>
-    /// 矩形框右下角x坐标
+    /// 获取或设置矩形右下角的横坐标。
     /// </summary>
     public int X1 { get; set; }
 
     /// <summary>
-    /// 矩形框左上角y坐标
+    /// 获取或设置矩形左上角的纵坐标。
     /// </summary>
     public int Y0 { get; set; }
 
     /// <summary>
-    /// 矩形框右下角y坐标
+    /// 获取或设置矩形右下角的纵坐标。
     /// </summary>
     public int Y1 { get; set; }
 
-    /// <summary>
-    /// 构建
-    /// </summary>
-    /// <param name="command">打印命令</param>
+    /// <inheritdoc />
     public override void Build(CPCLPrintCommand command) => command.Writer.WriteLine($"BOX {X0} {Y0} {X1} {Y1} {Width}");
 }

@@ -40,12 +40,16 @@ public class BizLabelTest : TestBase
     private void Build()
     {
         var result = Command.Build();
+        Assert.NotEmpty(result.GetBytes());
+        Assert.StartsWith("! ", result.ToString());
+        Assert.EndsWith("PRINT\r\n", result.ToString());
+        Assert.Equal(result.GetBytes(), Command.Build().GetBytes());
         Output.WriteLine("----------------------------- 调试命令 ---------------------------------------");
         Output.WriteLine(result.ToString());
         Output.WriteLine("----------------------------- 调试命令-十六进制 ---------------------------------------");
         Output.WriteLine(result.ToHex());
         Output.WriteLine("----------------------------- 执行命令 ---------------------------------------");
-        Print(result.GetBytes());
+        Assert.True(Print(result.GetBytes()));
     }
 
     /// <summary>
@@ -377,7 +381,7 @@ public class BizLabelTest : TestBase
         Command.SetPage(pageWidth, pageHeight);
 
         //顶部logo
-        var logo1 = Image.Load("./Biz/Images/utopa.jpg");
+        using var logo1 = Image.Load(System.IO.Path.Combine(AppContext.BaseDirectory, "Biz", "Images", "logo.jpg"));
         int logo1Width = logo1.Width;
         var logo1Text = "此处应有广告语！";
         int logo1TextWidth = logo1Text.Length * fontSize1 + xMargin;

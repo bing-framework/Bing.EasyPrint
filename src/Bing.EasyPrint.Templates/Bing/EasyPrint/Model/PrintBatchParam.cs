@@ -7,19 +7,27 @@ using System.Threading.Tasks;
 namespace Bing.EasyPrint.Model
 {
     /// <summary>
-    /// 打印批量参数
+    /// 封装按多组业务数据批量执行模板打印所需的输入。
     /// </summary>
-    /// <typeparam name="T">类型</typeparam>
+    /// <typeparam name="T">
+    /// 批量打印所使用的模板类型。
+    /// </typeparam>
     public class PrintBatchParam<T>
     {
         /// <summary>
-        /// 模板
+        /// 获取或设置本批次使用的模板对象。
         /// </summary>
+        /// <remarks>
+        /// 集合中的所有业务数据共用此模板。
+        /// </remarks>
         public T Template{ get; set; }
 
         /// <summary>
-        /// 打印主数据。注：属性值不支持List,Map,类对象
+        /// 获取或设置逐条传入模板的业务数据。
         /// </summary>
+        /// <remarks>
+        /// 每项对应一条打印记录；旧版字段绑定不支持将字段值解析为集合、映射或嵌套对象。
+        /// </remarks>
         public List<object> Params { get; set; }
     }
 }

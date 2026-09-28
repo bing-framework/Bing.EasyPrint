@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj" />
+    <Content Include="../../samples/Templates/label.json" Link="Samples/label.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/Templates/receipt.json" Link="Samples/receipt.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/Templates/price-label-pm0025.json" Link="Samples/price-label-pm0025.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/Templates/price-label-pm0034.json" Link="Samples/price-label-pm0034.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

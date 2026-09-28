@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EasyPrintProject Condition="'$(EasyPrintProject)' == ''">../../src/Bing.EasyPrint/Bing.EasyPrint.csproj</EasyPrintProject>
+    <DefineConstants Condition="'$(IncludeTemplates)' == 'true'">$(DefineConstants);TEMPLATES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(EasyPrintProject)" />
+    <ProjectReference Include="../../src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj" Condition="'$(IncludeTemplates)' == 'true'" />
+  </ItemGroup>
+</Project>

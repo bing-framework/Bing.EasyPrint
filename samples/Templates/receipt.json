@@ -1,0 +1,17 @@
+{
+  "Version": 1,
+  "Width": 576,
+  "Height": 400,
+  "AutoHeight": true,
+  "Rows": [
+    { "IsHeader": true, "Cells": [{ "Elements": [{ "Type": 1, "Bold": true, "Field": { "Name": "Title" } }] }] },
+    {
+      "RepeatSource": "Items",
+      "Condition": { "Path": "Quantity", "Operator": "gt", "Value": 0 },
+      "Cells": [
+        { "Width": 400, "Elements": [{ "Type": 1, "Field": { "Name": "Name" } }] },
+        { "Width": 176, "Elements": [{ "Type": 1, "Field": { "Name": "Quantity" } }] }
+      ]
+    }
+  ]
+}

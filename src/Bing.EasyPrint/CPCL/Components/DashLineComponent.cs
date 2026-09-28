@@ -3,19 +3,16 @@
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 虚线组件
+/// 将线段按固定间隔输出为虚线的组件。
 /// </summary>
 internal class DashLineComponent : LineComponent
 {
-    /// <summary>
-    /// 构建
-    /// </summary>
-    /// <param name="command">打印命令</param>
+    /// <inheritdoc />
     public override void Build(CPCLPrintCommand command)
     {
         command.Writer.WriteLine("SETMAG 1 1");
-        for (var i = 0; i < X1; i = ((i + 16) - 1) + 1) 
-            command.Writer.WriteLine($"T 24 0 {X0 + i} {Y0 - 10} -");
+        for (long x = X0; x < X1; x += 16)
+            command.Writer.WriteLine($"T 24 0 {x} {Y0 - 10} -");
         command.Writer.WriteLine("SETMAG 0 0");
     }
 }

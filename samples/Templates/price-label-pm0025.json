@@ -1,0 +1,421 @@
+{
+  "Version": 1,
+  "AutoHeight": false,
+  "PaperType": 0,
+  "Width": 671,
+  "Height": 360,
+  "Color": 0,
+  "Rows": [
+    {
+      "IsHeader": false,
+      "Height": 360,
+      "Cells": [
+        {
+          "Width": 671,
+          "Elements": [
+            {
+              "FontSize": 32,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": true,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "Name",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 8
+              },
+              "EndCoordinate": {
+                "X": 502,
+                "Y": 84
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Value": "监督电话:12358",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 86
+              },
+              "EndCoordinate": {
+                "X": 312,
+                "Y": 108
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Value": "规格:",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 112
+              },
+              "EndCoordinate": {
+                "X": 58,
+                "Y": 136
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "Specification",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 60,
+                "Y": 112
+              },
+              "EndCoordinate": {
+                "X": 360,
+                "Y": 136
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Value": "产地:",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 138
+              },
+              "EndCoordinate": {
+                "X": 58,
+                "Y": 162
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "Origin",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 60,
+                "Y": 138
+              },
+              "EndCoordinate": {
+                "X": 360,
+                "Y": 162
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Condition": {
+                "Path": "IsPromotion",
+                "Operator": "eq",
+                "Value": true
+              },
+              "Type": 1,
+              "Field": {
+                "Name": "OriginPriceDisplay",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 168
+              },
+              "EndCoordinate": {
+                "X": 132,
+                "Y": 190
+              }
+            },
+            {
+              "LineWidth": 1,
+              "LineEndCoordinate": {
+                "X": 132,
+                "Y": 189
+              },
+              "Condition": {
+                "Path": "IsPromotion",
+                "Operator": "eq",
+                "Value": true
+              },
+              "Type": 5,
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 189
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Condition": {
+                "Path": "IsPromotion",
+                "Operator": "eq",
+                "Value": false
+              },
+              "Type": 1,
+              "Field": {
+                "Value": "零售价 / Price",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 196
+              },
+              "EndCoordinate": {
+                "X": 132,
+                "Y": 222
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Condition": {
+                "Path": "IsPromotion",
+                "Operator": "eq",
+                "Value": true
+              },
+              "Type": 1,
+              "Field": {
+                "Value": "促销价 / Sale",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 196
+              },
+              "EndCoordinate": {
+                "X": 132,
+                "Y": 222
+              }
+            },
+            {
+              "FontSize": 24,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "CurrencySymbol",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 138,
+                "Y": 192
+              },
+              "EndCoordinate": {
+                "X": 170,
+                "Y": 226
+              }
+            },
+            {
+              "FontSize": 80,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 2,
+              "Type": 1,
+              "Field": {
+                "Name": "SalePriceInteger",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 172,
+                "Y": 174
+              },
+              "EndCoordinate": {
+                "X": 322,
+                "Y": 262
+              }
+            },
+            {
+              "FontSize": 32,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "SalePriceFraction",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 324,
+                "Y": 184
+              },
+              "EndCoordinate": {
+                "X": 406,
+                "Y": 228
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "Unit",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 324,
+                "Y": 230
+              },
+              "EndCoordinate": {
+                "X": 406,
+                "Y": 256
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Condition": {
+                "Path": "PromotionPeriod",
+                "Operator": "notNull"
+              },
+              "Type": 1,
+              "Field": {
+                "Name": "PromotionPeriod",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 274
+              },
+              "EndCoordinate": {
+                "X": 442,
+                "Y": 298
+              }
+            },
+            {
+              "BarcodeType": 0,
+              "LineWidth": 1,
+              "Ratio": 2,
+              "Width": 280,
+              "Height": 32,
+              "Condition": {
+                "Path": "Barcode",
+                "Operator": "notNull"
+              },
+              "Type": 4,
+              "Field": {
+                "Name": "Barcode",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 12,
+                "Y": 310
+              },
+              "EndCoordinate": {
+                "X": 292,
+                "Y": 342
+              }
+            },
+            {
+              "FontSize": 16,
+              "FontStyle": 0,
+              "FontName": 0,
+              "Bold": false,
+              "TextAlignment": 0,
+              "Type": 1,
+              "Field": {
+                "Name": "Code",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 308,
+                "Y": 310
+              },
+              "EndCoordinate": {
+                "X": 518,
+                "Y": 336
+              }
+            },
+            {
+              "UnitWidth": 4,
+              "ErrorLevel": "L",
+              "Width": 135,
+              "Height": 135,
+              "Condition": {
+                "Path": "QrCode",
+                "Operator": "notNull"
+              },
+              "Type": 3,
+              "Field": {
+                "Name": "QrCode",
+                "NeedFeedLine": true,
+                "Fit": false
+              },
+              "StartCoordinate": {
+                "X": 520,
+                "Y": 20
+              },
+              "EndCoordinate": {
+                "X": 655,
+                "Y": 155
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

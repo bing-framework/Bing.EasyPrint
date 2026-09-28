@@ -7,42 +7,42 @@ using System.Threading.Tasks;
 namespace Bing.EasyPrint.Model
 {
     /// <summary>
-    /// 字体
+    /// 定义模板文字元素使用的字体与排版选项。
     /// </summary>
     public class BpFont
     {
         /// <summary>
-        /// 字体大小
+        /// 获取或设置文字的字号值。
         /// </summary>
         public int FontSize{ get; set; }
 
         /// <summary>
-        /// 字体风格
+        /// 获取或设置字体样式标识。
         /// </summary>
         public int FontStyle { get; set; }
 
         /// <summary>
-        /// 字体名称
+        /// 获取或设置打印机字体编号。
         /// </summary>
         public int FontName { get; set; }
 
         /// <summary>
-        /// 字体加粗
+        /// 获取或设置文字是否加粗。
         /// </summary>
         public bool Bold { get; set; }
 
         /// <summary>
-        /// 字体放大
+        /// 获取或设置文字的放大系数。
         /// </summary>
         public int Mag { get; set; }
 
         /// <summary>
-        /// 是否自动换行
+        /// 获取或设置文字超过可用宽度时是否换行。
         /// </summary>
         public bool NeedFeedLine { get; set; }
 
         /// <summary>
-        /// 是否自适应宽度
+        /// 获取或设置是否将文字缩放至可用宽度。
         /// </summary>
         public bool Fit { get; set; }
     }

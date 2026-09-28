@@ -1,4 +1,4 @@
-﻿namespace Bing.EasyPrint.CPCL;
+namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
 /// CPCL 打印命令 - 条码指令
@@ -17,7 +17,13 @@ partial class CPCLPrintCommand
     /// <param name="y">纵向起始位置</param>
     /// <param name="data">条码数据</param>
     /// <remarks>BARCODE 命令能够以指定的宽度和高度纵向和横向打印条码。</remarks>
-    public CPCLPrintCommand Barcode(string type, int width, int ratio, int height, int x, int y, string data) => WriteRawLine($"B {type} {width} {ratio} {height} {x} {y} {data}");
+    /// <returns>当前打印命令实例。</returns>
+    public CPCLPrintCommand Barcode(string type, int width, int ratio, int height, int x, int y, string data)
+    {
+        CPCLInputValidator.ValidateToken(type, nameof(type));
+        CPCLInputValidator.ValidateLine(data, nameof(data));
+        return WriteRawLine($"B {type} {width} {ratio} {height} {x} {y} {data}");
+    }
 
     /// <summary>
     /// VBARCODE 命令（纵向）
@@ -30,7 +36,13 @@ partial class CPCLPrintCommand
     /// <param name="y">纵向起始位置</param>
     /// <param name="data">条码数据</param>
     /// <remarks>BARCODE 命令能够以指定的宽度和高度纵向和横向打印条码。</remarks>
-    public CPCLPrintCommand VBarcode(string type, int width, int ratio, int height, int x, int y, string data) => WriteRawLine($"VB {type} {width} {ratio} {height} {x} {y} {data}");
+    /// <returns>当前打印命令实例。</returns>
+    public CPCLPrintCommand VBarcode(string type, int width, int ratio, int height, int x, int y, string data)
+    {
+        CPCLInputValidator.ValidateToken(type, nameof(type));
+        CPCLInputValidator.ValidateLine(data, nameof(data));
+        return WriteRawLine($"VB {type} {width} {ratio} {height} {x} {y} {data}");
+    }
 
     /// <summary>
     /// BARCODE-TEXT 命令（开启）
@@ -42,7 +54,12 @@ partial class CPCLPrintCommand
     /// BARCODE-TEXT 命令用于通过创建条码时所用的相同数据来标记条码。这项命令避免了使用单独文本命令注释 条码的必要。文本位于条码下方的中间位置。<br />
     /// 使用 BARCODE-TEXT OFF（或 BT OFF）可以禁用它。
     /// </remarks>
-    public CPCLPrintCommand BarcodeText(string font, int size, int offset) => WriteRawLine($"BT {font} {size} {offset}");
+    /// <returns>当前打印命令实例。</returns>
+    public CPCLPrintCommand BarcodeText(string font, int size, int offset)
+    {
+        CPCLInputValidator.ValidateToken(font, nameof(font));
+        return WriteRawLine($"BT {font} {size} {offset}");
+    }
 
     /// <summary>
     /// BARCODE-TEXT 命令（关闭）
@@ -51,6 +68,7 @@ partial class CPCLPrintCommand
     /// BARCODE-TEXT 命令用于通过创建条码时所用的相同数据来标记条码。这项命令避免了使用单独文本命令注释 条码的必要。文本位于条码下方的中间位置。<br />
     /// 使用 BARCODE-TEXT OFF（或 BT OFF）可以禁用它。
     /// </remarks>
+    /// <returns>当前打印命令实例。</returns>
     public CPCLPrintCommand BarcodeTextOff() => WriteRawLine("BT OFF");
 
     /// <summary>
@@ -66,5 +84,11 @@ partial class CPCLPrintCommand
     /// <param name="dataLine">线性数据</param>
     /// <param name="data2D">2D数据</param>
     /// <remarks>缩减码型(RSS) 涵盖一系列线性符号，旨在为用户解决特定空间限制和应用需求提供相应功能。RSS 多支持 74 个数据字符的编码。 </remarks>
-    public CPCLPrintCommand BarcodeRss(int x, int y, int width, int linHeight, int sepHeight, int segments, int subType, string dataLine, string data2D) => WriteRawLine($"B RSS {x} {y} {width} {linHeight} {sepHeight} {segments} {subType} {dataLine}|{data2D}");
+    /// <returns>当前打印命令实例。</returns>
+    public CPCLPrintCommand BarcodeRss(int x, int y, int width, int linHeight, int sepHeight, int segments, int subType, string dataLine, string data2D)
+    {
+        CPCLInputValidator.ValidateLine(dataLine, nameof(dataLine));
+        CPCLInputValidator.ValidateLine(data2D, nameof(data2D));
+        return WriteRawLine($"B RSS {x} {y} {width} {linHeight} {sepHeight} {segments} {subType} {dataLine}|{data2D}");
+    }
 }

@@ -49,3 +49,7 @@ Bing.EasyPrint是Bing应用框架的便携式打印机命令生成库。
 > 这意味着你可以在任意场景下使用 Bing 应用框架而不会有人找你要钱。
 
 > Bing 会尽量引入开源免费的第三方技术框架，如有意外，还请自行了解。
+## Template rendering
+
+See [CPCL template rendering](docs/templates.md) for C# and JSON templates, pagination, input limits, and examples.
+Run `dotnet run --project samples/Templates` to generate sample CPCL files without printing.

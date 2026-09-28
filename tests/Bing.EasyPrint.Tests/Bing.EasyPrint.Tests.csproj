@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Bing.EasyPrint\Bing.EasyPrint.csproj" />
+    <ProjectReference Include="..\..\src\Bing.EasyPrint.Templates\Bing.EasyPrint.Templates.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp2.2' ">

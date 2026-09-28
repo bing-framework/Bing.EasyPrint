@@ -4,5 +4,9 @@
 	<Import Project="project.props" />
 
 	<Import Project="project.dependency.props" />
+	<ItemGroup>
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="ZXing.Net" Version="0.16.11" />
+	</ItemGroup>
 
 </Project>

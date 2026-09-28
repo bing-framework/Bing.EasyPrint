@@ -5,12 +5,25 @@ using System.Text.RegularExpressions;
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 打印命令结构
+/// 保存自动生成及显式指定的打印任务命令。
 /// </summary>
 internal class PrintCommandStruct
 {
     /// <summary>
-    /// 初始化一个<see cref="PrintCommandStruct"/>类型的实例
+    /// 指示起始命令是否由调用方显式提供。
+    /// </summary>
+    private bool _hasExplicitBegin;
+    /// <summary>
+    /// 指示页宽命令是否由调用方显式提供。
+    /// </summary>
+    private bool _hasExplicitPageWidth;
+    /// <summary>
+    /// 指示结束命令是否由调用方显式提供。
+    /// </summary>
+    private bool _hasExplicitEnd;
+
+    /// <summary>
+    /// 初始化一个 <see cref="PrintCommandStruct"/> 类型的实例。
     /// </summary>
     public PrintCommandStruct()
     {
@@ -18,22 +31,22 @@ internal class PrintCommandStruct
     }
 
     /// <summary>
-    /// 开始命令
+    /// 获取或设置打印任务的起始命令。
     /// </summary>
     public MetadataBase Begin { get; set; }
 
     /// <summary>
-    /// 页宽命令
+    /// 获取或设置页面宽度命令。
     /// </summary>
     public MetadataBase PageWidth { get; set; }
 
     /// <summary>
-    /// 命令内容
+    /// 获取或设置起止命令之间的打印内容。
     /// </summary>
     public List<MetadataBase> Content { get; set; }
 
     /// <summary>
-    /// 结束命令
+    /// 获取或设置打印任务的结束命令。
     /// </summary>
     public MetadataBase End { get; set; }
 
@@ -61,18 +74,21 @@ internal class PrintCommandStruct
         if (CheckBeginCommand(rawMetadata.Raw))
         {
             Begin = rawMetadata;
+            _hasExplicitBegin = true;
             return;
         }
         // 检查结束命令
         if (CheckEndCommand(rawMetadata.Raw))
         {
             End = rawMetadata;
+            _hasExplicitEnd = true;
             return;
         }
         // 检查页宽命令
         if (CheckPageWidthCommand(rawMetadata.Raw))
         {
             PageWidth = rawMetadata;
+            _hasExplicitPageWidth = true;
             return;
         }
         Content.Add(rawMetadata);
@@ -101,11 +117,12 @@ internal class PrintCommandStruct
     /// 检查开始命令
     /// </summary>
     /// <param name="raw">原文</param>
+    /// <returns>匹配打印任务起始命令时返回 true，否则返回 false。</returns>
     private bool CheckBeginCommand(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
             return false;
-        if (Regex.IsMatch(raw, "^!\\s[0-9]\\s[0-9]+\\s[0-9]+\\s[0-9]+\\s[0-9]+\\s{0,1}$"))
+        if (Regex.IsMatch(raw, "^!\\s[0-9]+\\s[0-9]+\\s[0-9]+\\s[0-9]+\\s[0-9]+\\s{0,1}$"))
             return true;
         return false;
     }
@@ -114,6 +131,7 @@ internal class PrintCommandStruct
     /// 检查结束命令
     /// </summary>
     /// <param name="raw">原文</param>
+    /// <returns>匹配打印任务结束命令时返回 true，否则返回 false。</returns>
     private bool CheckEndCommand(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -127,6 +145,7 @@ internal class PrintCommandStruct
     /// 检查页宽命令
     /// </summary>
     /// <param name="raw">原文</param>
+    /// <returns>匹配页宽命令时返回 true，否则返回 false。</returns>
     private bool CheckPageWidthCommand(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -145,6 +164,9 @@ internal class PrintCommandStruct
         Begin = null;
         End = null;
         PageWidth = null;
+        _hasExplicitBegin = false;
+        _hasExplicitPageWidth = false;
+        _hasExplicitEnd = false;
     }
 
     /// <summary>
@@ -153,9 +175,12 @@ internal class PrintCommandStruct
     /// <param name="info">CPCL命令信息</param>
     public void SafeInit(CPCLCommandInfo info)
     {
-        InitBeginCommand(info.Offset, info.Height, info.Qty);
-        InitPageWidth(info.Width);
-        InitEndCommand();
+        if (!_hasExplicitBegin)
+            InitBeginCommand(info.Offset, info.Height, info.Qty);
+        if (!_hasExplicitPageWidth)
+            InitPageWidth(info.Width);
+        if (!_hasExplicitEnd)
+            InitEndCommand();
     }
 
     /// <summary>
@@ -166,9 +191,7 @@ internal class PrintCommandStruct
     /// <param name="qty">标签数量。打印标签数量</param>
     private void InitBeginCommand(int offset, int height, int qty)
     {
-        if (Begin != null)
-            return;
-        AddRawLine($"! {offset} 200 200 {height} {qty}");
+        Begin = new RawMetadata($"! {offset} 200 200 {height} {qty}", true);
     }
 
     /// <summary>
@@ -177,9 +200,7 @@ internal class PrintCommandStruct
     /// <param name="width">宽度</param>
     private void InitPageWidth(int width)
     {
-        if (PageWidth != null)
-            return;
-        AddRawLine($"PAGE-WIDTH {width}");
+        PageWidth = new RawMetadata($"PAGE-WIDTH {width}", true);
     }
 
     /// <summary>
@@ -187,9 +208,7 @@ internal class PrintCommandStruct
     /// </summary>
     private void InitEndCommand()
     {
-        if (End != null)
-            return;
-        AddRawLine("PRINT");
+        End = new RawMetadata("PRINT", true);
     }
 
     /// <summary>

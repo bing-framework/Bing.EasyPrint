@@ -5,9 +5,6 @@
 /// </summary>
 public class DefaultEasyPrint : IEasyPrint
 {
-    /// <summary>
-    /// 创建打印命令
-    /// </summary>
-    /// <typeparam name="T">打印命令类型</typeparam>
+    /// <inheritdoc />
     public T CreateCommand<T>() where T : IPrintCommand<T>, new() => new T();
 }

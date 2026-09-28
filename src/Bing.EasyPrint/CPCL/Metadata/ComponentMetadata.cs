@@ -2,12 +2,10 @@
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 组件 - 元数据
+/// 表示可作为打印组件写入的元数据。
 /// </summary>
 internal abstract class ComponentMetadata : MetadataBase
 {
-    /// <summary>
-    /// 元数据类型
-    /// </summary>
+    /// <inheritdoc />
     public override MetadataType MetadataType => MetadataType.Component;
 }

@@ -11,7 +11,8 @@ public static class EasyPrintExtensions
     /// <summary>
     /// 创建CPCL打印命令
     /// </summary>
-    /// <param name="print"></param>
+    /// <param name="print">创建命令的打印服务。</param>
+    /// <returns>新建的 CPCL 打印命令实例。</returns>
     // ReSharper disable once InconsistentNaming
     public static CPCLPrintCommand CreateCPCLCommand(this IEasyPrint print)
     {

@@ -3,6 +3,9 @@
 // ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint;
 
+/// <summary>
+/// 提供打印服务的依赖注入注册方法。
+/// </summary>
 public static partial class Extensions
 {
     /// <summary>

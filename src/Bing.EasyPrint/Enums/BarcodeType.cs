@@ -2,71 +2,71 @@
 namespace Bing.EasyPrint;
 
 /// <summary>
-/// 条码类型
+/// 指定一维条码使用的编码制式。
 /// </summary>
 public enum BarcodeType
 {
     /// <summary>
-    /// CODE 128
+    /// Code 128 条码制式。
     /// </summary>
     Code128 = 0,
     /// <summary>
-    /// CODE 39
+    /// Code 39 条码制式。
     /// </summary>
     Code39 = 1,
     /// <summary>
-    /// CODE 93
+    /// Code 93 条码制式。
     /// </summary>
     Code93 = 2,
     /// <summary>
-    /// Codabar
+    /// Codabar 条码制式。
     /// </summary>
     Codabar = 3,
     /// <summary>
-    /// EAN-8
+    /// EAN-8 商品条码制式。
     /// </summary>
     Ean8 = 4,
     /// <summary>
-    /// EAN-13
+    /// EAN-13 商品条码制式。
     /// </summary>
     Ean13 = 5,
     /// <summary>
-    /// UPC-A
+    /// UPC-A 商品条码制式。
     /// </summary>
     UpcA = 6,
     /// <summary>
-    /// UPC-E
+    /// UPC-E 商品条码制式。
     /// </summary>
     UpcE = 7,
     /// <summary>
-    /// I2OF5
+    /// I2OF5 条码制式。
     /// </summary>
     // ReSharper disable once InconsistentNaming
     I2OF5 = 8,
     /// <summary>
-    /// I2OF5C
+    /// I2OF5C 条码制式。
     /// </summary>
     // ReSharper disable once InconsistentNaming
     I2OF5C = 9,
     /// <summary>
-    /// I2OF5G
+    /// I2OF5G 条码制式。
     /// </summary>
     // ReSharper disable once InconsistentNaming
     I2OF5G = 10,
     /// <summary>
-    /// UCCEAN128
+    /// UCC/EAN-128 条码制式。
     /// </summary>
     UccEan128 = 11,
     /// <summary>
-    /// MSI
+    /// MSI 条码制式。
     /// </summary>
     Msi = 12,
     /// <summary>
-    /// POSTNET
+    /// POSTNET 邮政条码制式。
     /// </summary>
     Postnet = 13,
     /// <summary>
-    /// FIM
+    /// FIM 邮政条码制式。
     /// </summary>
     Fim = 14
 }

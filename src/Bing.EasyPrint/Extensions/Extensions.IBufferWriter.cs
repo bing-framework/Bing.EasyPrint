@@ -14,6 +14,7 @@ public static class BufferWriterExtensions
     /// </summary>
     /// <typeparam name="T">类型</typeparam>
     /// <param name="writer">缓冲区写入器</param>
+    /// <returns>写入字节的小写十六进制文本；无字节时返回空字符串。</returns>
     public static string ToHex<T>(this IBufferWriter<T> writer)
     {
         var bytes = writer.GetBytes();
@@ -31,5 +32,6 @@ public static class BufferWriterExtensions
     /// <typeparam name="T">类型</typeparam>
     /// <param name="writer">缓冲区写入器</param>
     /// <param name="value">字符串</param>
+    /// <returns>当前缓冲区写入器实例。</returns>
     public static T WriteLine<T>(this IBufferWriter<T> writer, string value) => writer.Write($"{value}\r\n");
 }

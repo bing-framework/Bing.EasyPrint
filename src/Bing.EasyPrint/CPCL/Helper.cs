@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 命令生成辅助操作
+/// 提供 CPCL 命令标记和坐标换算辅助操作。
 /// </summary>
 internal static class Helper
 {
@@ -12,6 +12,7 @@ internal static class Helper
     /// 获取文本旋转命令
     /// </summary>
     /// <param name="rotate">旋转角度</param>
+    /// <returns>对应角度的 CPCL 文字命令标记。</returns>
     public static string GetTextRotateCommand(int rotate)
     {
         switch (rotate)
@@ -33,6 +34,7 @@ internal static class Helper
     /// 计算字体大小
     /// </summary>
     /// <param name="fontSize">字体大小</param>
+    /// <returns>内置字体编号、固件字号和缩放倍数。</returns>
     public static (int font, int size, int scale) ComputeFontSize(int fontSize)
     {
         switch (fontSize)
@@ -100,6 +102,7 @@ internal static class Helper
     /// 转换样式
     /// </summary>
     /// <param name="style">样式</param>
+    /// <returns>加粗和下划线两个状态。</returns>
     public static (bool bold, bool underline) ConvertStyle(int style)
     {
         switch (style)
@@ -122,6 +125,7 @@ internal static class Helper
     /// 获取条码旋转命令
     /// </summary>
     /// <param name="rotate">旋转角度</param>
+    /// <returns>水平或垂直条码命令标记。</returns>
     public static string GetBarcodeRotateCommand(int rotate)
     {
         switch (rotate)
@@ -141,12 +145,14 @@ internal static class Helper
     /// 获取条码起始坐标
     /// </summary>
     /// <param name="item">条码明细</param>
+    /// <returns>旋转后条码起始坐标，单位为打印点。</returns>
     public static (int x, int y) GetBarcodeCoordinate(Barcode1DComponent item) => GetBarcodeCoordinate(item.Rotate, item.X, item.Y, 0, item.Height);
 
     /// <summary>
     /// 获取条码起始坐标
     /// </summary>
     /// <param name="item">二维码明细</param>
+    /// <returns>旋转后二维码起始坐标，单位为打印点。</returns>
     public static (int x, int y) GetBarcodeCoordinate(QRCodeComponent item) => GetBarcodeCoordinate(item.Rotate, item.X, item.Y, 0, 0);
 
     /// <summary>
@@ -157,6 +163,7 @@ internal static class Helper
     /// <param name="y">y轴起始坐标</param>
     /// <param name="width">宽度</param>
     /// <param name="height">高度</param>
+    /// <returns>旋转后起始坐标，单位为打印点。</returns>
     public static (int x, int y) GetBarcodeCoordinate(int rotate, int x, int y, int width, int height)
     {
         switch (rotate)
@@ -177,6 +184,7 @@ internal static class Helper
     /// 转换二维码纠错级别
     /// </summary>
     /// <param name="level">二维码纠错级别</param>
+    /// <returns>二维码纠错等级标记。</returns>
     public static string ConvertErrorLevel(int level)
     {
         switch (level)
@@ -196,12 +204,14 @@ internal static class Helper
     /// 是否中文字符串
     /// </summary>
     /// <param name="value">值</param>
+    /// <returns>属于实现支持的汉字范围时返回 true，否则返回 false。</returns>
     public static bool IsChinese(char value) => Regex.IsMatch(value.ToString(), "^[一-龥]$");
 
     /// <summary>
     /// 转换条码类型
     /// </summary>
     /// <param name="type">条码类型</param>
+    /// <returns>对应的 CPCL 条码制式标记。</returns>
     public static string ConvertBarcodeType(BarcodeType type)
     {
         switch (type)
@@ -227,7 +237,7 @@ internal static class Helper
             case BarcodeType.I2OF5C:
                 return "I2OF5C";
             case BarcodeType.I2OF5G:
-                return "I20F5G";
+                return "I2OF5G";
             case BarcodeType.UccEan128:
                 return "UCCEAN128";
             case BarcodeType.Msi:
@@ -244,6 +254,7 @@ internal static class Helper
     /// 获取图片旋转命令
     /// </summary>
     /// <param name="rotate">旋转角度</param>
+    /// <returns>水平或垂直扩展图形命令标记。</returns>
     public static string GetImageRotateCommand(int rotate)
     {
         switch (rotate)
@@ -260,10 +271,10 @@ internal static class Helper
     }
 
     /// <summary>
-    /// 获取一行最大字符数。
-    /// 58mm票据打印机：一行可打印16个汉字，32个字符；80mm票据打印机，一行可打印24个汉字，48个字符；421D标签打印机，一行可打印34个汉字，69个字符。
+    /// 根据宽度和字体字距计算单行字符上限。
     /// </summary>
     /// <param name="width">宽度</param>
     /// <param name="fontSize">字体大小</param>
+    /// <returns>单行可容纳的整数个字符。</returns>
     public static int GetLineMaxLength(int width, int fontSize) => width / fontSize;
 }

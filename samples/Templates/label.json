@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Width": 576,
+  "Height": 320,
+  "Rows": [
+    { "Cells": [{ "Elements": [{ "Type": 1, "FontSize": 32, "Bold": true, "Field": { "Value": "商品标签" } }] }] },
+    { "Cells": [{ "Elements": [{ "Type": 1, "Field": { "Name": "Product.Name" } }] }] },
+    { "Cells": [{ "Elements": [{ "Type": 3, "UnitWidth": 3, "Field": { "Name": "Product.Code" } }] }] }
+  ]
+}

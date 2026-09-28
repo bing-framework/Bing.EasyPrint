@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Xunit.Abstractions;
+using System;
 
 namespace Bing.EasyPrint.Tests;
 
@@ -27,11 +28,15 @@ public abstract class TestBase
     /// 打印
     /// </summary>
     /// <param name="bytes">字节数组</param>
-    protected bool Print(byte[] bytes) => RawPrinterHelper.SendBytesToPrinter("Zicox CS4", bytes);
+    protected bool Print(byte[] bytes) => !HardwarePrintEnabled || RawPrinterHelper.SendBytesToPrinter(PrinterName, bytes);
 
     /// <summary>
     /// 打印
     /// </summary>
     /// <param name="str">字符串</param>
-    protected bool Print(string str) => RawPrinterHelper.SendStringToPrinter("Zicox CS4", str);
+    protected bool Print(string str) => !HardwarePrintEnabled || RawPrinterHelper.SendStringToPrinter(PrinterName, str);
+
+    private static bool HardwarePrintEnabled => Environment.GetEnvironmentVariable("EASYPRINT_ENABLE_HARDWARE_PRINT") == "1";
+    private static string PrinterName => Environment.GetEnvironmentVariable("EASYPRINT_PRINTER_NAME")
+        ?? throw new InvalidOperationException("启用真实打印时必须设置 EASYPRINT_PRINTER_NAME。");
 }

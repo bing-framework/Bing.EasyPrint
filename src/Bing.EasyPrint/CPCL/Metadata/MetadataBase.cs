@@ -2,18 +2,18 @@
 namespace Bing.EasyPrint.CPCL;
 
 /// <summary>
-/// 元数据基类
+/// 定义可写入 CPCL 命令的元数据。
 /// </summary>
 internal abstract class MetadataBase
 {
     /// <summary>
-    /// 元数据类型
+    /// 获取元数据的类型。
     /// </summary>
     public abstract MetadataType MetadataType { get; }
 
     /// <summary>
-    /// 构建
+    /// 将元数据写入指定打印命令。
     /// </summary>
-    /// <param name="command">打印命令</param>
+    /// <param name="command">接收元数据指令的打印命令。</param>
     public abstract void Build(CPCLPrintCommand command);
 }
