@@ -32,6 +32,11 @@ namespace Bing.EasyPrint.Model
         public bool Bold { get; set; }
 
         /// <summary>
+        /// 获取或设置文字是否反白。
+        /// </summary>
+        public bool Reverse { get; set; }
+
+        /// <summary>
         /// 获取或设置文字的放大系数。
         /// </summary>
         public int Mag { get; set; }

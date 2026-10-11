@@ -1,5 +1,7 @@
 using System;
 using System.Text;
+using System.Threading;
+using Bing.EasyPrint.Protocols;
 
 namespace Bing.EasyPrint.Templates;
 
@@ -8,6 +10,22 @@ namespace Bing.EasyPrint.Templates;
 /// </summary>
 internal static class QrMetrics
 {
+    internal static int RasterExtent(string text, string level, int unit)
+        => RasterExtent(text, level, unit, CancellationToken.None);
+
+    internal static int RasterExtent(string text, string level, int unit, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrEmpty(text)) throw new ArgumentException("二维码内容不能为空。", nameof(text));
+        if (level == null || level.Length != 1 || "LMQH".IndexOf(level, StringComparison.Ordinal) < 0 ||
+            unit < 1 || unit > 32)
+            throw new ArgumentException("二维码参数无效。");
+
+        var correction = level == "L" ? QrCodeCorrectionLevel.L : level == "M" ? QrCodeCorrectionLevel.M :
+            level == "Q" ? QrCodeCorrectionLevel.Q : QrCodeCorrectionLevel.H;
+        return checked((EscPosRasterCanvas.MeasureQrCodeSize(text, 1, correction, cancellationToken) + 8) * unit);
+    }
+
     /// <summary>
     /// 获取各版本在 L、M、Q、H 纠错等级下的可用数据位数。
     /// </summary>

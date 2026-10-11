@@ -15,6 +15,20 @@ namespace Bing.EasyPrint.Templates;
 public static class TemplateTableFactory
 {
     /// <summary>
+    /// 创建可插入单元格或组件定义的流式表格组合。
+    /// </summary>
+    /// <param name="repeatSource">明细集合的字段路径。</param>
+    /// <param name="columns">表格列定义。</param>
+    /// <param name="headerHeight">表头高度，单位为打印点。</param>
+    /// <param name="detailHeight">明细高度，单位为打印点。</param>
+    /// <param name="repeatHeader">是否在跨页时重复表头。</param>
+    /// <returns>包含表头和明细行的组合。</returns>
+    public static BpGroupElement CreateGroup(string repeatSource, IReadOnlyList<TemplateTableColumn> columns,
+        int headerHeight = 30, int detailHeight = 30, bool repeatHeader = true)
+        => new BpGroupElement { Rows = Create(repeatSource, columns, headerHeight, detailHeight, repeatHeader).ToList(),
+            Pagination = BpGroupPagination.Split };
+
+    /// <summary>
     /// 创建表头与重复明细行。
     /// </summary>
     /// <param name="repeatSource">指向明细集合的字段路径。</param>

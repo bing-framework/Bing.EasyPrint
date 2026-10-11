@@ -7,6 +7,7 @@ using System.Threading;
 using Bing.EasyPrint.Elements;
 using Bing.EasyPrint.Model;
 using Bing.EasyPrint.Templates;
+using Bing.EasyPrint.Protocols;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
@@ -73,6 +74,265 @@ public class TemplateRendererTests
     }
 
     [Fact]
+    public void Template_can_render_text_to_tspl_and_zpl()
+    {
+        var template = Template(Row(Text("HELLO")));
+        var tspl = Render(template, options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl });
+        var zpl = Render(template, options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Zpl });
+
+        Assert.Contains("SIZE 576 dot,200 dot", Output(tspl));
+        Assert.Contains("TEXT 0,0", Output(tspl));
+        Assert.Equal(PrintProtocol.Tspl, tspl.Protocol);
+        Assert.Equal(PrintProtocol.Tspl, tspl.Pages[0].Protocol);
+        Assert.Contains("^XA", Output(zpl));
+        Assert.Contains("^FO0,0", Output(zpl));
+    }
+
+    [Fact]
+    public void Template_preflight_reports_unsupported_element_on_later_page()
+    {
+        var second = Text("SECOND");
+        second.Bold = true;
+        var template = Template(Row(Text("FIRST")), Row(second));
+        template.Width = 120;
+        template.Height = 26;
+
+        var error = Assert.Throws<TemplateRenderException>(() => Render(template,
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl }));
+
+        Assert.Contains("Rows[1]", error.SourcePath);
+        Assert.Contains(PrintProtocol.Tspl.ToString(), error.Message);
+    }
+
+    [Fact]
+    public void Template_page_options_control_tspl_copies_and_reject_line_feed_units()
+    {
+        var options = new TemplateRenderOptions
+        {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl, Copies = 2, FeedLines = 3
+        };
+
+        var error = Assert.Throws<TemplateRenderException>(() => Render(Template(Row(Text("OK"))), options: options));
+        Assert.Contains("FEED", error.Message);
+        options.FeedLines = 0;
+        var result = Render(Template(Row(Text("OK"))), options: options);
+        Assert.Contains("PRINT 1,2\r\n", Output(result));
+    }
+
+    [Fact]
+    public void Template_tspl_media_options_are_emitted_before_content()
+    {
+        var result = Render(Template(Row(Text("OK"))), options: new TemplateRenderOptions
+        {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl,
+            TsplMedia = new TsplMediaOptions { GapDistance = 3, Direction = 1, Density = 8 }
+        });
+
+        var output = Output(result);
+        Assert.Contains("CLS\r\nGAP 3,0\r\nDIRECTION 1\r\nDENSITY 8\r\nTEXT", output);
+    }
+
+    [Fact]
+    public void Template_zpl_media_speed_is_emitted_before_content()
+    {
+        var result = Render(Template(Row(Text("OK"))), options: new TemplateRenderOptions
+        {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.Zpl,
+            ZplMedia = new ZplMediaOptions { Dpi = 300, PrintSpeed = 4 }
+        });
+
+        Assert.Contains("^LL200\r\n^PR4\r\n^FO", Output(result));
+    }
+
+    [Fact]
+    public void Template_page_options_can_disable_esc_pos_feed_and_cut()
+    {
+        var result = Render(Template(Row(Text("OK"))), options: new TemplateRenderOptions
+        {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos,
+            EscPosLayout = EscPosLayoutMode.Native, FeedLines = 0, CutAfterPrint = false
+        });
+
+        Assert.EndsWith("OK\n", Encoding.ASCII.GetString(result.Pages[0].Data));
+    }
+
+    [Fact]
+    public void Template_esc_pos_device_options_are_emitted_before_content()
+    {
+        var result = Render(Template(Row(Text("OK"))), options: new TemplateRenderOptions
+        {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos,
+            EscPosLayout = EscPosLayoutMode.Native,
+            EscPosDevice = new EscPosDeviceOptions { CodePageIndex = 17, PrintAreaWidthUnits = 384 }
+        });
+
+        Assert.Equal(new byte[] { 0x1B, 0x40, 0x1B, 0x74, 17, 0x1D, 0x57, 0x80, 0x01 },
+            result.Pages[0].Data.Take(9).ToArray());
+    }
+
+    [Theory]
+    [InlineData(PrintProtocol.Cpcl)]
+    [InlineData(PrintProtocol.Zpl)]
+    public void Unsupported_template_page_feed_is_rejected(PrintProtocol protocol)
+    {
+        var error = Assert.Throws<TemplateRenderException>(() => Render(Template(Row(Text("OK"))),
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = protocol, FeedLines = 2 }));
+
+        Assert.Equal(protocol == PrintProtocol.Cpcl ? "Template" : "Pages[0]", error.SourcePath);
+    }
+
+    [Fact]
+    public void Template_zpl_defaults_to_utf8_and_declares_encoding()
+    {
+        var result = Render(Template(Row(Text("中文"))), options: new TemplateRenderOptions { Protocol = PrintProtocol.Zpl });
+
+        Assert.StartsWith("^XA\r\n^CI28\r\n", Output(result));
+        Assert.Contains("^FD中文^FS", Output(result));
+    }
+
+    [Fact]
+    public void Template_tspl_lines_use_legal_bar_dimensions_and_normalize_reversed_axes()
+    {
+        var horizontal = new BpLineElement { LineWidth = 3,
+            StartCoordinate = new BpCoordinate { X = 20, Y = 10 },
+            LineEndCoordinate = new BpCoordinate { X = 2, Y = 10 } };
+        var vertical = new BpLineElement { LineWidth = 3,
+            StartCoordinate = new BpCoordinate { X = 40, Y = 35 },
+            LineEndCoordinate = new BpCoordinate { X = 40, Y = 5 } };
+        var diagonal = new BpLineElement { LineWidth = 2,
+            StartCoordinate = new BpCoordinate { X = 70, Y = 50 },
+            LineEndCoordinate = new BpCoordinate { X = 50, Y = 30 } };
+        var output = Output(Render(Template(Row(horizontal, vertical, diagonal)),
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl,
+                TsplMedia = new TsplMediaOptions { AllowRasterizedLines = true } }));
+
+        Assert.Contains("BAR 2,10,19,3\r\n", output);
+        Assert.Contains("BAR 40,5,3,31\r\n", output);
+        Assert.DoesNotContain("BAR 40,5,3,31,3", output);
+        Assert.Contains("BITMAP", output);
+    }
+
+    [Fact]
+    public void Template_tspl_ellipse_and_icon_render_diagonal_segments_as_bitmaps()
+    {
+        var ellipse = new BpEllipseElement { Width = 40, Height = 24, LineWidth = 2 };
+        var icon = new BpIconElement { Icon = "check", Size = 32, LineWidth = 2 };
+        var template = Template(Row(ellipse, icon));
+        template.Version = 2;
+        var output = Output(Render(template,
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl,
+                TsplMedia = new TsplMediaOptions { AllowRasterizedLines = true } }));
+
+        Assert.True(output.Split(new[] { "BITMAP " }, StringSplitOptions.None).Length > 3);
+    }
+
+    [Fact]
+    public void Template_zpl_ellipse_and_icon_render_diagonal_segments_as_graphics()
+    {
+        var template = Template(Row(
+            new BpEllipseElement { Width = 40, Height = 24, LineWidth = 1 },
+            new BpIconElement { Icon = "check", Size = 32, LineWidth = 1 }));
+        template.Version = 2;
+
+        var output = Output(Render(template,
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Zpl,
+                ZplMedia = new ZplMediaOptions { AllowRasterizedLines = true } }));
+
+        Assert.True(output.Split(new[] { "^GFA," }, StringSplitOptions.None).Length > 3);
+        Assert.DoesNotContain("^GB40,24", output);
+    }
+
+    [Fact]
+    public void Template_can_render_origin_text_to_esc_pos_native()
+    {
+        var result = Render(Template(Row(Text("HELLO"))),
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Native });
+
+        Assert.Contains("HELLO\n", Encoding.ASCII.GetString(result.Pages[0].Data));
+    }
+
+    [Fact]
+    public void Template_esc_pos_native_renders_consecutive_text_rows()
+    {
+        var template = Template(Row(Text("FIRST")), Row(Text("SECOND")));
+        var result = Render(template, options: new TemplateRenderOptions {
+            Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos,
+            EscPosLayout = EscPosLayoutMode.Native, FeedLines = 0, CutAfterPrint = false
+        });
+
+        Assert.EndsWith("FIRST\nSECOND\n", Encoding.ASCII.GetString(result.Pages[0].Data));
+    }
+
+    [Fact]
+    public void Unsupported_native_border_reports_protocol_and_template_path()
+    {
+        var row = Row(Text("HELLO"));
+        row.Border = new BpBorder { TopStyle = 1 };
+
+        var error = Assert.Throws<TemplateRenderException>(() => Render(Template(row),
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos,
+                EscPosLayout = EscPosLayoutMode.Native }));
+
+        Assert.Contains("Rows[0]", error.SourcePath);
+        Assert.Contains(PrintProtocol.EscPos.ToString(), error.Message);
+    }
+
+    [Fact]
+    public void Template_can_render_text_to_esc_pos_raster()
+    {
+        var result = Render(Template(Row(Text("HELLO"))),
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Raster });
+
+        var data = result.Pages[0].Data;
+        Assert.Equal(new byte[] { 0x1D, 0x76, 0x30, 0x00 }, data.Skip(2).Take(4).ToArray());
+        Assert.Contains(data.Skip(10).Take(72 * 200), value => value != 0);
+    }
+
+    [Fact]
+    public void Template_can_render_codes_to_esc_pos_raster()
+    {
+        var template = Template(
+            Row(new BpBarcodeElement { BarcodeType = BarcodeType.Code128, LineWidth = 1, Height = 30,
+                Field = new BgField { Value = "123456" } }),
+            Row(new BpQrCodeElement { UnitWidth = 2, Field = new BgField { Value = "hello" } }));
+        var result = Render(template,
+            options: new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Raster });
+
+        Assert.Contains(result.Pages[0].Data.Skip(10), value => value != 0);
+    }
+
+    [Fact]
+    public void Template_images_are_encoded_by_coordinate_providers()
+    {
+        using var image = new Image<Rgba32>(8, 1, new Rgba32(0, 0, 0));
+        using var stream = new MemoryStream();
+        image.SaveAsPng(stream);
+        var template = Template(Row(new BpImageElement { Field = new BgField { Value = "logo" }, Width = 8, Height = 1 }));
+        var provider = new Resources(stream.ToArray());
+
+        var renderer = new TemplateRenderer();
+        var tspl = renderer.Render(template, null, provider, new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Tspl });
+        var zpl = renderer.Render(template, null, new Resources(stream.ToArray()), new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.Zpl });
+
+        Assert.Contains("BITMAP", Output(tspl));
+        Assert.Contains("^GFA", Output(zpl));
+    }
+
+    [Fact]
+    public void Template_images_are_composed_by_esc_pos_raster()
+    {
+        using var image = new Image<Rgba32>(8, 1, new Rgba32(0, 0, 0));
+        using var stream = new MemoryStream();
+        image.SaveAsPng(stream);
+        var template = Template(Row(new BpImageElement { Field = new BgField { Value = "logo" }, Width = 8, Height = 1 }));
+        var result = new TemplateRenderer().Render(template, null, new Resources(stream.ToArray()),
+            new TemplateRenderOptions { Encoding = Encoding.ASCII, Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Raster });
+
+        Assert.Contains((byte)0x1D, result.Pages[0].Data);
+        Assert.Contains((byte)0x76, result.Pages[0].Data);
+    }
+
+    [Fact]
     public void Conditions_and_root_item_index_bindings_work()
     {
         var detail = Row(Text(name: "$root.Title"), Text(name: "$index"), Text(name: "$item.Name"));
@@ -114,7 +374,7 @@ public class TemplateRendererTests
     }
 
     [Theory]
-    [InlineData("{\"Version\":3,\"Width\":100,\"Height\":100}")]
+    [InlineData("{\"Version\":4,\"Width\":100,\"Height\":100}")]
     [InlineData("{\"Version\":1,\"Width\":100,\"Height\":100,\"$type\":\"System.Object\"}")]
     [InlineData("{\"Version\":1,\"Width\":100,\"Height\":100,\"ValueFunc\":\"code\"}")]
     [InlineData("{\"Version\":1,\"Version\":1,\"Width\":100,\"Height\":100}")]

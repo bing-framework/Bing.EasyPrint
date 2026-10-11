@@ -9,6 +9,15 @@
             保存自动生成及显式指定的打印任务命令。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.CPCL.PrintCommandStruct._contentRecordLeases">
+            <summary>记录内容项预留的租约；Clear 时释放仍属于当前作用域的记录估计。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.CPCL.PrintCommandStruct._contentCapacityLease">
+            <summary>当前内容列表 backing array 的容量租约。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.CPCL.PrintCommandStruct._beginLease">
+            <summary>边界元数据的存储租约。</summary>
+        </member>
         <member name="F:Bing.EasyPrint.CPCL.PrintCommandStruct._hasExplicitBegin">
             <summary>
             指示起始命令是否由调用方显式提供。
@@ -24,7 +33,7 @@
             指示结束命令是否由调用方显式提供。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.#ctor">
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.#ctor(System.Action)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.CPCL.PrintCommandStruct"/> 类型的实例。
             </summary>
@@ -136,6 +145,15 @@
             构建
             </summary>
             <param name="command">CPCL打印命令</param>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.AddContent(Bing.EasyPrint.CPCL.MetadataBase)">
+            <summary>
+            在内容进入普通 List 前预留其记录和可能发生的 backing array 扩容。
+            临时作用域保证预算失败不会留下记录或租约。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.PrintCommandStruct.ReplaceBoundary(Bing.EasyPrint.CPCL.MetadataBase,Bing.EasyPrint.CPCL.MetadataBase@,System.IDisposable@,System.String)">
+            <summary>先预留新边界，再提交替换，确保预算失败保留旧状态。</summary>
         </member>
         <member name="T:Bing.EasyPrint.CPCL.Barcode1DComponent">
             <summary>
@@ -344,20 +362,6 @@
             <param name="options">编码长度和像素数限制。</param>
             <returns>包含单色位图数据的图片组件。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.GetImageData(SixLabors.ImageSharp.Image)">
-            <summary>
-            将独立图片副本转换为按行打包的单色像素。
-            </summary>
-            <param name="image">允许原地转换的内部图片副本。</param>
-            <returns>每行按八像素对齐的单色字节。</returns>
-        </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.PackPixels(SixLabors.ImageSharp.Image{SixLabors.ImageSharp.PixelFormats.Rgba32})">
-            <summary>
-            将黑白像素按每字节八位写入行缓冲区。
-            </summary>
-            <param name="image">已完成二值化的图片。</param>
-            <returns>每行按八像素对齐的单色字节。</returns>
-        </member>
         <member name="M:Bing.EasyPrint.CPCL.ImageComponent.GetSingleFrameDecoder(SixLabors.ImageSharp.Formats.IImageFormat)">
             <summary>
             获取仅解码首帧的图片解码器。
@@ -390,6 +394,23 @@
             <param name="maxEncodedBytes">最大编码字节数。</param>
             <returns>定位至起始位置且由调用方释放的缓冲流。</returns>
         </member>
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.EnsureCopyStreamCapacity(Bing.EasyPrint.CPCL.ImageComponent.BudgetedMemoryStream,System.Int64)">
+            <summary>
+            将非定位图片缓冲流扩容到能够容纳下一次读取的数据，并在扩容成功后释放旧容量租约。
+            </summary>
+            <param name="target">受预算管理的目标缓冲流。</param>
+            <param name="required">下一次写入完成后需要的容量。</param>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.ImageComponent.BudgetedMemoryStream">
+            <summary>
+            为非 seek 输入流持有当前 MemoryStream 容量租约的私有实现。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.ImageComponent.OffsetReadStream">
+            <summary>
+            将可定位调用方流的剩余区间映射为从零开始的只读图片流视图。
+            </summary>
+        </member>
         <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ValidateEncodedLength(System.Int64,System.Int64)">
             <summary>
             校验编码后图片的字节数上限。
@@ -405,11 +426,12 @@
             <param name="height">图片像素高度。</param>
             <param name="options">像素数限制。</param>
         </member>
-        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ToHex(System.Byte[])">
+        <member name="M:Bing.EasyPrint.CPCL.ImageComponent.ToHex(System.Byte[],System.Threading.CancellationToken)">
             <summary>
             将图形字节转换为十六进制文本。
             </summary>
             <param name="data">待转换的图形字节。</param>
+            <param name="cancellationToken">转换过程中检查的取消令牌。</param>
             <returns>每字节对应两个大写十六进制字符的文本。</returns>
         </member>
         <member name="T:Bing.EasyPrint.CPCL.LineComponent">
@@ -729,6 +751,9 @@
             </summary>
             <summary>
             CPCL 打印命令 - 二维条码指令
+            </summary>
+            <summary>
+            CPCL 受限原始文本命令支持。
             </summary>
             <summary>
             CPCL 打印命令 - 文本指令
@@ -1264,6 +1289,16 @@
             保存构建 CPCL 命令时使用的文本编码。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.CPCL.CPCLPrintCommand._restrictedRawProgram">
+            <summary>
+            保存包含 CPCL 边界命令的受限原始程序；该程序构建时必须保持原文顺序。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.CPCL.CPCLPrintCommand._restrictedRawProgramLease">
+            <summary>
+            保存受限原始程序的文本预算租约。
+            </summary>
+        </member>
         <member name="P:Bing.EasyPrint.CPCL.CPCLPrintCommand.Content">
             <summary>
             获取待构建的命令结构。
@@ -1301,6 +1336,14 @@
         </member>
         <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Build">
             <inheritdoc />
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Build(System.Threading.CancellationToken)">
+            <summary>可取消构建命令；失败或取消时恢复前次 Writer。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.EnsureRestrictedRawProgramCanBeMixed">
+            <summary>
+            阻止包含完整原始程序的受限 Raw 与结构化记录静默拼接。
+            </summary>
         </member>
         <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
@@ -1556,6 +1599,18 @@
             <param name="errorCorrectionPercentage">纠错参数（0-99）。默认值为 0（默认纠错百分比）。</param>
             <param name="data">条码数据</param>
             <returns>当前打印命令实例。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.WriteRestrictedRaw(System.String)">
+            <summary>
+            校验并写入 CPCL 受限原始文本命令。
+            </summary>
+            <param name="raw">一条或多条 CPCL 文本命令。</param>
+            <returns>当前打印命令实例。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.ApplyRestrictedCommandInfo(Bing.EasyPrint.CPCL.CpclRestrictedParseResult)">
+            <summary>
+            将受限 Raw 中解析出的页面信息同步到命令状态。
+            </summary>
         </member>
         <member name="M:Bing.EasyPrint.CPCL.CPCLPrintCommand.Text(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
             <summary>
@@ -1840,6 +1895,21 @@
             <remarks>SETBOLD 命令可使文本加粗并且稍微加宽。SETBOLD 命令会采用一个操作数来设置文本变黑的程度。</remarks>
             <returns>当前打印命令实例。</returns>
         </member>
+        <member name="T:Bing.EasyPrint.CPCL.CpclRestrictedParseResult">
+            <summary>
+            CPCL 受限原始解析结果。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.CpclRestrictedRawParser">
+            <summary>
+            CPCL 受限文本解析器。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.CPCL.CpclGeometryState">
+            <summary>
+            CPCL 受限原始命令的页面几何状态。
+            </summary>
+        </member>
         <member name="T:Bing.EasyPrint.CPCL.Helper">
             <summary>
             提供 CPCL 命令标记和坐标换算辅助操作。
@@ -2080,6 +2150,30 @@
             <param name="uppercase">为 true 时使用大写字母，为 false 时使用小写字母。</param>
             <returns>按指定大小写表示的十六进制字符串。</returns>
         </member>
+        <member name="T:Bing.EasyPrint.Core.BudgetedBuffer">
+            <summary>分配前预留受管缓冲区；返回数据的预留保留到当前资源作用域结束。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BudgetedBuffer.Create(System.Int32,System.String,System.Action{System.Byte[]})">
+            <summary>
+            预留并创建缓冲区，在填充失败或取消时立即归还预留。
+            成功返回后，预留由当前资源作用域统一释放，不追踪数组的 GC 生命周期。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Core.BudgetedDictionary`2">
+            <summary>
+            为引擎索引预留容器和每次插入的保守存储估计，不计入已单独计费的值载荷。
+            每项估计包含哈希槽、扩容余量和租约记录；移除不退还估计，直到 owner/作用域结束。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Core.BudgetedList`1">
+            <summary>在容量扩展和记录进入集合前预留显式估计；不追踪 GC 或调用方已有对象。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Core.BudgetedList`1.AddFactory(System.Func{`0},System.Int64,System.Action)">
+            <summary>先预留记录成本，再创建对象；工厂或预算失败不会追加部分记录。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Core.BufferCopy">
+            <summary>在可取消复制中按固定大小检查令牌，未启用取消时保留整块复制。</summary>
+        </member>
         <member name="T:Bing.EasyPrint.Core.BufferWriter">
             <summary>
             累积 CPCL 命令的编码字节和文本片段。
@@ -2098,6 +2192,11 @@
         <member name="F:Bing.EasyPrint.Core.BufferWriter._sources">
             <summary>
             保存用于文本表示的原始命令片段。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Core.BufferWriter._sourceReservations">
+            <summary>
+            保存每个原始文本片段对应的 UTF-16 预算租约。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Core.BufferWriter._encoding">
@@ -2131,6 +2230,9 @@
         </member>
         <member name="M:Bing.EasyPrint.Core.BufferWriter.ToString">
             <inheritdoc />
+        </member>
+        <member name="T:Bing.EasyPrint.Core.PrintStorageBudget">
+            <summary>管理引擎自有模型的显式存储估计；可在临时布局结束时提前归还租约。</summary>
         </member>
         <member name="T:Bing.EasyPrint.DefaultEasyPrint">
             <summary>
@@ -2219,6 +2321,105 @@
             <summary>
             FIM 邮政条码制式。
             </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Planet">
+            <summary>
+            PLANET 邮政条码制式。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.IntelligentMail">
+            <summary>
+            USPS Intelligent Mail（IMb）邮政条码制式。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Plessey">
+            <summary>
+            Plessey 条码制式；当前由 TSPL 原生 PLESSEY 类型和 ZPL 原生 ^BP 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Itf14">
+            <summary>
+            ITF-14 条码制式；当前由 TSPL 原生 ITF14 类型支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Ean14">
+            <summary>
+            EAN-14 条码制式；当前由 TSPL 原生 EAN14 类型支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code11">
+            <summary>
+            Code 11 条码制式；当前由 TSPL 原生 11 类型支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.ChinaPost">
+            <summary>
+            China Post 邮政条码制式；TSPL 使用原生 CPOST，ESC/POS Raster 使用主机光栅编码。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Telepen">
+            <summary>
+            Telepen 条码制式；由 TSPL 原生 TELEPEN 或 ESC/POS Raster 主机编码支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Telepenn">
+            <summary>
+            Telepen 数字条码制式；由 TSPL 原生 TELEPENN 或 ESC/POS Raster 主机编码支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code49">
+            <summary>
+            Code 49 堆叠条码制式；当前由 TSPL 原生 CODE49 类型和 ZPL 原生 ^B4 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Gs1DataBarOmnidirectional">
+            <summary>
+            GS1 DataBar Omnidirectional；当前由 ESC/POS Native Function B 75、ESC/POS Raster 主机编码和 ZPL ^BR 类型 1 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Gs1DataBarTruncated">
+            <summary>
+            GS1 DataBar Truncated；当前由 ESC/POS Native Function B 76、ESC/POS Raster 主机编码和 ZPL ^BR 类型 2 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Gs1DataBarLimited">
+            <summary>
+            GS1 DataBar Limited；当前由 ESC/POS Native Function B 77、ESC/POS Raster 主机编码和 ZPL ^BR 类型 5 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Gs1DataBarExpanded">
+            <summary>
+            GS1 DataBar Expanded；ESC/POS Native Function B 78、ESC/POS Raster 主机编码（显式 FNC1 分隔的 Method 2 原始 GS1 数据、GTIN-14 `(01)` 加标准通用字段字符集子集及显式 `(3103)` 公斤重量 Method 3、`(3202)/(3203)` 英制重量 Method 4、`(392x)` 本地价格 Method 5、`(393x)` ISO 4217 货币+价格 Method 6、`(310x)/(320x)` 重量+虚拟日期 Method 7/8、带 `(11)/(13)/(15)/(17)` 日期 AI 的 Method 9–14）和 ZPL ^BR 类型 6 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Code128Auto">
+            <summary>
+            Code 128 auto；当前由 ESC/POS Native Function B 79 支持。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.BarcodeType.Gs1DataBarStacked">
+            <summary>
+            GS1 DataBar Stacked；当前由 ESC/POS Raster 主机编码支持。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.EscPosLayoutMode">
+            <summary>ESC/POS 内容布局模式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.EscPosLayoutMode.Native">
+            <summary>使用字符、条码等原生 ESC/POS 命令。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.EscPosLayoutMode.Raster">
+            <summary>由调用方提供光栅数据。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.EscPosNativeFlowMode">
+            <summary>ESC/POS Native 页面的顺序布局方式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.EscPosNativeFlowMode.Rows">
+            <summary>保留既有文字行和原点码图行为。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.EscPosNativeFlowMode.Sequential">
+            <summary>按声明占位推进逻辑游标，支持文字与原生码图顺序混排。</summary>
+            <remarks>坐标用于顺序、边界和分页校验；实际纸张位置由设备原生行距及码图进纸决定。</remarks>
         </member>
         <member name="T:Bing.EasyPrint.FontSize">
             <summary>
@@ -2390,6 +2591,51 @@
             使用白色打印内容。
             </summary>
         </member>
+        <member name="T:Bing.EasyPrint.PrintCutMode">
+            <summary>调用方明确请求的裁切形状；目标机型必须支持该模式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintCutMode.Full">
+            <summary>完全切断纸张。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintCutMode.Partial">
+            <summary>部分切断，保留设备规定的连接点。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintCopyOrder">
+            <summary>多页任务的份数输出顺序。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintCopyOrder.Collated">
+            <summary>逐份输出完整页面序列，如 A、B、A、B。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintCopyOrder.Uncollated">
+            <summary>逐页输出全部份数，如 A、A、B、B。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintFinishScope">
+            <summary>额外进纸或切纸的执行边界。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFinishScope.None">
+            <summary>不执行。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFinishScope.EachPage">
+            <summary>每个实际输出页后执行。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFinishScope.EachCopy">
+            <summary>每份完整文档结束后执行。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFinishScope.JobEnd">
+            <summary>整个任务的最后一个输出页后执行。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintFeedUnit">
+            <summary>明确的进纸数量单位，不把行数与点数互换。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFeedUnit.Lines">
+            <summary>设备当前行距下的行数，ESC/POS ESC d。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFeedUnit.Dots">
+            <summary>设备纵向打印点；ESC/POS 要求 Profile 声明纵向 DPI 和运动单位。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFeedUnit.MotionUnits">
+            <summary>设备纵向运动单位，ESC/POS ESC J。</summary>
+        </member>
         <member name="T:Bing.EasyPrint.PrintOrientation">
             <summary>
             指定打印页面的方向或旋转方式。
@@ -2414,6 +2660,33 @@
             <summary>
             向右旋转页面。
             </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintProtocol">
+            <summary>打印机指令协议。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.Cpcl">
+            <summary>CPCL 标签协议。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.EscPos">
+            <summary>ESC/POS 收据协议。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.Tspl">
+            <summary>TSPL 标签协议。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.Zpl">
+            <summary>ZPL 标签协议。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.CPCL">
+            <summary>CPCL（兼容命名）。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.ESC_POS">
+            <summary>ESC/POS（兼容命名）。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.TSPL">
+            <summary>TSPL（兼容命名）。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintProtocol.ZPL">
+            <summary>ZPL（兼容命名）。</summary>
         </member>
         <member name="T:Bing.EasyPrint.QrCodeCorrectionLevel">
             <summary>
@@ -2688,6 +2961,15 @@
             </summary>
             <param name="print">创建命令的打印服务。</param>
             <returns>新建的 CPCL 打印命令实例。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.EasyPrintExtensions.CreateEscPosCommand(Bing.EasyPrint.IEasyPrint)">
+            <summary>创建 ESC/POS 打印命令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.EasyPrintExtensions.CreateTsplCommand(Bing.EasyPrint.IEasyPrint)">
+            <summary>创建 TSPL 打印命令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.EasyPrintExtensions.CreateZplCommand(Bing.EasyPrint.IEasyPrint)">
+            <summary>创建 ZPL 打印命令。</summary>
         </member>
         <member name="T:Bing.EasyPrint.PrintComponentExtensions">
             <summary>
@@ -3212,6 +3494,2944 @@
             <remarks>非空文本按区域宽度换行；当前 CPCL 实现不根据高度截断内容。</remarks>
             <exception cref="T:System.ArgumentException">非空文本的区域宽度或高度为零。</exception>
             <returns>当前打印命令实例。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.IProtocolPrintCommand">
+            <summary>
+            可按协议识别的打印命令。
+            </summary>
+            <remarks>
+            该接口用于工厂和模板适配层识别协议能力；具体绘图 API 仍由各协议命令类型提供。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.IProtocolPrintCommand.Protocol">
+            <summary>获取命令所属协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.IProtocolPrintCommand.Capabilities">
+            <summary>获取协议能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.IProtocolPrintCommand.Build">
+            <summary>构建完整的打印指令。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.ICancelableProtocolPrintCommand">
+            <summary>
+            可选的可取消协议命令构建契约。
+            </summary>
+            <remarks>
+            该接口保持可选，既有实现只需继续实现 <see cref="T:Bing.EasyPrint.IProtocolPrintCommand"/>；
+            调用方可通过同文件中的扩展方法统一调用新旧命令。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.ICancelableProtocolPrintCommand.Build(System.Threading.CancellationToken)">
+            <summary>使用指定取消令牌构建完整打印指令。</summary>
+            <param name="cancellationToken">构建期间使用的取消令牌。</param>
+            <returns>包含完整指令的缓冲区写入器。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.ProtocolPrintCommandExtensions">
+            <summary>提供协议命令的可取消构建兼容入口。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.ProtocolPrintCommandExtensions.Build(Bing.EasyPrint.IProtocolPrintCommand,System.Threading.CancellationToken)">
+            <summary>
+            使用指定取消令牌构建协议命令；旧实现通过调用前后检查保持兼容。
+            </summary>
+            <param name="command">待构建的协议命令。</param>
+            <param name="cancellationToken">构建期间使用的取消令牌。</param>
+            <returns>包含完整指令的缓冲区写入器。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.IRestrictedRawPrintCommand`1">
+            <summary>
+            支持按协议语法校验可信原始文本命令的打印命令。
+            </summary>
+            <typeparam name="TCommand">具体命令类型，用于返回当前命令实例。</typeparam>
+        </member>
+        <member name="M:Bing.EasyPrint.IRestrictedRawPrintCommand`1.WriteRestrictedRaw(System.String)">
+            <summary>
+            校验并写入当前协议明确支持的原始文本命令。
+            </summary>
+            <param name="raw">单条或多条协议文本命令。</param>
+            <returns>当前打印命令实例。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintCapabilities">
+            <summary>描述一个打印协议能够表达的基础能力。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.DeviceProfileName">
+            <summary>可选的标签机型配置名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.DeviceFirmwareVersion">
+            <summary>调用方记录的固件版本，不证明实机兼容。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxLabelHeightDots">
+            <summary>标签机型声明的页高上限；null 表示未声明。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxImageDataBytes">
+            <summary>标签机型声明的单条单色图片数据上限。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxGs1LinearPayloadCharacters">
+            <summary>设备 Profile 声明的 GS1-128 payload 字符上限；null 表示不按设备收窄。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxGs1DataBarExpandedPayloadCharacters">
+            <summary>设备 Profile 声明的 GS1 DataBar Expanded payload 字符上限；null 表示不按设备收窄。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.DeviceCharacterRanges">
+            <summary>标签机型声明的公共字库覆盖区间；null 表示未声明。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.RasterFonts">
+            <summary>当前 Raster 固定字体配置；为空时使用既有系统字体策略。配置及资源不可变。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.RasterBarcodeHumanReadableFontSize">
+            <summary>获取 ESC/POS Raster 条码可读文字实际使用的主机字号；其他布局或协议为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeTextProfile">
+            <summary>目标机型的 Native 文字契约副本；未声明或使用主机光栅布局时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeFlow">
+            <summary>当前 ESC/POS Native 页面的顺序布局方式；其他布局为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.JobFeedUnits">
+            <summary>显式任务策略可以编码的进纸单位；空集合表示不支持额外任务进纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.Protocol">
+            <summary>获取协议类型。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.Dpi">
+            <summary>获取协议使用的默认 DPI。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsCoordinates">
+            <summary>获取是否支持坐标布局。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsExplicitQuietZone">
+            <summary>获取是否支持显式码图静区及坐标占位检查；Native 顺序布局不支持非零静区。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsImages">
+            <summary>获取是否支持图片。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsQrCode">
+            <summary>获取是否支持二维码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsRotation">
+            <summary>获取是否支持旋转。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsCut">
+            <summary>获取是否支持裁切。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CutModes">
+            <summary>获取显式裁切选项可请求的形状；空列表不证明旧切纸入口的物理形状。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CutFeedUnits">
+            <summary>获取进纸到切刀位置后的补偿单位；空列表表示此功能未声明。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CutFeedMotionUnits">
+            <summary>获取换算后的切前补偿运动单位范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CutFeedDots">
+            <summary>TSPL 实测切刀位置以外可追加的打印点补偿范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.TsplCutter">
+            <summary>TSPL 切刀策略的独立副本；为空时保留旧无切刀配置行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.ZplCutter">
+            <summary>ZPL 受控切刀契约的独立副本；为空时仅保留旧入口。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsIndependentOutputSegments">
+            <summary>当前配置可能生成必须独立发送的控制文件。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsText">
+            <summary>获取是否支持文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsGraphics">
+            <summary>获取是否支持线段和矩形。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsBarcode">
+            <summary>获取是否支持一维条码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsNativeBarcodeHumanReadable">
+            <summary>获取机型是否声明支持原生一维条码下方的可读文字（HRI）。</summary>
+            <remarks>未绑定标签机型时沿用协议默认能力；具体条码制式仍可能有独立限制。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportedNativeBarcodeHumanReadableTypes">
+            <summary>
+            获取已确认支持原生 HRI 的条码制式；null 表示未按制式收窄。
+            ESC/POS Raster 的 HRI 由主机绘制，不受该列表限制。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableReserveWidthDots">
+            <summary>获取标签机型声明的原生 HRI 最小横向占位宽度；null 表示只按条码主体估算。</summary>
+            <remarks>宽度从条码字段原点向右计量，不代表固件字体宽度或居中 HRI 的左侧外伸。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableLeftOverhangDots">
+            <summary>获取标签机型声明的原生 HRI 页面 X 轴左侧外伸；null 等同于零。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableTopOverhangDots">
+            <summary>获取标签机型声明的原生 HRI 页面上侧外伸；null 等同于零。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableRightOverhangDots">
+            <summary>获取标签机型声明的原生 HRI 页面右侧外伸；null 等同于零。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableBottomOverhangDots">
+            <summary>获取标签机型声明的原生 HRI 页面下侧外伸；null 等同于零。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableRotation90Overhang">
+            <summary>获取原生条码旋转 90 度时的 HRI 页面边距覆盖；null 表示沿用通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableRotation180Overhang">
+            <summary>获取原生条码旋转 180 度时的 HRI 页面边距覆盖；null 表示沿用通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.NativeBarcodeHumanReadableRotation270Overhang">
+            <summary>获取原生条码旋转 270 度时的 HRI 页面边距覆盖；null 表示沿用通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportedNativeQrCodeRotations">
+            <summary>获取标签机型已确认支持的原生二维码非零旋转角度；null 表示未按角度收窄。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportedNativeBarcodeHumanReadablePositions">
+            <summary>
+            获取 ESC/POS Native 已确认支持的 HRI 位置；null 表示未按位置收窄。
+            Raster HRI 由主机绘制，不使用此列表。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsCommandBarcode">
+            <summary>获取是否支持由独立协议命令直接编码一维条码。</summary>
+            <remarks>
+            该属性与统一打印模型的 <see cref="P:Bing.EasyPrint.PrintCapabilities.SupportsBarcode"/> 分开表示。
+            例如 ESC/POS Raster 可以通过主机光栅化输出条码，但目标设备可能不支持
+            GS k 原生条码命令。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsCommandQrCode">
+            <summary>获取是否支持由独立协议命令直接编码二维码。</summary>
+            <remarks>
+            该属性与统一打印模型的 <see cref="P:Bing.EasyPrint.PrintCapabilities.SupportsQrCode"/> 分开表示。
+            例如 ESC/POS Raster 可以通过主机光栅化输出二维码，但目标设备可能不支持
+            GS ( k 原生二维码命令。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsNativeLayout">
+            <summary>获取是否支持原生行式布局。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsRasterLayout">
+            <summary>获取是否支持光栅布局。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsBoldText">
+            <summary>获取是否支持加粗文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsUnderlineText">
+            <summary>获取是否支持下划线文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsReverseText">
+            <summary>获取是否支持反白文字。</summary>
+            <remarks>ESC/POS Native 使用 <c>GS B n</c>；不支持的布局必须在预检阶段拒绝。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsHostFontFamily">
+            <summary>获取是否支持由主机字体族生成文字位图。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxRasterRowBytes">
+            <summary>获取光栅命令每行字节数的协议上限；null 表示未声明通用上限。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxRasterHeight">
+            <summary>获取光栅命令高度的协议上限；null 表示未声明通用上限。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxPrintableWidthDots">
+            <summary>获取目标设备的可打印宽度（水平点数）；未配置机型时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.RasterVerticalDpi">
+            <summary>获取 ESC/POS 图片的垂直分辨率；输入布局仍使用 <see cref="P:Bing.EasyPrint.PrintCapabilities.Dpi"/>。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.RasterImageCommand">
+            <summary>获取 ESC/POS 实际使用的图片指令；其他协议为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.MaxImageBlockBytes">
+            <summary>获取单条图片指令的数据字节预算；未配置时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsTextRotation">
+            <summary>获取统一打印模型是否支持旋转文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsImageRotation">
+            <summary>获取是否支持主机单色图片旋转；不依赖设备原生文字或条码旋转能力。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsBarcodeRotation">
+            <summary>获取协议命令是否支持旋转一维条码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsQrCodeRotation">
+            <summary>获取协议命令是否支持统一模型二维码的任一非零旋转。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsQrCodeRotationAngle(Bing.EasyPrint.RotationAngle)">
+            <summary>判断统一模型二维码是否支持指定旋转角度；标签机型 profile 可以进一步收窄 TSPL/ZPL 原生角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsBarcodeHumanReadable">
+            <summary>获取统一打印模型是否支持启用条码下方的可读文字。</summary>
+            <remarks>
+            CPCL 使用设备的 <c>BT</c> 条码文字命令；ESC/POS Native 使用原生 HRI，
+            Raster 使用主机字体绘制。<c>null</c> 仍由各 Provider 保留既有默认行为，
+            此能力只表示显式开启可以被表达。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsBarcodeHumanReadableType(Bing.EasyPrint.BarcodeType)">
+            <summary>判断指定条码制式是否支持启用条码下方的可读文字。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsNativeBarcodeHumanReadablePosition(Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition)">
+            <summary>判断 ESC/POS Native 是否支持指定的 HRI 位置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsFilledRectangles">
+            <summary>获取统一打印模型是否支持填充矩形。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsPageCopies">
+            <summary>获取 Provider 是否支持单页多份输出。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsExtraFeed">
+            <summary>获取 Provider 是否支持页级额外进纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.FontKinds">
+            <summary>获取统一文本模型可以表达的字体来源；主机字体仍需检查运行时字形。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.DeviceFontNames">
+            <summary>获取统一文本模型接受的设备字体标识；不证明目标固件包含该字体。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.QrModuleSize">
+            <summary>获取统一模型的二维码模块尺寸范围；模板层可能进一步限制上限。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.BarcodeModuleWidth">
+            <summary>获取统一模型的一维条码窄条点宽范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.BarcodeHeight">
+            <summary>获取统一模型的一维条码条高范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CommandQrModuleSize">
+            <summary>获取独立命令原生二维码的模块范围；与主机 Raster 模型的范围分开。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CommandBarcodeModuleWidth">
+            <summary>获取独立命令原生条码的窄条点宽范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.CommandBarcodeHeight">
+            <summary>获取独立命令原生条码的条高范围。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.GetTextSizeRange(Bing.EasyPrint.PrintFont)">
+            <summary>获取统一模型指定字体可接受的字号参数范围；离散字号另由 <see cref="M:Bing.EasyPrint.PrintCapabilities.SupportsFont(Bing.EasyPrint.PrintFont,System.Int32)"/> 检查。</summary>
+            <remarks>固定 TSPL 字体按现有整数倍率取整规则限制请求高度，实际字高可能与请求值不同。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsFont(Bing.EasyPrint.PrintFont,System.Int32)">
+            <summary>判断统一模型的字体选择和字号能否由当前 Provider 表达；不检查文本字形或页面占位。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.#ctor(Bing.EasyPrint.PrintProtocol,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Nullable{System.Int32},System.Nullable{System.Int32},System.Boolean)">
+            <summary>初始化能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsBarcodeType(Bing.EasyPrint.BarcodeType)">
+            <summary>判断统一打印模型能否使用指定的一维条码制式。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsCommandBarcodeType(Bing.EasyPrint.BarcodeType)">
+            <summary>判断独立协议命令是否支持指定的一维条码制式。</summary>
+            <remarks>此方法描述命令编码能力；统一打印模型应使用 <see cref="M:Bing.EasyPrint.PrintCapabilities.SupportsBarcodeType(Bing.EasyPrint.BarcodeType)"/> 查询。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCapabilities.SupportsEncoding(System.Text.Encoding)">
+            <summary>判断指定 .NET 编码是否有明确的协议字符集表达。</summary>
+            <remarks>
+            ESC/POS 未绑定 Native 文字契约时只检查主机字节布局；绑定后还匹配声明的编码代码页。
+            设备索引和实际字库覆盖仍需由机型配置、文字预检及实机验收确认。
+            </remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintCharacterRange">
+            <summary>声明设备字库覆盖的 Unicode 标量闭区间；不包含 UTF-16 代理项。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCharacterRange.First">
+            <summary>区间首个 Unicode 标量。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintCharacterRange.Last">
+            <summary>区间最后一个 Unicode 标量。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCharacterRange.#ctor(System.Int32,System.Int32)">
+            <summary>创建由设备手册或实测结果确认的字符覆盖区间。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintCharacterRange.Contains(System.Int32)">
+            <summary>判断标量是否在声明区间内。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintFontKind">
+            <summary>
+            指定文本使用的字体来源。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFontKind.Default">
+            <summary>
+            使用目标协议或设备的默认字体。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFontKind.Device">
+            <summary>
+            使用目标设备内置的字体标识。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.PrintFontKind.Host">
+            <summary>
+            使用主机字体进行渲染；固定字体配置中名称引用资源别名，否则引用系统字体族。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintFont">
+            <summary>
+            描述协议无关文本元素的字体来源和名称。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintFont.Kind">
+            <summary>
+            获取字体来源类型。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintFont.Name">
+            <summary>
+            获取主机字体名称/固定资源别名或设备字体标识；默认字体没有名称。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintFont.Default">
+            <summary>
+            获取使用目标协议默认字体的不可变字体描述。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintFont.#ctor(Bing.EasyPrint.PrintFontKind,System.String)">
+            <summary>
+            创建字体描述。
+            </summary>
+            <param name="kind">字体来源类型。</param>
+            <param name="name">主机字体名称或设备字体标识；默认字体必须为 <see langword="null" />。</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">字体来源类型不是已定义的 <see cref="T:Bing.EasyPrint.PrintFontKind" /> 值。</exception>
+            <exception cref="T:System.ArgumentException">名称与字体来源类型的约束不匹配。</exception>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.IPrintProtocolProvider">
+            <summary>将协议无关打印文档编码为目标指令集的 Provider。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.IPrintProtocolProvider.Protocol">
+            <summary>获取目标协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.IPrintProtocolProvider.Capabilities">
+            <summary>获取目标协议能力。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.IPrintProtocolProvider.Validate(Bing.EasyPrint.Printing.PrintDocument)">
+            <summary>验证文档是否能由当前 Provider 表达。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.IPrintProtocolProvider.Render(Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>生成逐页打印字节。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.IPrintCancelableProtocolProvider">
+            <summary>可选的可取消预检契约；旧 Provider 不必增加接口成员。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.IPrintCancelableProtocolProvider.Validate(Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>校验文档并响应取消；取消不转换为能力或输入错误。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.IPrintProtocolProviderFactory">
+            <summary>按协议创建 Provider 的工厂。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.IPrintProtocolProviderFactory.Create(Bing.EasyPrint.PrintProtocol)">
+            <summary>创建指定协议的 Provider。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintCapabilityException">
+            <summary>描述打印元素与目标协议不兼容的错误。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCapabilityException.Protocol">
+            <summary>获取目标协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCapabilityException.ElementPath">
+            <summary>获取文档元素或模板节点路径。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCapabilityException.PageIndex">
+            <summary>获取失败页面的零基序号；旧调用未提供时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCapabilityException.ElementIndex">
+            <summary>获取失败元素在页面中的零基序号；页级错误为 null。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintCutOptions">
+            <summary>显式裁切模式和切刀位置补偿；省略时保留原有页面或任务切纸行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCutOptions.Mode">
+            <summary>请求的裁切形状，不自动改用另一种模式。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCutOptions.FeedToCutPosition">
+            <summary>先由设备进纸到切刀位置，再追加补偿距离并裁切。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCutOptions.FeedBeforeCutAmount">
+            <summary>切刀位置以外的额外进纸量；零仍可显式请求进纸到切刀位置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintCutOptions.FeedBeforeCutUnit">
+            <summary>补偿量单位；设备运动单位与打印点的换算须由机型声明。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintCutOptions.Validate">
+            <summary>校验参数和内部组合；协议及机型能力由输出端继续检查。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintCutOptions.Snapshot">
+            <summary>创建经过校验的独立副本，后续修改原选项不会影响副本。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintDocument">
+            <summary>协议无关的打印文档。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintDocument.#ctor">
+            <summary>创建不附带独立存储归属的打印文档。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintDocument.#ctor(Bing.EasyPrint.Core.PrintStorageBudget)">
+            <summary>创建将模型存储租约归属于指定生命周期的打印文档。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintDocument.Pages">
+            <summary>获取文档页面。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintDocument.AddPage(System.Int32,System.Int32)">
+            <summary>追加页面。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintPage">
+            <summary>协议无关的打印页面。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.Width">
+            <summary>获取页面宽度，单位为逻辑打印点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.Height">
+            <summary>获取页面高度，单位为逻辑打印点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.Elements">
+            <summary>获取页面元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.Copies">
+            <summary>获取或设置打印份数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.FeedLines">
+            <summary>获取或设置打印后额外进纸行数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.CutAfterPrint">
+            <summary>获取或设置打印后是否切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPage.CutOptions">
+            <summary>可选显式裁切参数；仅在启用切纸时使用，渲染期间不得修改。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintPage.Add(Bing.EasyPrint.Printing.PrintElement,System.String)">
+            <summary>追加元素的独立归属副本，允许同一元素复用于多个页面。</summary>
+            <remarks>输入元素不会被修改。标准元素的打印数据不可变；自定义元素的额外引用状态须由其实现保持不可变。</remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintElement">
+            <summary>协议无关的打印元素基类。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.X">
+            <summary>元素左上角 X 坐标。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.Y">
+            <summary>元素左上角 Y 坐标。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.Width">
+            <summary>元素旋转前的预留宽度；文字和原生码图由调用方声明，零表示未知。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.Height">
+            <summary>元素旋转前的预留高度；文字和二维码由调用方声明，零表示未知。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.Rotation">
+            <summary>元素旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElement.SourcePath">
+            <summary>获取此元素在模板或调用方文档中的路径。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintTextElement">
+            <summary>协议无关的文本元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.Text">
+            <summary>获取文本内容。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.FontSize">
+            <summary>获取字体大小。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.Bold">
+            <summary>获取是否加粗。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.Underline">
+            <summary>获取是否下划线。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.Reverse">
+            <summary>是否反白输出文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.FontFamily">
+            <summary>获取 ESC/POS Raster 的系统字体族或固定资源别名；其他 Provider 会拒绝非空值。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.DeviceFontName">
+            <summary>获取设备字体标识；旧构造器用于 TSPL/ZPL，语义字体选择还支持 CPCL 24/55。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintTextElement.Font">
+            <summary>获取统一字体描述；使用旧构造器创建时为 <see langword="null" />。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintTextElement.#ctor(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.PrintFont,System.Boolean,System.Boolean,Bing.EasyPrint.RotationAngle,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            创建使用统一字体描述的文本元素。
+            </summary>
+            <param name="x">元素左上角的 X 坐标。</param>
+            <param name="y">元素左上角的 Y 坐标。</param>
+            <param name="text">要输出的文本内容。</param>
+            <param name="fontSize">字体大小，单位由目标协议的 Provider 解释。</param>
+            <param name="font">字体来源和名称；不能为 <see langword="null" />。</param>
+            <param name="bold">是否请求加粗。</param>
+            <param name="underline">是否请求下划线。</param>
+            <param name="rotation">文本旋转角度。</param>
+            <param name="width">文本预留宽度；零表示未知。</param>
+            <param name="height">文本预留高度；零表示未知。</param>
+            <param name="reverse">是否反白输出文本。</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="font" /> 为 <see langword="null" />。</exception>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintLineElement">
+            <summary>协议无关的线元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintLineElement.EndX">
+            <summary>线条终点 X 坐标。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintLineElement.EndY">
+            <summary>线条终点 Y 坐标。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintLineElement.LineWidth">
+            <summary>线条宽度。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintRectangleElement">
+            <summary>协议无关的矩形元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintRectangleElement.LineWidth">
+            <summary>边框线宽。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintRectangleElement.Filled">
+            <summary>是否填充；旧构造器在 CPCL 下保留反色端点语义。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintRectangleElement.CreateFilled(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>创建按精确宽高绘制实心黑色区域的矩形。</summary>
+            <param name="x">填充区域左边界，单位为打印点。</param>
+            <param name="y">填充区域上边界，单位为打印点。</param>
+            <param name="width">填充宽度，必须为正数。</param>
+            <param name="height">填充高度，必须为正数。</param>
+            <returns>占用半开区域 [x, x + width) × [y, y + height) 的实心矩形。</returns>
+            <remarks>
+            此入口与模板的 Filled=true 语义一致。旧构造器的 CPCL filled=true 输出仍保留
+            IL 反色及端点行为；新代码需要跨协议实心填充时应使用本工厂。
+            </remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintBarcodeElement">
+            <summary>协议无关的一维条码元素。</summary>
+            <remarks>
+            ESC/POS Raster Code 49 的坐标表示含固有静区和边界分隔条的完整符号外框；
+            其余协议遵循各自 Provider 对原生条码坐标的定义。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.QuietZone">
+            <summary>获取条码占用区四周的显式静区；null 沿用调用方的旧留白行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.Type">
+            <summary>条码类型。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.Data">
+            <summary>条码内容。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.BarHeight">
+            <summary>条码高度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.NarrowWidth">
+            <summary>条码窄条宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.WideWidth">
+            <summary>条码宽条宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.CpclRatioCode">
+            <summary>旧 CPCL 模板使用的比例枚举；未指定时沿用 WideWidth 的旧映射。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.HumanReadable">
+            <summary>是否输出条码下方的可读文字；null 表示沿用目标协议默认行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintBarcodeElement.HumanReadableReserveHeight">
+            <summary>为设备绘制的条码可读文字预留的高度，单位为打印点；零表示不额外预留。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintBarcodeElement.#ctor(System.Int32,System.Int32,Bing.EasyPrint.BarcodeType,System.String,System.Int32,Bing.EasyPrint.PrintQuietZone,System.Int32,System.Int32,Bing.EasyPrint.RotationAngle,System.Nullable{System.Int32},System.Nullable{System.Boolean},System.Int32,System.Int32)">
+            <summary>创建包含显式静区校验的条码；坐标与预留宽度仍指向编码区，静区向外扩展。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintQrCodeElement">
+            <summary>协议无关的二维码元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintQrCodeElement.QuietZone">
+            <summary>获取编码区四周的显式静区；null 沿用调用方的旧留白行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintQrCodeElement.Data">
+            <summary>二维码内容。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintQrCodeElement.ModuleSize">
+            <summary>二维码模块尺寸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintQrCodeElement.ErrorLevel">
+            <summary>二维码纠错级别。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintQrCodeElement.#ctor(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel,Bing.EasyPrint.PrintQuietZone,System.Int32,System.Int32,Bing.EasyPrint.RotationAngle)">
+            <summary>创建包含显式静区校验的二维码；坐标与预留尺寸指向编码区，静区向外扩展。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintImageElement">
+            <summary>协议无关的单色位图元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintImageElement.Raster">
+            <summary>获取按行排列的 MSB 优先单色位图副本；修改返回数组不会改变元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintImageElement.RowBytes">
+            <summary>每行字节数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintImageElement.Compressed">
+            <summary>是否使用 CPCL 的二进制 CG 图片命令；其他协议忽略此编码偏好。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintImageElement.#ctor(System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],Bing.EasyPrint.RotationAngle,System.Boolean)">
+            <summary>创建按顺时针旋转的单色图片；宽高和位图为旋转前数据，坐标为旋转后占位左上角。</summary>
+            <remarks>旋转由主机执行，旧构造器保留原始方向和输出字节；非零角度的行尾填充位清零。</remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintElementValidationException">
+            <summary>描述带有页面或元素路径的打印数据校验错误。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElementValidationException.Protocol">
+            <summary>获取目标协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElementValidationException.ElementPath">
+            <summary>获取文档页面或元素路径。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElementValidationException.PageIndex">
+            <summary>获取失败页面的零基序号；旧调用未提供时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintElementValidationException.ElementIndex">
+            <summary>获取失败元素在页面中的零基序号；页级错误为 null。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintImageRasterizer">
+            <summary>将图片按 CPCL 兼容的抖动规则转换为 MSB 优先单色位图。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintImageRasterizer.ToCpclMonochrome(SixLabors.ImageSharp.Image,System.Threading.CancellationToken)">
+            <summary>可取消的 CPCL 抖动转换；第三方图像处理在调用前后检查取消。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintImageRotation">
+            <summary>内置 Provider 共用的单色图片旋转结果，临时位图预留在指令复制或画布绘制后释放。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintJobOptions">
+            <summary>显式打印任务策略；不设置任务策略时保留旧页面设置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.Copies">
+            <summary>整个文档的打印份数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.CopyOrder">
+            <summary>多页文档的份数顺序。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.FeedScope">
+            <summary>额外进纸的执行边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.FeedUnit">
+            <summary>进纸单位。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.FeedAmount">
+            <summary>每次额外进纸的数量，零表示不进纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.CutScope">
+            <summary>切纸执行边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobOptions.CutOptions">
+            <summary>任务切纸边界使用的显式裁切参数；为空时保留原有输出。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintJobOptions.Validate">
+            <summary>校验任务参数；协议和实际页数的限制由任务渲染器继续检查。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintJobRenderer">
+            <summary>用显式任务策略编排页面、份数及收尾操作，保留 Provider 原页面 API。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintJobRenderer.ValidateSettings(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintJobOptions,System.Nullable{System.Int32})">
+            <summary>在资源加载前检查协议可判定的任务能力；实际页数未知时不猜测份边界。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintJobRenderer.Render(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintDocument,Bing.EasyPrint.Printing.PrintJobOptions,System.Threading.CancellationToken,System.Int32,System.Int64)">
+            <summary>生成逐个实际输出页，并在展开份数前检查页数与已知输出预算。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintJobRenderResult">
+            <summary>按实际输出顺序保存任务页，不把重复份数隐藏在单个页面字节内。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobRenderResult.Pages">
+            <summary>每个实际输出页的字节及归属，须按此顺序发送。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintJobPage">
+            <summary>打印任务的一个实际输出页。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.SourcePageIndex">
+            <summary>原文档中的零基页面序号。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.CopyIndex">
+            <summary>零基份数序号。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.Data">
+            <summary>单文件页的完整字节；包含独立控制文件时抛错，须使用 Segments。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.Output">
+            <summary>本页有序输出；独立文件必须分别发送。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.Segments">
+            <summary>须逐个独立发送的命令文件。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.ByteLength">
+            <summary>所有文件字节总数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.FeedAfterPrint">
+            <summary>本页之后是否执行了额外进纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintJobPage.CutAfterPrint">
+            <summary>本页之后是否请求切纸。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintMatrixBudget">
+            <summary>按当前 ZXing.Net 0.16.11 默认编码参数预估符号矩阵的数据区。</summary>
+            <remarks>上界包含下述显式矩阵存储，不包含对象头、集合或编码器的全部内部工作缓冲。</remarks>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintOutputSegmentKind">
+            <summary>独立发送文件的用途；文件边界不能按普通缓冲块合并。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Printing.PrintOutputSegmentKind.Commands">
+            <summary>页面格式或受信任的原始命令。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Printing.PrintOutputSegmentKind.Control">
+            <summary>须在前一文件之后独立发送的控制命令。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintOutputSegment">
+            <summary>一个独立发送的命令文件；发送方须保留顺序和文件边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintOutputSegment.Kind">
+            <summary>文件用途。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintOutputSegment.Data">
+            <summary>文件字节；与旧页面数据一致，发送期间不得修改。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintOutputSegment.ByteLength">
+            <summary>文件字节数。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintOutputSegment.#ctor(System.Byte[],Bing.EasyPrint.Printing.PrintOutputSegmentKind)">
+            <summary>复制输入字节，创建独立文件。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintPageOutput">
+            <summary>一个逻辑或物理页面的有序文件集合；不把独立控制文件拼接到页面末尾。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPageOutput.Segments">
+            <summary>须逐个独立发送的文件，顺序即发送顺序。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPageOutput.ByteLength">
+            <summary>全部文件的字节数，供输出预算使用。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintPageOutput.#ctor(System.Collections.Generic.IEnumerable{Bing.EasyPrint.Printing.PrintOutputSegment})">
+            <summary>创建有序输出；集合采用副本，文件数据由调用方保持发送期间不变。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintPageOutput.Data">
+            <summary>获取旧单文件数据；多文件输出须使用 Segments，禁止静默合并。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.IPrintOutputProtocolProvider">
+            <summary>支持独立输出文件的可选 Provider 契约；不增加旧 Provider 的必实现成员。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.IPrintOutputProtocolProvider.RenderOutput(Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>生成逐页有序文件；失败时不返回部分输出。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintOutputProviderExtensions">
+            <summary>为旧 Provider 适配单文件输出。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintOutputProviderExtensions.RenderOutput(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>生成页面文件；旧 Provider 的每页字节保持为一个文件。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintProtocolProviderFactory">
+            <summary>按统一打印文档生成协议字节的内置 Provider 工厂。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintProtocolProviderFactory.Create(Bing.EasyPrint.PrintProtocol,System.Text.Encoding,Bing.EasyPrint.EscPosLayoutMode,Bing.EasyPrint.Protocols.EscPosDeviceOptions,Bing.EasyPrint.Protocols.TsplMediaOptions,Bing.EasyPrint.Protocols.ZplMediaOptions,System.Boolean)">
+            <summary>创建指定协议的 Provider。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintProtocolProviderBase.ValidationCancellationToken">
+            <summary>当前预检的取消令牌；按执行上下文隔离并在调用结束时恢复。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintProtocolProviderBase.Validate(Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>可取消预检，仍调用旧虚方法以保留派生 Provider 的校验行为。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.CpclPrintProtocolProvider">
+            <summary>将统一打印文档编码为 CPCL。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.TsplPrintProtocolProvider">
+            <summary>将统一打印文档编码为 TSPL。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.ZplPrintProtocolProvider">
+            <summary>将统一打印文档编码为 ZPL。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.ZplPrintProtocolProvider.RenderOutput(Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>生成页面及独立控制文件，保留 Delayed 裁切的文件边界。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.EscPosPrintProtocolProvider">
+            <summary>将统一打印文档编码为 ESC/POS。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.EscPosPrintProtocolProvider.NormalizeEscPosI2of5Data(Bing.EasyPrint.BarcodeType,System.String)">
+            <summary>
+            将 CPCL 语义的 I2OF5C/I2OF5G 校验规则转换为 ESC/POS 的基础 ITF 数据。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintQuietZoneValidator">
+            <summary>在生成任何字节前检查显式静区的页面边界及相邻元素占位。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintResourceScope">
+            <summary>
+            为受管缓冲区和调用方提供的资源估计建立一个可嵌套的预留作用域。
+            该类型记录的是显式估计的字节数，不是进程实际内存使用量。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceScope.CurrentBytes">
+            <summary>当前作用域已预留的字节数，包括仍在活动的子作用域预留。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceScope.PeakBytes">
+            <summary>当前作用域生命周期内达到的预留峰值。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceScope.MaxBytes">
+            <summary>当前作用域允许的最大预留字节数。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceScope.LimitTo(System.Int64)">
+            <summary>
+            收紧当前作用域的最大预留字节数。
+            </summary>
+            <param name="maxBytes">新的最大预留字节数；只能小于或等于当前限制。</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">新的限制为负数。</exception>
+            <exception cref="T:System.ArgumentException">新的限制会放宽当前限制。</exception>
+            <exception cref="T:Bing.EasyPrint.Printing.PrintResourceLimitException">新的限制低于当前已预留字节数。</exception>
+            <exception cref="T:System.ObjectDisposedException">作用域已经释放。</exception>
+            <exception cref="T:System.OperationCanceledException">作用域的取消令牌已经取消。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceScope.Begin(System.Int64,System.Threading.CancellationToken)">
+            <summary>
+            在当前异步执行上下文建立一个资源预留作用域。
+            作用域结束时会恢复进入前的父作用域。
+            </summary>
+            <param name="maxBytes">此作用域允许的最大预留字节数，不能为负数。</param>
+            <param name="cancellationToken">预留前检查的取消令牌。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceScope.Reserve(System.Int64,System.String)">
+            <summary>
+            在当前作用域预留指定字节数。无当前作用域时返回无操作 Lease。
+            </summary>
+            <param name="bytes">预留字节数，不能为负数。</param>
+            <param name="resourceName">资源用途名称，用于超限诊断。</param>
+            <returns>释放预留的幂等 Lease。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceScope.Retain(System.Int64,System.String)">
+            <summary>
+            在当前作用域保留指定字节数直到作用域结束，不返回需要调用方保存的对象。
+            无当前作用域时不执行任何记账。
+            </summary>
+            <param name="bytes">预留字节数，不能为负数。</param>
+            <param name="resourceName">资源用途名称，用于超限诊断。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceScope.Dispose">
+            <summary>释放当前作用域及其自身的所有预留，并恢复父作用域；活动子作用域必须先结束。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintResourceLimitException">
+            <summary>表示受管打印资源预留超过作用域限制。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceLimitException.ResourceName">
+            <summary>触发预留的资源名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceLimitException.RequestedBytes">
+            <summary>本次请求的预留字节数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceLimitException.CurrentBytes">
+            <summary>拒绝前当前作用域已预留的字节数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintResourceLimitException.MaxBytes">
+            <summary>拒绝发生的作用域最大字节数。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintResourceLimitException.#ctor(System.String,System.Int64,System.Int64,System.Int64)">
+            <summary>创建资源预算超限异常。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintValidationResult">
+            <summary>打印文档的首次协议校验结果。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationResult.Protocol">
+            <summary>获取目标协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationResult.IsValid">
+            <summary>获取文档是否通过校验。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationResult.FirstIssue">
+            <summary>获取首个校验问题；校验通过时为 null。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintValidationIssue">
+            <summary>带元素路径的协议能力或数据问题。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationIssue.ElementPath">
+            <summary>获取问题所在的页面或元素路径。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationIssue.Message">
+            <summary>获取可显示的问题原因。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationIssue.IsCapabilityIssue">
+            <summary>获取是否为目标协议不支持的能力。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationIssue.PageIndex">
+            <summary>获取问题所在页面的零基序号；未提供位置时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintValidationIssue.ElementIndex">
+            <summary>获取问题所在页内元素的零基序号；页级问题为 null。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintProtocolProviderValidationExtensions">
+            <summary>打印 Provider 的非抛错校验入口。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintProtocolProviderValidationExtensions.Validate(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>执行可取消预检；旧 Provider 在调用前后检查取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintProtocolProviderValidationExtensions.Check(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintDocument)">
+            <summary>校验文档并返回第一个能力或数据问题；参数错误仍抛异常。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintProtocolProviderValidationExtensions.Check(Bing.EasyPrint.Printing.IPrintProtocolProvider,Bing.EasyPrint.Printing.PrintDocument,System.Threading.CancellationToken)">
+            <summary>执行可取消校验；取消仍抛出 OperationCanceledException，不作为校验问题返回。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintParameterRange">
+            <summary>描述主机侧指令参数的整数范围；不代表设备的物理或资源容量。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintParameterRange.Minimum">
+            <summary>获取包含在范围内的最小值。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintParameterRange.Maximum">
+            <summary>获取包含在范围内的最大值；null 表示未声明额外上限。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintParameterRange.#ctor(System.Int32,System.Nullable{System.Int32})">
+            <summary>创建整数参数范围。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintParameterRange.Contains(System.Int32)">
+            <summary>判断参数是否位于声明的范围内。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.PrintQuietZone">
+            <summary>码图占用区四周保留的空白，单位为旋转前的逻辑打印点。</summary>
+            <remarks>
+            静区向目标协议条码占用区外扩展，不改变原生命令的数据。ESC/POS Raster Code 49
+            的占用区包含固有左右静区和顶/底边界分隔条，其坐标指向完整符号外框。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintQuietZone.Left">
+            <summary>获取旋转前左侧静区点数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintQuietZone.Top">
+            <summary>获取旋转前上侧静区点数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintQuietZone.Right">
+            <summary>获取旋转前右侧静区点数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.PrintQuietZone.Bottom">
+            <summary>获取旋转前下侧静区点数。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintQuietZone.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>创建四边静区；各边必须为非负整数打印点。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintQuietZone.Uniform(System.Int32)">
+            <summary>创建四周相同的静区；零表示显式不保留静区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintQuietZone.IsEmpty">
+            <summary>判断四边是否均为零；显式零值不添加静区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.PrintQuietZone.Rotate(Bing.EasyPrint.RotationAngle)">
+            <summary>按顺时针旋转换算各边空白。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.ProtocolCommandFactory">
+            <summary>按打印协议创建命令实例。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.ProtocolCommandFactory.Create(Bing.EasyPrint.PrintProtocol,System.Text.Encoding,Bing.EasyPrint.EscPosLayoutMode,Bing.EasyPrint.Protocols.EscPosDeviceOptions,Bing.EasyPrint.Protocols.TsplMediaOptions,Bing.EasyPrint.Protocols.ZplMediaOptions)">
+            <summary>
+            创建指定协议的命令实例。
+            </summary>
+            <param name="protocol">目标打印协议。</param>
+            <param name="encoding">文本编码；为空时使用协议默认编码。</param>
+            <param name="escPosLayoutMode">ESC/POS 的布局模式。</param>
+            <param name="escPosOptions">ESC/POS 设备选项；仅适用于 ESC/POS。</param>
+            <param name="tsplOptions">TSPL 介质和设备选项；仅适用于 TSPL。</param>
+            <param name="zplOptions">ZPL 介质和设备选项；仅适用于 ZPL。</param>
+            <returns>协议命令实例。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosCutEncoder">
+            <summary>共用 GS V 参数预检，确保独立命令、页面和任务采用同一种切纸语义。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosDeviceOptions">
+            <summary>ESC/POS 设备专用设置；代码页编号应以目标打印机手册为准。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.Dpi">
+            <summary>获取或设置输入点阵的分辨率；有机型配置时默认使用其水平 DPI，否则为 203。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.Profile">
+            <summary>目标机型的能力与图片指令配置；为空时保留既有 GS v 0 行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.RasterFonts">
+            <summary>显式固定的主机字体及替代策略；仅用于 Raster，未设置时使用既有系统字体策略。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.RasterBarcodeHumanReadableFontSize">
+            <summary>获取或设置 ESC/POS Raster 条码可读文字的主机字号；未设置时使用 12 点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.CodePageIndex">
+            <summary>获取或设置 ESC t 使用的设备代码页编号。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.PrintAreaWidthUnits">
+            <summary>获取或设置 GS W 使用的水平运动单位宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.NativeTabWidthDots">
+            <summary>Native 模板水平制表位的逻辑点距；未设置时只接受从左侧原点开始的文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosDeviceOptions.NativeFlow">
+            <summary>Native 顺序布局方式；默认保留旧文字行行为，Sequential 显式启用混合收据。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosImageEncoder">
+            <summary>将逐行单色数据编码为设备选择的图片指令。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosPrintCommand">
+            <summary>生成 ESC/POS 收据打印指令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrintCommand.Protocol">
+            <summary>获取 ESC/POS 的基础能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Initialize(System.Nullable{System.Int32})">
+            <summary>
+            初始化打印机。
+            </summary>
+            <remarks>
+            ESC/POS 没有跨设备通用的“字符列数”设置；字符宽度取决于字体、代码页和打印机型号。
+            因此传入列数会严格失败，避免把列数误当作 <c>GS !</c> 的字符放大倍数。
+            需要设置实际打印区域时，请使用 <see cref="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.SetPrintAreaWidth(System.Int32)"/>，其单位为水平运动单位。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.SelectCodePage(System.Byte)">
+            <summary>使用 ESC t 选择设备代码页；编号由具体打印机决定。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.SetCharacterMode(Bing.EasyPrint.Protocols.EscPosCharacterMode)">
+            <summary>选择声明过的设备字符模式；未绑定文字契约时不推断 FS 指令支持。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.SetPrintAreaWidth(System.Int32)">
+            <summary>
+            设置标准模式下的打印区域宽度。
+            </summary>
+            <param name="widthUnits">打印区域宽度，单位为打印机的水平运动单位，范围为 0 到 65535。</param>
+            <remarks>对应 ESC/POS 的 <c>GS W nL nH</c> 命令，不是字符列数或固定 DPI 的点数。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Bold(System.Boolean)">
+            <summary>设置 ESC/POS 原生文字的加粗状态。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Underline(System.Boolean)">
+            <summary>设置 ESC/POS 原生文字的单线下划线状态。</summary>
+            <remarks>对应 ESC/POS <c>ESC - n</c>；Native 使用 0/1，Raster 仍由主机画布处理。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Reverse(System.Boolean)">
+            <summary>设置 ESC/POS 原生文字的反白状态。</summary>
+            <remarks>对应 ESC/POS <c>GS B n</c>；Native 使用 0/1，Raster 仍由主机画布处理。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Text(System.String,System.Threading.CancellationToken)">
+            <summary>校验并记录可取消的原生文字及换行。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.WriteText(System.String)">
+            <summary>写入文字但不自动换行，便于组成原生行和制表列。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.WriteText(System.String,System.Threading.CancellationToken)">
+            <summary>校验并记录可取消的原生文字，不自动换行。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Tab">
+            <summary>写入原生水平制表符。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.NewLine(System.Int32)">
+            <summary>写入指定数量的原生换行符。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Text(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.String)">
+            <summary>在 Raster 光栅页按指定字号、样式和顺时针角度绘制文字。</summary>
+            <param name="x">旋转后文字墨迹外框的左上角 X 坐标。</param>
+            <param name="y">旋转后文字墨迹外框的左上角 Y 坐标。</param>
+            <param name="value">待绘制的文字。</param>
+            <param name="fontSize">主机字体字号，单位为打印点。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="bold">是否使用粗体。</param>
+            <param name="underline">是否绘制下划线。</param>
+            <param name="fontFamily">可选的系统字体名称或固定 Raster 字体别名。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterBarcode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>在 Raster 光栅页绘制主机编码的 Code 128 条码。</summary>
+            <param name="x">旋转后条码外框左上角 X 坐标。</param>
+            <param name="y">旋转后条码外框左上角 Y 坐标。</param>
+            <param name="data">非空的 Code 128 内容。</param>
+            <param name="height">条码编码区高度。</param>
+            <param name="moduleWidth">一个条码模块的宽度。</param>
+            <param name="humanReadable">是否绘制条码下方可读文字。</param>
+            <param name="humanReadableReserveHeight">可读文字预留高度。</param>
+            <param name="fontFamily">可选 Raster 字体名称或固定别名。</param>
+            <param name="humanReadableFontSize">可读文字字号。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterBarcode(Bing.EasyPrint.BarcodeType,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>在 Raster 光栅页绘制能力快照允许的主机条码。</summary>
+            <param name="type">主机编码条码类型；具体集合以 <see cref="T:Bing.EasyPrint.PrintCapabilities"/> 为准。</param>
+            <param name="x">旋转后条码外框左上角 X 坐标。</param>
+            <param name="y">旋转后条码外框左上角 Y 坐标。</param>
+            <param name="data">已按目标条码语义规范化的数据。</param>
+            <param name="height">条码编码区高度。</param>
+            <param name="moduleWidth">一个条码模块的宽度。</param>
+            <param name="humanReadable">是否绘制条码下方可读文字。</param>
+            <param name="humanReadableReserveHeight">可读文字预留高度。</param>
+            <param name="fontFamily">可选 Raster 字体名称或固定别名。</param>
+            <param name="humanReadableFontSize">可读文字字号。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterQrCode(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel,System.Int32)">
+            <summary>在 Raster 光栅页绘制主机编码的二维码。</summary>
+            <param name="x">旋转后二维码外框左上角 X 坐标。</param>
+            <param name="y">旋转后二维码外框左上角 Y 坐标。</param>
+            <param name="data">非空的二维码内容。</param>
+            <param name="moduleSize">二维码模块尺寸。</param>
+            <param name="errorLevel">二维码纠错级别。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Cut(Bing.EasyPrint.Printing.PrintCutOptions)">
+            <summary>按显式机型裁切形状与切刀位置补偿生成 GS V；失败时不追加指令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.FeedMotionUnits(System.Int32)">
+            <summary>打印缓冲区并进纸指定纵向运动单位；对应 ESC J，不修改当前行距。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeGs1DataBarOmnidirectional(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 75 输出 GS1 DataBar Omnidirectional。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeGs1DataBarTruncated(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 76 输出 GS1 DataBar Truncated。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeGs1DataBarLimited(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 77 输出 GS1 DataBar Limited。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeGs1DataBarExpanded(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 78 输出 GS1 DataBar Expanded。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeCode128Auto(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 79 输出 7-bit ASCII 的 Code 128 auto。</summary>
+            <remarks>需要任意 8-bit 数据时使用 <see cref="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeCode128Auto(System.Byte[],System.Byte,System.Byte,System.Byte)"/>。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeCode128Auto(System.Byte[],System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 79 输出原始 Code 128 auto 字节。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BarcodeUccEan128(System.String,System.Byte,System.Byte,System.Byte)">
+            <summary>使用 ESC/POS Function B 的 <c>GS k 74</c> 输出 GS1-128（UCC/EAN-128）。</summary>
+            <remarks>
+            数据必须是 2–255 字节的 7-bit ASCII；AI、分隔符和可选校验标记按目标 Epson
+            固件约定传入。设备会补齐起始符、FNC1、校验和停止符，方法不会替调用方生成 GS1 业务数据。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterImage(System.Int32,System.Int32,System.Byte[],System.Boolean,System.Boolean)">
+            <summary>写入 ESC/POS 光栅位图（每行按 MSB 优先排列）。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterImage(System.Int32,System.Int32,System.Byte[],System.Threading.CancellationToken,System.Boolean,System.Boolean)">
+            <summary>复制并记录可取消的位图；取消发生在追加指令之前。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterPage(System.Int32,System.Int32,System.Action{Bing.EasyPrint.Protocols.EscPosRasterCanvas},System.Boolean,System.Boolean)">
+            <summary>创建并输出一张由画布绘制的 ESC/POS 光栅页。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterPage(System.Int32,System.Int32,System.Action{Bing.EasyPrint.Protocols.EscPosRasterCanvas},System.Threading.CancellationToken,System.Boolean,System.Boolean)">
+            <summary>绘制可取消的光栅页；取消时不追加该页指令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BeginRasterPage(System.Int32,System.Int32)">
+            <summary>开始一张可通过坐标文字、Line 和 Box 绘制的光栅页。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.BeginRasterPage(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>开始可取消的坐标光栅页。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.EndRasterPage">
+            <summary>将当前光栅页编码为一条 ESC/POS 光栅指令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.EndRasterPage(System.Threading.CancellationToken)">
+            <summary>结束光栅页；取消时保留当前页，允许再次结束。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Build(System.Threading.CancellationToken)">
+            <summary>可取消构建完整命令；未结束的光栅页仍拒绝构建。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.WriteRestrictedRaw(System.String)">
+            <summary>完整扫描 ESC/POS Native 文本命令，并按原文写入。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosImageCommand">
+            <summary>选择设备实际支持的单色图片指令。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosImageCommand.RasterGsV0">
+            <summary>使用逐行光栅 GS v 0。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosImageCommand.BitImageEscStar">
+            <summary>使用按列编码的 ESC *，按带输出并控制进纸。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosBitImageMode">
+            <summary>ESC * 的点阵密度模式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBitImageMode.SingleDensity8">
+            <summary>8 点单密度。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBitImageMode.DoubleDensity8">
+            <summary>8 点双密度。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBitImageMode.SingleDensity24">
+            <summary>24 点单密度。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBitImageMode.DoubleDensity24">
+            <summary>24 点双密度。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition">
+            <summary>ESC/POS 原生条码可读文字的设备位置。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition.None">
+            <summary>不输出可读文字。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition.Above">
+            <summary>输出在条码上方。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition.Below">
+            <summary>输出在条码下方。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition.Both">
+            <summary>同时输出在条码上方和下方。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosPrinterProfile">
+            <summary>
+            描述目标 ESC/POS 机型的图片格式、物理分辨率和可用指令。
+            必须按设备手册填写；它不探测打印机，也不声称设备已经验收。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.Name">
+            <summary>配置的名称，用于识别目标机型。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.Text">
+            <summary>可选的原生文字契约；与主机 Raster 字体能力分开声明。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.ImageCommand">
+            <summary>图片指令类型。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.BitImageMode">
+            <summary>ESC * 的点阵模式；使用 GS v 0 时保留默认值。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.HorizontalDpi">
+            <summary>图片水平分辨率；模板和输入位图的点数使用此分辨率。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.VerticalDpi">
+            <summary>图片垂直分辨率；ESC * 编码时显式转换输入位图的纵向采样。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.MotionUnitsPerInch">
+            <summary>ESC 3 / ESC J 的每英寸进纸单位数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.PrintableWidthDots">
+            <summary>设备可打印宽度（水平点数）；为空时只检查协议字段范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.MaxGs1LinearPayloadCharacters">
+            <summary>设备手册声明的 GS1-128 payload 字符上限；统计规范化数据及 ASCII 29 分隔符，不含符号 framing。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.MaxGs1DataBarExpandedPayloadCharacters">
+            <summary>设备手册声明的 GS1 DataBar Expanded payload 字符上限；为空时只检查协议/编码器范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.MaxImageBlockBytes">
+            <summary>单条图片指令的最大数据字节数（不含命令头）；为空时不分块。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsCut">
+            <summary>是否支持 GS V 切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportedCutModes">
+            <summary>已确认的切纸形状；null 保留原有全切/半切入口，空数组禁用切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsFeedAndCut">
+            <summary>是否支持进纸到切刀位置后裁切的 GS V Function B；默认不声明支持。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsNativeBarcode">
+            <summary>是否支持 GS k 原生条码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsNativeBarcodeHumanReadable">
+            <summary>是否支持 GS k 原生条码的设备可读文字（HRI）。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportedNativeBarcodeHumanReadableTypes">
+            <summary>
+            已确认支持原生 HRI 的条码制式；null 表示不按制式收窄，空数组表示全部禁用。
+            Raster 模式的 HRI 由主机绘制，不使用此列表。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportedNativeBarcodeHumanReadablePositions">
+            <summary>
+            已确认支持的 ESC/POS Native HRI 位置；null 表示不按位置收窄，空数组表示所有 HRI 位置均禁用。
+            <see cref="F:Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition.None"/> 不需要列入列表；Raster 模式忽略此列表。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsNativeQrCode">
+            <summary>是否支持 GS ( k 原生二维码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsPrintAreaWidth">
+            <summary>是否支持 GS W 打印区域。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.SupportsTextSize">
+            <summary>是否支持 GS ! 文字倍数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosPrinterProfile.UnidirectionalBitImage">
+            <summary>ESC * 绘制期间是否使用单向打印；结束后恢复双向打印。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrinterProfile.EightDotImpact(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            创建需要调用方确认纸宽的 8 点针式 ESC/POS 配置。
+            默认使用 180x60 DPI 和 1/144 英寸进纸单位，不启用切刀或原生条码。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosRasterTextBounds">
+            <summary>
+            描述 ESC/POS Raster 文字实际产生的黑色像素范围。
+            </summary>
+            <remarks>
+            坐标相对于传给 <see cref="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String)"/>
+            的原点，并使用左闭右开、上闭下开的范围约定。该范围表示已光栅化的 ink，
+            不包含没有像素的字体 advance 空间。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Left">
+            <summary>相对于绘制原点的左边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Top">
+            <summary>相对于绘制原点的上边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Width">
+            <summary>实际黑色像素范围的宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Height">
+            <summary>实际黑色像素范围的高度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Right">
+            <summary>相对于绘制原点的右边界（不包含该列）。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.Bottom">
+            <summary>相对于绘制原点的下边界（不包含该行）。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterTextBounds.IsEmpty">
+            <summary>获取是否没有可见黑色像素。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosRasterCanvas">
+            <summary>用于 ESC/POS Raster 输出的单色位图画布。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterCanvas.Width">
+            <summary>画布宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterCanvas.Height">
+            <summary>画布高度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosRasterCanvas.RowBytes">
+            <summary>每行字节数。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.#ctor(System.Int32,System.Int32,Bing.EasyPrint.Protocols.RasterFontCatalog)">
+            <summary>使用固定字体配置创建画布；配置为空时保留系统字体选择。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.#ctor(System.Int32,System.Int32,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>使用固定字体配置和取消令牌创建画布。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.SetPixel(System.Int32,System.Int32,System.Boolean)">
+            <summary>设置一个黑色像素；越界坐标会被忽略。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawLine(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>绘制线段。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawRectangle(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Boolean)">
+            <summary>绘制矩形边框或填充矩形。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawRaster(System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[])">
+            <summary>将另一张 MSB 优先单色位图复制到画布。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.SupportsBarcodeType(Bing.EasyPrint.BarcodeType)">
+            <summary>判断是否有稳定的主机光栅编码实现；邮政制式按各自主机编码器输出。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>将 Code 128 条码按指定模块宽度绘制到画布。</summary>
+            <param name="x">条码编码区左上角 X 坐标。</param>
+            <param name="y">条码编码区左上角 Y 坐标。</param>
+            <param name="data">非空的 Code 128 内容。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="moduleWidth">一个条码模块的宽度，单位为打印点。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32)">
+            <summary>绘制 Code 128 条码，并可使用主机字体绘制条码下方的可读文字；保留旧公开签名。</summary>
+            <param name="x">条码编码区左上角 X 坐标。</param>
+            <param name="y">条码编码区左上角 Y 坐标。</param>
+            <param name="data">非空的 Code 128 内容。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="moduleWidth">一个条码模块的宽度，单位为打印点。</param>
+            <param name="humanReadable">是否绘制可读文字；false 保持旧的纯条码输出。</param>
+            <param name="humanReadableReserveHeight">调用方为可读文字声明的布局高度；仅用于输入校验。</param>
+            <param name="fontFamily">可选的固定 Raster 字体别名；为空时自动选择字体。</param>
+            <param name="humanReadableFontSize">可读文字字号，单位为打印点。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>绘制 Code 128 条码，并按顺时针角度旋转完整编码区和可读文字预留区。</summary>
+            <param name="x">旋转后条码外框左上角 X 坐标。</param>
+            <param name="y">旋转后条码外框左上角 Y 坐标。</param>
+            <param name="data">非空的 Code 128 内容。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="moduleWidth">一个条码模块的宽度，单位为打印点。</param>
+            <param name="humanReadable">是否绘制可读文字。</param>
+            <param name="humanReadableReserveHeight">调用方为可读文字声明的布局高度。</param>
+            <param name="fontFamily">可选的固定 Raster 字体别名。</param>
+            <param name="humanReadableFontSize">可读文字字号，单位为打印点。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(Bing.EasyPrint.BarcodeType,System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>绘制支持的主机条码；保留不带 HRI 的便捷重载。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(Bing.EasyPrint.BarcodeType,System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>绘制支持的主机条码，并可绘制可读文字和旋转结果。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawBarcode(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.PrintQuietZone,System.Int32)">
+            <summary>将 Code 128 条码绘制到画布，并为编码区登记显式静区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureBarcodeWidth(System.String,System.Int32)">
+            <summary>测量 ESC/POS Raster Code 128 实际编码区宽度，单位为打印点。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureBarcodeWidth(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>可取消地测量 ESC/POS Raster Code 128 实际编码区宽度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureBarcodeWidth(Bing.EasyPrint.BarcodeType,System.String,System.Int32)">
+            <summary>测量支持的 ESC/POS Raster 主机条码符号输出宽度。</summary>
+            <remarks>Code 49 的结果包含 10X 左静区和 1X 右静区。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureBarcodeWidth(Bing.EasyPrint.BarcodeType,System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>可取消地测量支持的 ESC/POS Raster 主机条码符号输出宽度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureBarcodeHeight(Bing.EasyPrint.BarcodeType,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>测量支持的 ESC/POS Raster 主机条码符号输出高度。</summary>
+            <remarks>
+            Code 49 的 <paramref name="height"/> 表示每个堆叠行的条高，结果包含顶部、行间和底部 1X 分隔条；
+            其它制式沿用原有条高语义。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeChinaPostPattern(System.String)">
+            <summary>生成 Datalogic 2 of 5（China Post）的完整模块串。</summary>
+            <remarks>
+            Raster 没有独立宽条参数，因此固定使用 3:1 宽窄比；这是 Datalogic 2 of 5
+            允许的上界比例，适合点阵/热敏输出。数字字符沿用 Matrix 2 of 5，字符间保留
+            一个窄空白；起始为两根窄条，结束为一根宽条和一根窄条，不追加可选校验位。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeCode11Pattern(System.String)">
+            <summary>生成 Code 11 的完整模块串；包括起止星号和协议校验位。</summary>
+            <remarks>保留 internal 供协议回归测试验证 C/K 校验与窄空白位序。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeTelepenPattern(System.String)">
+            <summary>生成 Telepen Alpha 的完整模块串；包括起始、Mod-127 校验和结束符号。</summary>
+            <remarks>保留 internal 供协议回归测试验证符号宽度、校验位和起止模式。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeTelepennPattern(System.String)">
+            <summary>生成 Telepen Numeric 的完整模块串；输入为数字，奇数位前补零。</summary>
+            <remarks>保留 internal 供协议回归测试验证数字压缩、校验位和固定符号宽度。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarPattern(System.String)">
+            <summary>生成 GS1 DataBar Omnidirectional/Truncated 的 96 模块串。</summary>
+            <remarks>
+            算法和数据表依据 libzint 的 GS1 DataBar 实现（BSD-3-Clause）；项目只
+            保留线性 Omnidirectional/Truncated 形式，输入为统一模型中的 13 位数字 payload。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarLimitedPattern(System.String)">
+            <summary>生成 GS1 DataBar Limited 的 79 模块串。</summary>
+            <remarks>
+            算法和数据表依据 libzint 的 GS1 DataBar Limited 实现（BSD-3-Clause）。
+            输入为统一模型中的 13 位数字 payload，并由调用方负责完成严格校验。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarExpandedPattern(System.String)">
+            <summary>生成 GS1 DataBar Expanded Method 1/2/3/4/5/6/7/8/9/10/11/12/13/14 的线性模块串。</summary>
+            <remarks>
+            Raster 主机编码器支持 `(01)` GTIN-14 后接 Expanded 通用字段字符集子集、显式 FNC1
+            分隔的 Method 2 原始 GS1 数据，以及受支持常用 AI 子集的圆括号/方括号输入（自动规范化为 FNC1），
+            以及显式 `(3103)` 公斤重量的 Method 3、`(3202)/(3203)` 英制重量的 Method 4；
+            `(392x)` 本地价格的 Method 5、`(393x)` 货币代码加价格的 Method 6，以及 `(310x)`/
+            `(320x)` 重量加虚拟日期的 Method 7/8，以及带日期和可选通用尾部的 Method 9–14；日期后的
+            常用括号 AI 尾部会按变长/定长规则规范化为 FNC1 或连续字段；其它 AI、
+            压缩方法、组合码和堆叠形式在规范化阶段严格拒绝。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ValidateExpandedMethod2Data(System.String,System.String,System.Boolean)">
+            <summary>
+            校验 DataBar Expanded Method 2 的原始 AI/FNC1 数据和通用字段字符集。
+            </summary>
+            <param name="normalized">以两位数字 AI 开头的原始元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <param name="requireFnc1">是否要求元素串包含 FNC1 分隔符。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarExpandedGeneralField(System.String,System.Int32,System.Text.StringBuilder,System.Threading.CancellationToken,System.Int32@,System.Char@)">
+            <summary>按 ISO/IEC 24724 的 Expanded 通用字段状态机追加编码位。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeIntelligentMailPattern(System.String)">
+            <summary>
+            将 20/25/29/31 位 IMb 数字转换为 USPS 四状态条字符。
+            </summary>
+            <remarks>
+            该实现对应 USPS-B-3200 第 2.2 节：路由/跟踪数字进入 102 位整数，
+            通过 CRC-11 和 10 个混合进制 codeword，再经 5-of-13/2-of-13 表及
+            FCS 位取反得到 65 根 A/D/T/F 条。方法保持 internal，避免把 USPS
+            构造细节扩展为公共 API。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.NormalizeBarcodeData(Bing.EasyPrint.BarcodeType,System.String)">
+            <summary>按统一模型语义规范化 Raster I2OF5 校验变体的数据。</summary>
+            <remarks>
+            I2OF5C 使用 CPCL 3/1 Mod10；I2OF5G 使用 German Post 4/9 Mod10。
+            规范化后的数据始终是 ZXing ITF 可编码的偶数位数字。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.HumanReadableBarcodeData(Bing.EasyPrint.BarcodeType,System.String)">
+            <summary>
+            返回 Raster 条码的可读文字语义。
+            </summary>
+            <param name="type">条码制式。</param>
+            <param name="data">待编码的数据或括号 AI 输入。</param>
+            <returns>可读文字内容；DataBar 会补齐隐含 AI 和 GTIN 校验位，并还原输入转义。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>将 QR Code 按指定模块尺寸绘制到画布，默认使用 M 级纠错。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel)">
+            <summary>将 QR Code 按指定模块尺寸和纠错级别绘制到画布。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel,System.Int32)">
+            <summary>将 QR Code 按顺时针角度绘制到画布。</summary>
+            <param name="x">旋转后二维码外框左上角 X 坐标。</param>
+            <param name="y">旋转后二维码外框左上角 Y 坐标。</param>
+            <param name="data">非空的二维码内容。</param>
+            <param name="moduleSize">二维码模块尺寸。</param>
+            <param name="errorLevel">二维码纠错级别。</param>
+            <param name="rotation">旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawQrCode(System.Int32,System.Int32,System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel,Bing.EasyPrint.PrintQuietZone)">
+            <summary>将 QR Code 绘制到画布，并为编码区登记显式静区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureQrCodeSize(System.String,System.Int32,Bing.EasyPrint.QrCodeCorrectionLevel,System.Threading.CancellationToken)">
+            <summary>可取消地测量 ESC/POS Raster QR Code 的编码区尺寸。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String)">
+            <summary>将系统字体文字绘制到当前单色画布。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.String)">
+            <summary>将系统字体文字按顺时针角度绘制；该重载把角度放在字号之后，便于调用方显式指定角度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int32)">
+            <summary>将系统字体文字按顺时针角度绘制到当前单色画布。</summary>
+            <param name="x">旋转后文字墨迹外框的左上角 X 坐标。</param>
+            <param name="y">旋转后文字墨迹外框的左上角 Y 坐标。</param>
+            <param name="text">待绘制的文字。</param>
+            <param name="fontSize">字体大小，单位为打印点。</param>
+            <param name="bold">是否使用粗体。</param>
+            <param name="underline">是否绘制下划线；下划线随文字一起旋转。</param>
+            <param name="fontFamily">可选的系统字体名称或固定 Raster 字体别名。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.RasterizeText(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int32,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>
+            将文字光栅化为紧致的单色位图，供不具备原生文字样式的标签协议显式降级使用。
+            </summary>
+            <param name="text">待绘制文字。</param>
+            <param name="fontSize">字体大小，单位为打印点。</param>
+            <param name="bold">是否使用粗体。</param>
+            <param name="underline">是否绘制下划线。</param>
+            <param name="fontFamily">可选主机字体名称。</param>
+            <param name="rotation">顺时针旋转角度，只允许 0、90、180 或 270。</param>
+            <param name="fonts">可选固定字体目录。</param>
+            <param name="cancellationToken">取消令牌。</param>
+            <returns>已按旋转角度变换并裁切空白边缘的单色位图。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ResolveFontFamilyName(System.String)">
+            <summary>解析适合给定文本的 ESC/POS Raster 系统字体名称。</summary>
+            <param name="text">待输出的文本。</param>
+            <returns>实际选用的系统字体名称。</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text" /> 为 <c>null</c>。</exception>
+            <exception cref="T:System.NotSupportedException">系统中没有可用于该文本的字体。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ResolveFontFamilyName(System.String,System.String)">
+            <summary>解析指定的系统字体族，并返回实际字体族名称。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ResolveFontFamilyName(System.String,System.String,System.Boolean)">
+            <summary>按实际粗体样式校验字形覆盖，并返回选用的系统字体名称。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ResolveFontFamilyName(System.String,System.String,System.Boolean,Bing.EasyPrint.Protocols.RasterFontCatalog)">
+            <summary>按固定配置解析整段文字字体；返回资源别名，供度量和绘制复用。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ResolveFontFamilyName(System.String,System.String,System.Boolean,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>使用固定字体配置解析整段文字字体，并支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextWidth(System.String,System.Int32,System.Boolean,System.String)">
+            <summary>测量 ESC/POS Raster 文字的水平前进宽度，单位为打印点。</summary>
+            <param name="text">待测量的文本。</param>
+            <param name="fontSize">字体大小，单位为打印点。</param>
+            <param name="bold">是否使用粗体。</param>
+            <param name="fontFamily">可选的系统字体名称；为空时按文本内容选择字体。</param>
+            <returns>足以容纳字体前进宽度的整数打印点数。</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text" /> 为 <c>null</c>。</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="fontSize" /> 不为正数。</exception>
+            <exception cref="T:System.NotSupportedException">指定字体不存在，或系统中没有可用于该文本的字体。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextWidth(System.String,System.Int32,System.Boolean,System.String,Bing.EasyPrint.Protocols.RasterFontCatalog)">
+            <summary>使用固定字体配置测量文字前进宽度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextWidth(System.String,System.Int32,System.Boolean,System.String,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>使用固定字体配置并支持取消地测量文字前进宽度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextInkBounds(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int64)">
+            <summary>
+            测量文字经过 ESC/POS Raster 实际光栅化后的黑色像素范围。
+            </summary>
+            <param name="text">待测量的文本。</param>
+            <param name="fontSize">字体大小，单位为打印点。</param>
+            <param name="bold">是否使用粗体。</param>
+            <param name="underline">是否把当前画布使用的下划线笔画并入范围。</param>
+            <param name="fontFamily">可选的系统字体名称；为空时按文本内容选择字体。</param>
+            <param name="maxPixels">临时测量位图允许使用的最大像素数。</param>
+            <returns>相对于 <c>DrawText(x, y, ...)</c> 原点的实际像素范围。</returns>
+            <remarks>
+            该方法使用与 <see cref="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String)"/> 相同的
+            ImageSharp 绘制调用和黑色像素判定，因此返回的是可见 ink 范围，而不是字体的 advance 宽度。
+            </remarks>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text" /> 为 <c>null</c>。</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="fontSize" /> 不为正数。</exception>
+            <exception cref="T:System.NotSupportedException">指定字体不存在，或系统中没有可用于该文本的字体。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextInkBounds(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int64,Bing.EasyPrint.Protocols.RasterFontCatalog)">
+            <summary>使用与固定配置画布相同的字体测量实际墨迹范围。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextInkBounds(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int64,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>使用固定字体配置并支持取消地测量实际墨迹范围。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ToBytes">
+            <summary>获取画布的独立位图副本。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.ToBytes(System.Threading.CancellationToken)">
+            <summary>使用调用方令牌获取画布的独立位图副本。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosCharacterMode">
+            <summary>显式声明目标机型的字符处理模式；不会自动推断厂商或固件。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosCharacterMode.DeviceDefault">
+            <summary>使用初始化后的设备默认模式，不追加字符模式指令。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosCharacterMode.SingleByte">
+            <summary>使用 FS . 取消双字节模式；须声明单字节编码。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.EscPosCharacterMode.FsKanji">
+            <summary>使用 FS &amp; 选择汉字模式；须由设备手册确认编码和字库。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.EscPosTextProfile">
+            <summary>
+            目标 ESC/POS 设备当前原生字库的编码、模式、覆盖范围及实测布局。
+            不设置此契约时保留旧代码页行为；声明后拒绝编码冲突和缺字。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.EncodingCodePage">
+            <summary>与设备原生字符集对应的 .NET 编码代码页，必须显式设置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.CodePageIndex">
+            <summary>初始化时使用 ESC t 选择的设备代码页；为空表示不追加该指令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.CharacterMode">
+            <summary>设备实际支持的字符模式；默认不追加模式指令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.CharacterRanges">
+            <summary>当前默认字库已确认支持的字符区间；声明契约时必须非空。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.HalfCellWidthDots">
+            <summary>24 点逻辑字号下实测的半角字宽，单位为布局点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.FullCellWidthDots">
+            <summary>24 点逻辑字号下实测的全角字宽，单位为布局点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.EscPosTextProfile.LineHeightDots">
+            <summary>Native 文字的逻辑行高；当前布局接受 24 或 26 点。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosTextProfile.MeasureTextWidth(System.String)">
+            <summary>按已声明的半角/全角单元测量文字宽度；不代替字库和编码校验。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosTextProfile.MeasureTextWidth(System.String,System.Threading.CancellationToken)">
+            <summary>按已声明字宽进行可取消测量。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser">
+            <summary>
+            GS1 括号 AI 元素串解析器。
+            </summary>
+            <remarks>
+            该解析器只负责当前各 Provider 已声明的常用 AI 子集；未知 AI、未表达的复合字段和
+            业务关联规则会严格失败，不会猜测字段边界。字段值中的字面左括号使用 \( 表示；
+            反斜杠只作输入转义，不属于输出数据。GS1 官方字典仍是完整 AI 语义的来源。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.ShouldNormalize(System.String)">
+            <summary>
+            判断输入是否需要严格解析而非沿用单元素括号兼容行为。
+            </summary>
+            <param name="data">待检查的括号 AI 输入。</param>
+            <returns>包含多个 AI 或反斜杠字符时返回 <see langword="true"/>，否则返回 <see langword="false"/>。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.DecodeDisplayEscapes(System.String)">
+            <summary>
+            将括号 AI 展示文本中的左括号转义还原为数据字符。
+            </summary>
+            <param name="data">经过严格解析验证的括号 AI 文本。</param>
+            <returns>移除字面左括号转义符后的文本；输入为 <see langword="null"/> 时返回 <see langword="null"/>。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.Normalize(System.String,System.String)">
+            <summary>
+            校验受支持的括号 AI 元素串并生成原始 AI/FNC1 数据。
+            </summary>
+            <param name="data">统一括号样式的 AI 元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <returns>去除 AI 展示括号并按需插入 FNC1 后的数据。</returns>
+            <exception cref="T:System.ArgumentException">AI 子集、字段值或括号结构不符合当前规则时抛出。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.NormalizeForProtocol(System.String,System.String,System.Int32)">
+            <summary>
+            按当前已声明的 AI 子集规范化协议输入。
+            </summary>
+            <param name="data">统一括号样式的 AI 元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <param name="maximumLength">规范化结果允许的最大长度。</param>
+            <returns>去除 AI 展示括号并按需插入 FNC1 后的数据。</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">最大长度小于 3 时抛出。</exception>
+            <exception cref="T:System.ArgumentException">AI、字段值或规范化长度不符合当前子集时抛出。</exception>
+            <remarks>
+            Raster Expanded 的符号上限仍由 <see cref="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.Normalize(System.String,System.String)"/> 保持为 77；
+            原生 GS1-128/DataBar 固件可接受更长 payload 时，协议层使用此入口只放宽总长度，
+            不放宽 AI 字典、字符集或字段长度校验。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.NormalizeDateTail(System.String,System.String)">
+            <summary>
+            规范化 GS1 日期字段后的括号 AI 尾部。
+            </summary>
+            <param name="data">日期后的括号 AI 元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <returns>去除展示括号并按需插入 FNC1 后的数据。</returns>
+            <exception cref="T:System.ArgumentException">AI 子集、字段值或括号结构不符合当前规则时抛出。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.Normalize(System.String,System.String,System.Boolean)">
+            <summary>
+            使用默认协议长度上限规范化括号 AI 元素串。
+            </summary>
+            <param name="data">括号 AI 元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <param name="rejectDateIdentifiers">是否拒绝日期类型的应用标识。</param>
+            <returns>去除展示括号并按需插入 FNC1 后的数据。</returns>
+            <exception cref="T:System.ArgumentException">AI 子集或字段值不符合当前规则时抛出。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.Normalize(System.String,System.String,System.Boolean,System.Int32)">
+            <summary>
+            解析括号 AI 元素、校验字段，并生成原始 AI/FNC1 数据。
+            </summary>
+            <param name="data">统一括号样式的 AI 元素串。</param>
+            <param name="name">异常中的参数名称。</param>
+            <param name="rejectDateIdentifiers">是否拒绝日期类型的应用标识。</param>
+            <param name="maximumLength">规范化结果允许的最大长度。</param>
+            <returns>原始 AI 数据及必要的 FNC1 分隔符。</returns>
+            <exception cref="T:System.ArgumentException">AI、字段值或规范化长度不符合当前规则时抛出。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.FindNextElement(System.String,System.Int32)">
+            <summary>
+            查找下一个未转义的括号 AI 起点。
+            </summary>
+            <param name="data">待扫描的元素串。</param>
+            <param name="start">开始扫描的位置。</param>
+            <returns>下一个 AI 起点的索引；不存在时返回 -1。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1ApplicationIdentifierParser.DecodeValue(System.String,System.String,System.String)">
+            <summary>
+            解码 AI 值中用于表示字面左括号的转义序列。
+            </summary>
+            <param name="ai">当前应用标识。</param>
+            <param name="value">当前元素的编码值。</param>
+            <param name="name">异常中的参数名称。</param>
+            <returns>替换转义序列后的值。</returns>
+            <exception cref="T:System.ArgumentException">值包含不支持的反斜杠转义时抛出。</exception>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.Gs1BarcodeCapacity">
+            <summary>校验设备 Profile 声明的 GS1 单符号 payload 字符上限。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang">
+            <summary>声明原生条码可读文字（HRI）超出估算条码矩形的页面边距。</summary>
+            <remarks>
+            数值使用打印点。角度专用配置中，未指定的边继承 Profile 通用边距；显式零表示不增加该边距。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang.#ctor(System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Int32})">
+            <summary>创建可选的页面左、上、右、下边距覆盖值。</summary>
+            <param name="leftDots">左侧外伸；null 表示继承通用配置。</param>
+            <param name="topDots">上侧外伸；null 表示继承通用配置。</param>
+            <param name="rightDots">右侧外伸；null 表示继承通用配置。</param>
+            <param name="bottomDots">下侧外伸；null 表示继承通用配置。</param>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang.LeftDots">
+            <summary>获取页面左侧外伸点数；null 表示继承 Profile 通用配置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang.TopDots">
+            <summary>获取页面上侧外伸点数；null 表示继承 Profile 通用配置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang.RightDots">
+            <summary>获取页面右侧外伸点数；null 表示继承 Profile 通用配置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang.BottomDots">
+            <summary>获取页面下侧外伸点数；null 表示继承 Profile 通用配置。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1">
+            <summary>协议命令的通用动作记录和可重复构建实现。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.Protocol">
+            <summary>获取命令所属协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.Capabilities">
+            <summary>获取协议能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.AddWithStorage(System.Action{Bing.EasyPrint.IBufferWriter},System.Int64)">
+            <summary>预留动作持有的数据；保留原 Add 虚方法的协议状态校验。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.AddCancellable(System.Action{Bing.EasyPrint.IBufferWriter,System.Threading.CancellationToken})">
+            <summary>记录构建时可取消的动作；失败或取消不修改已记录动作。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.SuppressActionRecording">
+            <summary>在临时命令副本中执行结构化校验而不记录输出动作。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.ValidateField(System.String,System.String,System.Char[])">
+            <summary>校验会被嵌入协议字段的文本，拒绝控制符和指定分隔符。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.WriteRawWithCommit(System.String,System.Action)">
+            <summary>记录文本 Raw，并在动作不可失败地提交前完成关联元数据提交。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.WriteRawBytes(System.Byte[])">
+            <summary>写入原始二进制数据。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.WriteRawBytes(System.Byte[],System.Threading.CancellationToken)">
+            <summary>复制原始字节并支持取消；失败时不追加动作。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.Build(System.Threading.CancellationToken)">
+            <summary>可取消构建；取消后仍可使用新令牌重新构建完整命令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.RecordedActionCount">
+            <summary>已记录动作数，供有独立文件边界的协议使用。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.BuildRecordedActions(System.Int32,System.Int32)">
+            <summary>构建指定动作区间，不修改记录；用于保持控制文件边界。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.BuildRecordedActions(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>构建可取消的动作区间，不修改记录。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.ValidateEncodable(System.String,System.String)">
+            <summary>
+            校验文本能否使用当前协议编码完整表示。
+            </summary>
+            <remarks>
+            协议命令必须在记录动作前拒绝替换回退，否则打印机收到的字节可能已经
+            把原始字符静默变成问号。该检查只存在于新协议基类，因此不会改变 CPCL
+            现有的替换回退行为。原始二进制写入不经过此方法。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ProtocolPrintCommandBase`1.GetEncodedBytes(System.String,System.String)">
+            <summary>严格编码文本，用于需要在追加动作前取得字节的协议命令。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.RasterFontCatalog">
+            <summary>不可变的 Raster 字体配置；只使用所提供资源，按显式替代列表选择整段文字字体。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontCatalog.Fonts">
+            <summary>固定字体资源的只读列表。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontCatalog.DefaultFont">
+            <summary>未指定主机字体名称时使用的资源别名。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontCatalog.FallbackFonts">
+            <summary>主字体缺字或缺少样式时依次尝试的资源别名；空列表表示严格拒绝。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.RasterFontCatalog.#ctor(System.Collections.Generic.IEnumerable{Bing.EasyPrint.Protocols.RasterFontResource},System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>创建固定字体配置；名称按序号区分大小写，所有引用必须存在。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.RasterFontCatalog.#ctor(System.Collections.Generic.IEnumerable{Bing.EasyPrint.Protocols.RasterFontResource},System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>使用取消令牌创建固定字体配置；目录数据由资源对象共享，不重复复制或计费。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.RasterFontCatalog.SupportsSelection(System.String,System.Boolean)">
+            <summary>检查资源别名和样式及显式替代是否可表达；不代替实际文字的字形检查。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.RasterFontLimits">
+            <summary>Core、模板和设计器 Host 共用的固定字体入口边界。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.RasterFontLimits.MaxResourceCount">
+            <summary>一个字体目录允许的最大资源数，与设计器现有入口限制一致。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.RasterFontLimits.MaxTotalDataBytes">
+            <summary>单资源及整个目录允许的常规、粗体原始字体数据总字节数。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.RasterFontResource">
+            <summary>调用方提供的固定字体资源；字体字节在构造时复制，不读取系统字体或外部路径。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.Name">
+            <summary>模板使用的资源别名，与字体文件内部的字体族名称无关。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.Version">
+            <summary>调用方声明的资源版本；用于记录来源，不自动验证厂商版本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.HasBold">
+            <summary>是否提供了经过验证的粗体资源。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.ByteLength">
+            <summary>常规与粗体原始字体数据的总字节数，不创建副本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.RegularData">
+            <summary>获取常规字体字节的独立副本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.RasterFontResource.BoldData">
+            <summary>获取粗体字体字节的独立副本；未提供时返回 null。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.RasterFontResource.#ctor(System.String,System.String,System.Byte[],System.Byte[])">
+            <summary>加载单个常规 TTF/OTF 字体及可选的同族粗体；不接受隐式合成样式。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.RasterFontResource.#ctor(System.String,System.String,System.Byte[],System.Byte[],System.Threading.CancellationToken)">
+            <summary>使用取消令牌加载单个常规 TTF/OTF 字体及可选的同族粗体。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplCutStrategy">
+            <summary>TSPL 裁切时序：立即命令或每个 PRINT 批次的自动裁切。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.TsplCutStrategy.Immediate">
+            <summary>PRINT 后等待 EOJ，再执行 CUT；只接受设备确认的固定切法。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.TsplCutStrategy.Batch">
+            <summary>PRINT 前启用 SET CUTTER/SET PARTIAL_CUTTER BATCH，结束后关闭。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplCutterProfile">
+            <summary>按目标设备手册及实测声明的 TSPL 切刀契约；未配置时不启用切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplCutterProfile.Strategy">
+            <summary>选择立即 CUT 或批次自动裁切，不根据固件字符串推断。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplCutterProfile.SupportedCutModes">
+            <summary>确认支持的切法；Immediate 必须仅声明 CUT 的一种实际固定形状。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplCutterProfile.SupportsEndOfJob">
+            <summary>设备支持 EOJ 完成同步；当前受控裁切要求显式确认此能力。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplCutterProfile.CutPositionFeedDots">
+            <summary>从 PRINT 完成后的介质位置送到切刀的实测纵向点数；只用于 Immediate，null 禁用补偿。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplFontSizing">
+            <summary>TSPL 内置字体的点阵尺寸与 TEXT 放大倍率。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplFontSizing.FixedCell(System.String)">
+            <summary>取得固定字体的基础单元尺寸；字体 0 为可缩放字体。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplFontSizing.FixedScale(System.String,System.Int32)">
+            <summary>将期望的打印点高度转换为固定字体的整数放大倍率。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplMediaOptions">
+            <summary>
+            TSPL 标签介质和设备设置。
+            </summary>
+            <remarks>
+            介质设置会在命令写入前完成校验。<see cref="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Dpi"/> 是主机侧的设备元数据，TSPL
+            不提供通用的运行时 DPI 设置命令，因此不会直接写入指令流。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Profile">
+            <summary>可选机型声明；为空时保留协议通用能力和默认字节。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.TsplMediaOptions.DefaultDpi">
+            <summary>
+            TSPL 常用的默认打印分辨率，单位为 DPI。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.GapDistance">
+            <summary>
+            获取或设置标签间隙距离，单位由打印机的标签设置决定。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.GapOffset">
+            <summary>
+            获取或设置标签间隙偏移量，单位由打印机的标签设置决定。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Direction">
+            <summary>
+            获取或设置打印方向；有效值为 0 或 1。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.ReferenceX">
+            <summary>
+            获取或设置打印参考点的水平坐标。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.ReferenceY">
+            <summary>
+            获取或设置打印参考点的垂直坐标。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Speed">
+            <summary>
+            获取或设置打印速度级别；必须为正数。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Density">
+            <summary>
+            获取或设置打印浓度级别；有效范围为 0 到 15。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.Dpi">
+            <summary>
+            获取或设置打印机分辨率元数据，单位为 DPI。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.AllowRasterizedLines">
+            <summary>允许斜线以主机生成的位图输出；默认关闭。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplMediaOptions.AllowRasterizedTextStyles">
+            <summary>允许粗体、下划线文字以主机位图输出；默认关闭并严格拒绝。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplPrintCommand">
+            <summary>生成 TSPL 标签打印指令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrintCommand.Protocol">
+            <summary>获取 TSPL 的基础能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.#ctor(System.Text.Encoding,Bing.EasyPrint.Protocols.TsplMediaOptions)">
+            <summary>
+            使用指定编码和介质设置创建 TSPL 命令构建器。
+            </summary>
+            <param name="encoding">写入文本时使用的编码；为空时使用 GBK。</param>
+            <param name="mediaOptions">介质和设备设置；为空时不追加额外设置。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.ApplyMediaOptions(Bing.EasyPrint.Protocols.TsplMediaOptions)">
+            <summary>
+            将 TSPL 介质和设备设置应用到命令流。
+            </summary>
+            <param name="mediaOptions">待应用的设置；不能为 <c>null</c>。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            设置会在调用前一次性完成校验。尚未写入标签尺寸时，设置会延后到
+            <see cref="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Size(System.Int32,System.Int32,System.String)"/> 之后，以保持 TSPL 页面设置顺序。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.ClearImageBuffer">
+            <summary>清空打印机的标签图像缓冲区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.TextRasterized(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>
+            将带粗体或下划线的文字以主机位图写入 TSPL。
+            </summary>
+            <remarks>
+            只有显式设置 <see cref="P:Bing.EasyPrint.Protocols.TsplMediaOptions.AllowRasterizedTextStyles" /> 后才允许使用；
+            输出使用 BITMAP，文字不再依赖打印机内置字体。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>绘制线段；斜线光栅化过程支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.FillRectangle(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            绘制填充矩形。
+            </summary>
+            <param name="x">矩形左边界坐标，单位为 dots。</param>
+            <param name="y">矩形上边界坐标，单位为 dots。</param>
+            <param name="width">矩形宽度，单位为 dots；必须为正数。</param>
+            <param name="height">矩形高度，单位为 dots；必须为正数。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            宽度和高度表示半开区域 [x, x + width) × [y, y + height)，与
+            <see cref="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)"/> 使用的右下端点坐标不同。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.FillRectangle(System.Int32,System.Int32,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            绘制填充矩形，并支持在记录前取消操作。
+            </summary>
+            <param name="x">矩形左边界坐标，单位为 dots。</param>
+            <param name="y">矩形上边界坐标，单位为 dots。</param>
+            <param name="width">矩形宽度，单位为 dots；必须为正数。</param>
+            <param name="height">矩形高度，单位为 dots；必须为正数。</param>
+            <param name="cancellationToken">用于取消记录的令牌。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            宽度和高度表示半开区域 [x, x + width) × [y, y + height)，与
+            <see cref="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)"/> 使用的右下端点坐标不同；所有尺寸均以 dots 表示。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeI2OF5G(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 DPI/DPL 输出 German Post 4/9 校验语义的 I2OF5G。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">11/13 位 payload，或带 4/9 校验位的 12/14 位完整数据。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，单位为打印点。</param>
+            <remarks>
+            TSPL 的 DPI/DPL 分别要求 11/13 位内容，并由设备完成邮政条码的最终编码。
+            主机仍验证统一模型的 4/9 校验语义，然后只发送固定长度 payload，避免将完整值误当作 TSPL 内容。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodePostnet(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 POST 输出 POSTNET 邮政条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">5、9 或 11 位邮政数字；连字符会在写入 TSPL 前移除。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，TSPL POST 类型保留该参数以保持统一命令签名。</param>
+            <remarks>
+            TSC 将 POST 定义为 5、9 或 11 位输入的 POSTNET 类型，并由设备编码最终校验位；
+            主机只负责统一模型的长度、数字和协议字段校验。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodePlanet(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 PLANET 输出完整校验位的邮政条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">12 或 14 位 PLANET 数字；连字符会在写入 TSPL 前移除，末位必须为有效校验位。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度；PLANET 设备通常按 1:1 邮政码比例处理，保留统一命令签名。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodePlessey(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 PLESSEY 输出数字 Plessey 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空 ASCII 数字；Plessey 的校验与条形编码由设备完成。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度；TSPL PLESSEY 固定要求窄条:宽条为 1:2。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeCode11(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 11 输出 Code 11 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空数字或连字符；Code 11 的校验位由设备生成。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，TSPL Code 11 支持的宽窄比例。</param>
+            <remarks>
+            Code 11 支持数字和连字符。TSPL 固件会根据数据长度生成一个或两个 Modulo-11
+            校验位；主机不把设备生成的校验位拼入可读数据，避免重复编码。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeChinaPost(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 CPOST 输出 China Post 邮政条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空 ASCII 数字；China Post 的校验和条形编码由设备完成。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度；TSPL CPOST 固定要求窄条:宽条为 1:1。</param>
+            <remarks>
+            CPOST 的数据长度由目标固件决定，主机不擅自截断或追加校验位；统一模型只校验
+            非空 ASCII 数字、固定 1:1 模块宽度和页面边界。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeTelepen(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 TELEPEN 输出 ASCII Telepen 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空 ASCII 数据，最多 30 个字符；协议字段只接受可安全嵌入 TSPL 引号的字符。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，必须使用 TSPL 支持的宽窄比例。</param>
+            <remarks>
+            TSC 手册将 TELEPEN 定义为 ASCII 0–127、最多 30 个字符。TSPL 的
+            <c>BARCODE</c> 行本身使用引号和换行分隔；NUL、换行、转义字符和引号
+            无法安全保留为原始字段，因此命令层会在写入前明确拒绝这些 framing 冲突字符。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeTelepenn(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 TELEPENN 输出纯数字 Telepen 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空 ASCII 数字，最多 60 位。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，必须使用 TSPL 支持的宽窄比例。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeCode49(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 CODE49 输出 ASCII Code 49 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">非空 ASCII 数据，最多 81 个字符；协议字段只接受可安全嵌入 TSPL 引号的字符。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，必须使用 TSPL 支持的宽窄比例。</param>
+            <remarks>
+            TSC 手册将 CODE49 定义为 ASCII 0–127、最多 81 个字符。TSPL 的
+            <c>BARCODE</c> 行使用引号和换行分隔；NUL、ESC、CR/LF 和引号会在字段
+            framing 层明确拒绝。Code 49 的实际堆叠行数和设备宽度由固件决定，Provider
+            只使用保守的模块上界进行页面预检。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeItf14(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 ITF14 输出 13 位数字 payload。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">恰好 13 位 ASCII 数字；设备负责追加 ITF-14 最终校验位。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，TSPL ITF14 支持手册声明的宽窄比例。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeEan14(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 EAN14 输出 13 位数字 payload。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">恰好 13 位 ASCII 数字；设备负责追加 EAN-14 最终校验位。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度；TSPL EAN14 固定要求窄条:宽条为 1:1。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.BarcodeUccEan128(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以 TSPL 原生 EAN128 输出 GS1-128（UCC/EAN-128）条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">以数字应用标识开头的 GS1 元素串；ASCII 29 表示后续 FNC1。</param>
+            <param name="height">条码高度，单位为打印点。</param>
+            <param name="humanReadable">是否输出可读文字，1 表示输出。</param>
+            <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+            <param name="narrow">窄条宽度，单位为打印点。</param>
+            <param name="wide">宽条宽度，单位为打印点。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.QrCode(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Int32,System.String)">
+            <summary>以 TSPL 原生 QRCODE 指令输出二维码；旋转角度按顺时针度数表示。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Bitmap(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>将十六进制位图输入解码后写入 TSPL BITMAP 二进制数据。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Bitmap(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>将十六进制位图输入解码后写入 TSPL BITMAP 二进制数据；解码支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Bitmap(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[])">
+            <summary>写入 TSPL BITMAP 的原始二进制数据。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Bitmap(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Threading.CancellationToken)">
+            <summary>写入 TSPL BITMAP 的原始二进制数据；输入快照支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Print(System.Int32,System.Int32)">
+            <summary>打印当前标签；声明切刀契约时同步并关闭已声明的自动切纸设置。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.PrintWithCut(Bing.EasyPrint.Printing.PrintCutOptions,System.Int32,System.Int32)">
+            <summary>打印一个 PRINT 批次后裁切一次；预检失败不会追加任何命令。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Cut(Bing.EasyPrint.Printing.PrintCutOptions)">
+            <summary>等待 EOJ 后使用机型已确认的立即 CUT；Batch 使用 PrintWithCut。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Cut">
+            <summary>按机型声明的固定切法执行立即 CUT。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.NormalizeSupportedBarcodeData(System.String,System.String)">
+            <summary>
+            校验 TSPL 内置条码的数据格式，并补齐允许省略的零售条码校验位。
+            </summary>
+            <remarks>
+            未列入统一能力描述的 TSPL 类型仍保留原始命令扩展入口；已声明支持的类型
+            使用与模板 <c>BarcodeMetrics</c> 一致的字符、长度和校验位规则。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.WriteRestrictedRaw(System.String)">
+            <summary>完整校验 TSPL 文本命令批次，并按原文写入。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.TsplPrinterProfile">
+            <summary>调用方按设备资料声明的 TSPL 机型限制；不探测设备或下载字体。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.Cutter">
+            <summary>可选的已确认切刀策略；为空时不支持结构化切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.Name">
+            <summary>机型配置名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.FirmwareVersion">
+            <summary>可选固件版本记录，不触发自动兼容推断。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.PrintableWidthDots">
+            <summary>相对打印原点的最大可打印宽度，单位为当前 DPI 的点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.MaxLabelHeightDots">
+            <summary>最大标签高度，单位为当前 DPI 的点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.MaxImageDataBytes">
+            <summary>单条图片的单色数据字节上限，不包含命令头。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.MaxGs1LinearPayloadCharacters">
+            <summary>设备手册声明的 GS1-128 payload 字符上限；统计规范化数据及 ASCII 29 分隔符，不含符号 framing。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsImages">
+            <summary>是否支持 BITMAP。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsGraphics">
+            <summary>是否支持线框绘图；位图斜线还须允许图片。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsNativeBarcode">
+            <summary>是否支持原生一维条码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsNativeBarcodeHumanReadable">
+            <summary>是否支持原生一维条码的设备可读文字（HRI）。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportedNativeBarcodeHumanReadableTypes">
+            <summary>已确认支持原生 HRI 的条码制式；null 表示不按制式收窄，空数组表示全部禁用。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableReserveHeightDots">
+            <summary>direct 条码页边界预检的 HRI 保留高度，单位为当前 DPI 的打印点；null 沿用兼容性 24 点主机估值。</summary>
+            <remarks>应按目标机型手册或实测填写保守值；此值只影响主机边界估算，不设置打印机字体或字号。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableReserveWidthDots">
+            <summary>原生 HRI 页边界预检的最小横向占位宽度，单位为当前 DPI 的打印点；仅在 HRI 启用时使用。</summary>
+            <remarks>该宽度从条码字段原点向右计量，只影响主机边界估算；居中 HRI 的左侧外伸仍须由调用方留边。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableLeftOverhangDots">
+            <summary>HRI 启用时相对条码字段坐标向页面 X 轴左侧外伸的距离，单位为打印点；默认不增加左侧占位。</summary>
+            <remarks>该值用于主机边界预检，不移动输出字段或改变设备对齐；应按目标机型的实际可读文字边界校准。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableTopOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形上边的页面坐标边距，单位为打印点；只扩充主机边界预检。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableRightOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形右边的页面坐标边距，单位为打印点；与最小总宽预留相加。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableBottomOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形下边的页面坐标边距，单位为打印点；只扩充主机边界预检。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableRotation90Overhang">
+            <summary>原生条码旋转 90 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableRotation180Overhang">
+            <summary>原生条码旋转 180 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.NativeBarcodeHumanReadableRotation270Overhang">
+            <summary>原生条码旋转 270 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsNativeQrCode">
+            <summary>是否支持原生二维码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportedNativeQrCodeRotations">
+            <summary>已确认支持的原生二维码非零旋转角度；null 表示不按角度收窄，空数组表示禁用非零旋转。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.SupportsRotation">
+            <summary>是否支持原生文字及条码旋转。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.DeviceFontNames">
+            <summary>已确认的内置字体标识 0–8；null 不额外限制，空数组禁用文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.EncodingCodePages">
+            <summary>已确认的主机代码页，只能收窄当前 ASCII、UTF-8、936 映射；null 不额外限制。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.TsplPrinterProfile.CharacterRanges">
+            <summary>所声明字体共同支持的 Unicode 区间；null 不额外限制，不证明设备字库覆盖。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ZplCutStrategy">
+            <summary>依据目标设备手册确认的 ZPL 裁切模式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.ZplCutStrategy.Cutter">
+            <summary>^MMC 与 ^PQ 分组裁切；每个 PrintWithCut 批次切一次。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.ZplCutStrategy.Delayed">
+            <summary>^MMD 后单独发送 ~JK 文件。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.ZplCutStrategy.Kiosk">
+            <summary>设备确认支持 ^MMK、^KV 与 ^CN 的 Kiosk 裁切。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ZplCutterProfile">
+            <summary>调用方确认的切刀契约；不从型号或固件字符串推断支持。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplCutterProfile.Strategy">
+            <summary>裁切策略。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplCutterProfile.SupportedCutModes">
+            <summary>确认的切法；Cutter/Delayed 仅映射 Full。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplCutterProfile.SupportsTearOff">
+            <summary>确认支持 ^MMT，供非裁切格式关闭自动裁切；须显式确认。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplCutterProfile.KioskPartialUncutMillimeters">
+            <summary>Kiosk 半切留下未切介质的毫米数，10–60；其他策略不接受。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplCutterProfile.KioskCutMarginMillimeters">
+            <summary>Kiosk 裁切边距，2–9 毫米；Kiosk 策略必须明确设置。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ZplMediaOptions">
+            <summary>
+            ZPL 标签介质和设备设置。
+            </summary>
+            <remarks>
+            <see cref="P:Bing.EasyPrint.Protocols.ZplMediaOptions.Dpi"/> 是主机侧的设备分辨率元数据，ZPL 不提供通用的运行时 DPI 设置命令，
+            因此不会直接写入指令流。<see cref="P:Bing.EasyPrint.Protocols.ZplMediaOptions.PrintSpeed"/> 会在未显式指定标签打印速度时由
+            <see cref="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Label(System.Int32,System.Int32,System.Nullable{System.Int32})"/> 写入 <c>^PR</c>。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.Profile">
+            <summary>可选机型声明；为空时保留协议通用能力和默认字节。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Protocols.ZplMediaOptions.DefaultDpi">
+            <summary>
+            ZPL 常用的默认打印分辨率，单位为 DPI。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.Dpi">
+            <summary>
+            获取或设置打印机分辨率元数据，单位为 DPI。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.AllowRasterizedLines">
+            <summary>允许斜线以主机生成的位图输出；默认关闭。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.AllowRasterizedTextStyles">
+            <summary>允许粗体、下划线文字以主机位图输出；默认关闭并严格拒绝。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.PrintSpeed">
+            <summary>
+            获取或设置默认标签打印速度；必须为正数。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.Orientation">
+            <summary>获取或设置标签打印方向；ZPL 仅支持 None 和 Down；为空时保留打印机当前方向。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.MediaTracking">
+            <summary>
+            获取或设置介质跟踪方式：N 连续介质，Y/W 网格或间隙介质，M 黑标介质，A 自动检测，V 可变长度连续介质。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplMediaOptions.Darkness">
+            <summary>获取或设置打印浓度，ZPL <c>^MD</c> 范围为 -30 到 30。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ZplPrintCommand">
+            <summary>生成 Zebra ZPL 标签打印指令。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrintCommand.Protocol">
+            <summary>获取 ZPL 的基础能力描述。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.#ctor(System.Text.Encoding,Bing.EasyPrint.Protocols.ZplMediaOptions)">
+            <summary>
+            使用指定编码和介质设置创建 ZPL 命令构建器。
+            </summary>
+            <param name="encoding">写入文本时使用的编码；为空时使用 UTF-8。</param>
+            <param name="mediaOptions">介质和设备设置；为空时使用默认设置。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.TextRasterized(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>
+            将带粗体或下划线的文字以主机位图写入 ZPL。
+            </summary>
+            <remarks>
+            只有显式设置 <see cref="P:Bing.EasyPrint.Protocols.ZplMediaOptions.AllowRasterizedTextStyles" /> 后才允许使用；
+            输出使用 ^GFA，文字不再依赖打印机内置字体。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>按端点绘制线段；显式启用后斜线以单色位图输出。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>绘制线段；斜线光栅化过程支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.FillRectangle(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            绘制填充矩形。
+            </summary>
+            <param name="x">矩形左边界坐标，单位为 dots。</param>
+            <param name="y">矩形上边界坐标，单位为 dots。</param>
+            <param name="width">矩形宽度，单位为 dots；范围为 1 到 32000。</param>
+            <param name="height">矩形高度，单位为 dots；范围为 1 到 32000。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            宽度和高度表示半开区域 [x, x + width) × [y, y + height)，与
+            <see cref="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)"/> 使用的右下端点坐标不同。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.FillRectangle(System.Int32,System.Int32,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            绘制填充矩形，并支持在记录前取消操作。
+            </summary>
+            <param name="x">矩形左边界坐标，单位为 dots。</param>
+            <param name="y">矩形上边界坐标，单位为 dots。</param>
+            <param name="width">矩形宽度，单位为 dots；范围为 1 到 32000。</param>
+            <param name="height">矩形高度，单位为 dots；范围为 1 到 32000。</param>
+            <param name="cancellationToken">用于取消记录的令牌。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            宽度和高度表示半开区域 [x, x + width) × [y, y + height)，与
+            <see cref="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Box(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)"/> 使用的右下端点坐标不同；所有尺寸均以 dots 表示。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以原生 N/R/I/B 方向生成 Code 128 条码；角度以顺时针度数表示。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUccEan128(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BC</c> 输出 GS1-128（UCC/EAN-128）条码。</summary>
+            <remarks>
+            ZPL 用 <c>&gt;;&gt;8</c> 选择 Code 128 子集 C 并插入首个 FNC1；输入中的 ASCII 29
+            分隔符会转换为后续的 <c>&gt;8</c>。应用标识和业务校验由调用方按 GS1 规则提供。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUccEan128(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出 GS1-128（UCC/EAN-128）条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode39(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B3</c> 指令生成 Code 39 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">Code 39 基础字符集数据；起止星号由设备自动生成。</param>
+            <param name="height">条码高度，单位为点。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <returns>当前命令构建器。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode39(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Code 39 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCode11(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B1</c> 指令生成 Code 11 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">Code 11 数据；仅接受 ASCII 数字和连字符。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            ZPL 的 Code 11 参数使用两个 Modulo-11 校验位（<c>e=N</c>），由打印机生成；
+            主机只发送业务数据，避免将设备校验位重复编码。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCode11(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Code 11 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePlessey(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BP</c> 指令生成数字 Plessey 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">Plessey 数据；当前统一模型只接受非空 ASCII 数字。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点；ZPL 默认使用 3:1 宽窄比。</param>
+            <returns>当前命令构建器。</returns>
+            <remarks>
+            <c>e=N</c> 保留调用方提供的数据，不请求打印机额外输出校验位；<c>^BY</c> 的默认
+            3:1 比例落在 Plessey 规定的 2:1 到 3:1 范围内。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePlessey(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成数字 Plessey 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCode49(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B4</c> 指令生成 Code 49 堆叠条码。</summary>
+            <remarks>
+            Code 49 的起始模式默认交给打印机自动选择；可读文字使用 ZPL 的 B（下方）位置。
+            ZPL 的 <c>^B4</c> 使用单一模块宽度和固定条空比例，统一模型的宽条参数不会被静默传入。
+            </remarks>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">1 到 81 个可安全嵌入 ZPL 字段的 ASCII 字符。</param>
+            <param name="height">目标 Code 49 单行高度，单位为点，范围为 1 到 32000；会向上取整到模块宽度的整数倍。</param>
+            <param name="printText">是否在条码下方输出可读文字。</param>
+            <param name="moduleWidth">窄模块宽度，范围为 1 到 10 点。</param>
+            <returns>当前命令构建器。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCode49(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Code 49 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCode49(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Char,System.Int32)">
+            <summary>以指定起始模式和顺时针角度生成 Code 49 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">1 到 81 个可安全嵌入 ZPL 字段的 ASCII 字符。</param>
+            <param name="height">目标 Code 49 单行高度，单位为点，范围为 1 到 32000；会向上取整到模块宽度的整数倍。</param>
+            <param name="printText">是否在条码下方输出可读文字。</param>
+            <param name="moduleWidth">窄模块宽度，范围为 1 到 10 点。</param>
+            <param name="startMode">ZPL 起始模式：A 或 0 到 5。</param>
+            <param name="rotation">顺时针旋转角度，只允许 0、90、180 或 270 度。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarOmnidirectional(System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BR</c> 输出 GS1 DataBar Omnidirectional。</summary>
+            <remarks>
+            ZPL 的 <c>^BR</c> 没有普通一维条码的 HRI 参数；调用方需要可读文字时应显式追加文字元素。
+            统一模板因此要求该制式的 <c>HumanReadable</c> 不得显式设为 true。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarOmnidirectional(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出 GS1 DataBar Omnidirectional。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarTruncated(System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BR</c> 输出 GS1 DataBar Truncated。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarTruncated(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出 GS1 DataBar Truncated。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarLimited(System.Int32,System.Int32,System.String,System.Int32,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BR</c> 输出 GS1 DataBar Limited。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarLimited(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出 GS1 DataBar Limited。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarExpanded(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BR</c> 输出 GS1 DataBar Expanded。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">GS1 DataBar Expanded 数据。</param>
+            <param name="height">条码高度，单位为点。</param>
+            <param name="moduleWidth">放大倍数，范围为 1 到 10。</param>
+            <param name="segmentWidth">每行段数；必须为 2–22 的偶数。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeGs1DataBarExpanded(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出 GS1 DataBar Expanded。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode93(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BA</c> 指令生成 Code 93 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">Code 93 的非空可打印 ASCII 数据。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <returns>当前命令构建器。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode93(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Code 93 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Barcode93(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Boolean,System.Int32)">
+            <summary>以指定方向和校验位显示选项生成 Code 93 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">Code 93 的非空可打印 ASCII 数据。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <param name="printCheckDigit">是否在可读文字中显示设备生成的校验位。</param>
+            <param name="rotation">顺时针旋转角度，只允许 0、90、180 或 270 度。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeEan8(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B8</c> 指令生成 EAN-8 条码。</summary>
+            <remarks>输入可为 7 位数据或带有效校验位的 8 位数据；写入 ZPL 时只发送 7 位数据。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeEan8(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 EAN-8 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeEan13(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BE</c> 指令生成 EAN-13 条码。</summary>
+            <remarks>输入可为 12 位数据或带有效校验位的 13 位数据；写入 ZPL 时只发送 12 位数据。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeEan13(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 EAN-13 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcA(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BU</c> 指令生成 UPC-A 条码。</summary>
+            <remarks>输入可为 11 位数据或带有效校验位的 12 位数据；写入 ZPL 时只发送 11 位数据。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcA(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 UPC-A 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcA(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Boolean,System.Int32)">
+            <summary>以指定方向和校验位显示选项生成 UPC-A 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcE(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B9</c> 指令生成 UPC-E 条码。</summary>
+            <remarks>
+            输入使用统一模型的 6 位压缩数据或带号码系统的 7 位数据；号码系统必须为 0，
+            命令会展开为 ZPL 要求的 10 位厂商/商品数据，校验位由设备计算。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcE(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 UPC-E 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeUpcE(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Boolean,System.Int32)">
+            <summary>以指定方向和校验位显示选项生成 UPC-E 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCodabar(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BK</c> 指令生成 Codabar 条码。</summary>
+            <remarks>输入必须包含 A-D 起止符；起止符通过 ^BK 参数发送，正文写入 ^FD。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeCodabar(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Codabar 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B2</c> 指令生成 Interleaved 2 of 5 条码。</summary>
+            <remarks>输入必须为偶数位数字；可选由打印机计算并打印 Mod 10 校验位。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 Interleaved 2 of 5 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Boolean,System.Int32)">
+            <summary>以指定方向和校验位显示选项生成 Interleaved 2 of 5 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5C(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B2</c> 计算并打印 CPCL 语义的 I2OF5C 校验位。</summary>
+            <remarks>
+            ZPL 设备负责计算 Mod 10 校验位；为保持统一 I2OF5C 语义，偶数位输入会在发送前补一个前导零，
+            奇数位输入保持不变。旧的 <see cref="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Boolean,System.Int32)"/>
+            入口保留原有的偶数位校验和字节行为。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5C(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成带 Mod 10 校验位的 I2OF5C 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5G(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以主机生成的 German Post 4/9 校验位输出 I2OF5G。</summary>
+            <remarks>
+            ZPL 原生 <c>^B2</c> 只表达基础 Interleaved 2 of 5；调用方的 CPCL I2OF5G 语义
+            在主机侧生成或校验 4/9 校验位，再关闭 ZPL 的 Mod 10 选项，避免使用错误的校验算法。
+            </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2OF5G(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度输出带 German Post 4/9 校验位的 I2OF5G。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeMsi(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BM</c> 指令生成 MSI 条码。</summary>
+            <remarks>
+            默认使用 A 方案，即保留输入数字且不追加校验位；需要设备计算校验位时，
+            请使用带校验方案参数的重载并选择 B、C 或 D。
+            </remarks>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">MSI 非空 ASCII 数字数据，A 方案最多 13 位，其他方案最多 14 位。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <returns>当前命令构建器。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeMsi(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Char,System.Boolean,System.Int32)">
+            <summary>以指定方向和校验方案生成 MSI 条码。</summary>
+            <param name="x">条码左上角 X 坐标。</param>
+            <param name="y">条码左上角 Y 坐标。</param>
+            <param name="data">MSI 非空 ASCII 数字数据。</param>
+            <param name="height">条码高度，单位为点，范围为 1 到 32000。</param>
+            <param name="printText">是否打印下方可读文字。</param>
+            <param name="moduleWidth">窄条宽度，范围为 1 到 10 点。</param>
+            <param name="checkDigit">ZPL MSI 校验方案：A、B、C 或 D。</param>
+            <param name="printCheckDigit">是否在可读文字中显示设备生成的校验位。</param>
+            <param name="rotation">顺时针旋转角度，只允许 0、90、180 或 270 度。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePostnet(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BZ</c> 指令生成 POSTNET 邮政条码。</summary>
+            <remarks>统一模型只接受 5、9 或 11 位邮政数字；连字符会在写入 ZPL 前移除。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePostnet(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 POSTNET 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePlanet(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^B5</c> 指令生成 PLANET 邮政条码。</summary>
+            <remarks>PLANET 必须为 12 或 14 位数字并包含有效校验位；连字符会在写入 ZPL 前移除。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodePlanet(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 PLANET 条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeIntelligentMail(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>以 ZPL 原生 <c>^BZ</c> 类型 3 指令生成 USPS Intelligent Mail（IMb）条码。</summary>
+            <remarks>统一模型接受 20、25、29 或 31 位数字；连字符会在写入 ZPL 前移除，IMb 不含校验位。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeIntelligentMail(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>以指定顺时针角度生成 USPS Intelligent Mail（IMb）条码。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2of5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32)">
+            <summary>兼容常见小写缩写命名的 Interleaved 2 of 5 入口。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BarcodeI2of5(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>兼容常见小写缩写命名的旋转 Interleaved 2 of 5 入口。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.QrCode(System.Int32,System.Int32,System.String,System.Int32,System.Char,System.Int32)">
+            <summary>以原生 BQ 指令输出二维码；角度按顺时针度数表示。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.GraphicField(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>写入 ZPL ^GFA ASCII 十六进制图片数据。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.GraphicField(System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>写入 ZPL ^GFA ASCII 十六进制图片数据；校验过程支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.GraphicField(System.Int32,System.Int32,System.Int32,System.Int32,System.Byte[],System.Threading.CancellationToken)">
+            <summary>写入 ZPL ^GFA 二进制光栅；输入快照和十六进制转换支持取消。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.PrintWithCut(Bing.EasyPrint.Printing.PrintCutOptions,System.Int32)">
+            <summary>按声明策略在一个打印批次末尾裁切；Delayed 的控制命令由 BuildOutput 独立返回。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Cut">
+            <summary>保留旧裸 ^CN 入口；配置受控切刀时须使用 PrintWithCut。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Build">
+            <summary>构建旧单文件输出；需要独立 ~JK 时明确拒绝，不合并文件。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Build(System.Threading.CancellationToken)">
+            <summary>可取消构建旧单文件输出；独立控制文件仍须使用 BuildOutput。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BuildOutput">
+            <summary>可重复构建完整的有序独立文件；失败不修改已记录动作。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.BuildOutput(System.Threading.CancellationToken)">
+            <summary>可取消构建有序独立文件；取消后可重新构建完整输出。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.WriteRestrictedRaw(System.String)">
+            <summary>完整校验 ZPL 控制命令与字段边界，并按原文写入。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.ZplPrinterProfile">
+            <summary>调用方按设备资料声明的 ZPL 机型限制；不探测设备或下载字体。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.Name">
+            <summary>机型配置名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.FirmwareVersion">
+            <summary>可选固件版本记录，不触发自动兼容推断。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.PrintableWidthDots">
+            <summary>相对打印原点的最大可打印宽度，单位为当前 DPI 的点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.MaxLabelHeightDots">
+            <summary>最大标签高度，单位为当前 DPI 的点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.MaxImageDataBytes">
+            <summary>单条图片的单色数据字节上限，不包含十六进制膨胀或命令头。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.MaxGs1LinearPayloadCharacters">
+            <summary>设备手册声明的 GS1-128 payload 字符上限；统计规范化数据及 ASCII 29 分隔符，不含符号 framing。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.MaxGs1DataBarExpandedPayloadCharacters">
+            <summary>设备手册声明的 GS1 DataBar Expanded payload 字符上限；为空时只检查协议字段范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsImages">
+            <summary>是否支持 ^GFA。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsGraphics">
+            <summary>是否支持线框绘图；位图斜线还须允许图片。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsNativeBarcode">
+            <summary>是否支持原生一维条码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsNativeBarcodeHumanReadable">
+            <summary>是否支持原生一维条码的设备可读文字（HRI）。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportedNativeBarcodeHumanReadableTypes">
+            <summary>已确认支持原生 HRI 的条码制式；null 表示不按制式收窄，空数组表示全部禁用。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableReserveHeightDots">
+            <summary>direct 条码页边界预检的 HRI 保留高度，单位为当前 DPI 的打印点；null 沿用兼容性 24 点主机估值。</summary>
+            <remarks>应按目标机型手册或实测填写保守值；此值只影响主机边界估算，不设置打印机字体或字号。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableReserveWidthDots">
+            <summary>原生 HRI 页边界预检的最小横向占位宽度，单位为当前 DPI 的打印点；仅在 HRI 启用时使用。</summary>
+            <remarks>该宽度从条码字段原点向右计量，只影响主机边界估算；居中 HRI 的左侧外伸仍须由调用方留边。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableLeftOverhangDots">
+            <summary>HRI 启用时相对条码字段坐标向页面 X 轴左侧外伸的距离，单位为打印点；默认不增加左侧占位。</summary>
+            <remarks>该值用于主机边界预检，不移动输出字段或改变设备对齐；应按目标机型的实际可读文字边界校准。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableTopOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形上边的页面坐标边距，单位为打印点；只扩充主机边界预检。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableRightOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形右边的页面坐标边距，单位为打印点；与最小总宽预留相加。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableBottomOverhangDots">
+            <summary>HRI 启用时超出条码估算矩形下边的页面坐标边距，单位为打印点；只扩充主机边界预检。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableRotation90Overhang">
+            <summary>原生条码旋转 90 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableRotation180Overhang">
+            <summary>原生条码旋转 180 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.NativeBarcodeHumanReadableRotation270Overhang">
+            <summary>原生条码旋转 270 度时的 HRI 页面边距覆盖；每个 null 边继承通用边距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsNativeQrCode">
+            <summary>是否支持原生二维码。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportedNativeQrCodeRotations">
+            <summary>已确认支持的原生二维码非零旋转角度；null 表示不按角度收窄，空数组表示禁用非零旋转。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsRotation">
+            <summary>是否支持原生文字及条码旋转。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.SupportsCut">
+            <summary>是否支持现有 ^CN 切纸；切刀模式和补偿另由裁切契约描述。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.Cutter">
+            <summary>可选受控切刀声明；为空时仅保留旧裸 ^CN 输出。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.DeviceFontNames">
+            <summary>已确认的内置字体标识 0–9/A–Z；null 不额外限制，空数组禁用文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.EncodingCodePages">
+            <summary>已确认的主机代码页，只能收窄当前 ASCII、UTF-8 映射；null 不额外限制。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Protocols.ZplPrinterProfile.CharacterRanges">
+            <summary>所声明字体共同支持的 Unicode 区间；null 不额外限制，不证明设备字库覆盖。</summary>
         </member>
     </members>
 </doc>

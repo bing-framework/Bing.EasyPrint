@@ -35,6 +35,12 @@
             0 至 4 表示 1.5 至 3.5 的比值，20 至 30 表示 2.0 至 3.0 的比值；用于 POSTNET 时表示条间距参数。
             </remarks>
         </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.NarrowModuleWidth">
+            <summary>获取或设置非 CPCL 协议的窄条模块宽度，单位为打印点；未指定时沿用旧参数映射。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.WideModuleWidth">
+            <summary>获取或设置 TSPL 的宽条模块宽度，单位为打印点；其他协议不支持显式指定。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.Width">
             <summary>
             获取或设置条码预留宽度，单位为打印点；零表示按条码内容和制式计算。
@@ -44,6 +50,19 @@
             <summary>
             获取或设置条码高度，单位为打印点。
             </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.Rotation">
+            <summary>获取或设置顺时针旋转角度；宽高表示旋转前占位，坐标表示旋转后左上角。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.HumanReadable">
+            <summary>是否输出条码下方的可读文字；未指定时沿用目标协议默认行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.HumanReadableReserveHeight">
+            <summary>为设备条码可读文字额外预留的高度，单位为打印点；零表示不额外预留。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpBarcodeElement.QuietZone">
+            <summary>获取或设置旋转前编码区四周的静区，单位为打印点；null 保留旧制式留白，显式零值不留白。</summary>
+            <remarks>Width 包含左右静区；Height 仍为条高，布局高度另加上下静区及可读文字预留高度。</remarks>
         </member>
         <member name="T:Bing.EasyPrint.Elements.BpElement">
             <summary>
@@ -162,9 +181,30 @@
             获取或设置打印机使用的字体编号。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.Font">
+            <summary>获取或设置显式语义字体选择；为空时使用旧版字体字段。</summary>
+            <remarks>指定后不能同时设置非零 FontName、非空 FontFamily 或 DeviceFontName。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.FontFamily">
+            <summary>获取或设置 ESC/POS Raster 输出时使用的系统字体族名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.DeviceFontName">
+            <summary>获取或设置 TSPL/ZPL 的内置设备字体标识；留空时使用字体 0。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.Rotation">
+            <summary>获取或设置顺时针旋转角度；坐标表示旋转后占位的左上角。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.Width">
+            <summary>获取或设置旋转前的单行排版宽度，单位为打印点；零表示自动选择可用宽度。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.Elements.BpFontElement.Bold">
             <summary>
             获取或设置是否以粗体输出文字。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpFontElement.Reverse">
+            <summary>
+            获取或设置是否以反白方式输出文字。
             </summary>
         </member>
         <member name="P:Bing.EasyPrint.Elements.BpFontElement.TextAlignment">
@@ -174,10 +214,10 @@
         </member>
         <member name="T:Bing.EasyPrint.Elements.BpGroupElement">
             <summary>
-            定义作为单一分页单位布局的元素组合。
+            定义可整体布局或跨页布局的元素组合。
             </summary>
             <remarks>
-            组合可以内联包含子元素，也可以通过组件标识引用模板定义；两种方式不能同时使用。
+            组合可以包含内联元素、行列内容或通过组件标识引用模板定义；内容来源不能同时使用。
             </remarks>
         </member>
         <member name="M:Bing.EasyPrint.Elements.BpGroupElement.#ctor">
@@ -192,17 +232,43 @@
         </member>
         <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Width">
             <summary>
-            获取或设置组合布局宽度，单位为打印点；零表示使用所引用组件的宽度，未引用组件时使用可用宽度。
+            获取或设置组合布局宽度。
             </summary>
+            <remarks>
+            单位为打印点；零表示使用所引用组件的宽度，未引用组件时使用可用宽度。
+            </remarks>
         </member>
         <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Height">
             <summary>
-            获取或设置组合布局高度，单位为打印点；零表示使用所引用组件的高度，未引用组件时按子元素内容计算。
+            获取或设置组合布局高度。
             </summary>
+            <remarks>
+            单位为打印点；零表示使用所引用组件的高度，未引用组件时按子元素内容计算。
+            </remarks>
         </member>
         <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Elements">
             <summary>
             获取或设置相对于组合原点布局的内联子元素。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Rows">
+            <summary>
+            获取或设置相对于组合原点布局的行列内容。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGroupElement.DataPath">
+            <summary>
+            获取或设置相对于外层上下文的数据路径。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Parameters">
+            <summary>
+            获取或设置组件实例的参数绑定。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGroupElement.Pagination">
+            <summary>
+            获取或设置组合的分页策略。
             </summary>
         </member>
         <member name="T:Bing.EasyPrint.Elements.BpIconElement">
@@ -264,6 +330,22 @@
             获取或设置是否使用压缩方式编码图片打印数据。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Elements.BpImageElement.Rotation">
+            <summary>
+            获取或设置图片的顺时针旋转角度。
+            </summary>
+            <remarks>
+            宽高表示旋转前尺寸；默认不旋转。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpImageElement.Crop">
+            <summary>
+            获取或设置图片源文件中的裁切区域。
+            </summary>
+            <remarks>
+            坐标和尺寸使用源图片像素；为空时使用完整源图，非空时先裁切再按 Width 和 Height 缩放。
+            </remarks>
+        </member>
         <member name="T:Bing.EasyPrint.Elements.BpLineElement">
             <summary>
             定义从起点到终点绘制的 CPCL 线段。
@@ -320,7 +402,7 @@
         </member>
         <member name="T:Bing.EasyPrint.Elements.BpQrCodeElement">
             <summary>
-            用于输出 CPCL 二维码的模板元素。
+            用于输出二维码的统一模板元素。
             </summary>
         </member>
         <member name="M:Bing.EasyPrint.Elements.BpQrCodeElement.#ctor">
@@ -344,6 +426,10 @@
             支持 <c>L</c>、<c>M</c>、<c>Q</c> 和 <c>H</c>。
             </remarks>
         </member>
+        <member name="P:Bing.EasyPrint.Elements.BpQrCodeElement.Rotation">
+            <summary>获取或设置二维码的顺时针旋转角度；默认不旋转。</summary>
+            <remarks>二维码为正方形，旋转不会改变编码区尺寸；目标协议仍须声明对应能力。</remarks>
+        </member>
         <member name="P:Bing.EasyPrint.Elements.BpQrCodeElement.Width">
             <summary>
             获取或设置二维码预留区域宽度，单位为打印点；零表示按编码结果计算。
@@ -354,9 +440,13 @@
             获取或设置二维码预留区域高度，单位为打印点；零表示按编码结果计算。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Elements.BpQrCodeElement.QuietZone">
+            <summary>获取或设置编码区四周的静区，单位为打印点；null 保留旧的四模块留白，显式零值不留白。</summary>
+            <remarks>Width、Height 和布局占位包含静区；StartCoordinate 指向外部占位起点。</remarks>
+        </member>
         <member name="T:Bing.EasyPrint.Elements.BpRectangleElement">
             <summary>
-            定义矩形轮廓模板元素。
+            定义矩形轮廓或填充模板元素。
             </summary>
         </member>
         <member name="M:Bing.EasyPrint.Elements.BpRectangleElement.#ctor">
@@ -373,6 +463,10 @@
             <summary>
             获取或设置矩形高度，单位为打印点。
             </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpRectangleElement.Filled">
+            <summary>获取或设置是否绘制黑色填充；默认 false 保留轮廓输出。</summary>
+            <remarks>填充占位为 Width × Height 个打印点，LineWidth 不影响填充面积。</remarks>
         </member>
         <member name="P:Bing.EasyPrint.Elements.BpRectangleElement.LineWidth">
             <summary>
@@ -536,6 +630,83 @@
             获取或设置相对于组件原点布局的子元素。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentDefinition.Rows">
+            <summary>
+            获取或设置相对于组件原点布局的行列内容。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentDefinition.Parameters">
+            <summary>
+            获取或设置组件的参数定义。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpGroupPagination">
+            <summary>
+            指定组合的分页方式。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Model.BpGroupPagination.KeepTogether">
+            <summary>
+            将整个组合放在同一页。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Model.BpGroupPagination.Split">
+            <summary>
+            允许组合内容跨页。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpComponentParameterDefinition">
+            <summary>
+            定义可复用组件的参数。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentParameterDefinition.Required">
+            <summary>
+            获取或设置参数是否必须由实例提供。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentParameterDefinition.DefaultValue">
+            <summary>
+            获取或设置参数默认值。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Model.BpComponentParameterDefinition.defaultValue">
+            <summary>
+            保存显式设置的参数默认值。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Model.BpComponentParameterDefinition.ShouldSerializeDefaultValue">
+            <summary>
+            判断是否序列化参数默认值。
+            </summary>
+            <returns>已显式设置默认值时返回 true，否则返回 false。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpComponentParameterBinding">
+            <summary>
+            指定组件实例的参数来源。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentParameterBinding.Path">
+            <summary>
+            获取或设置外层数据的字段路径。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpComponentParameterBinding.Value">
+            <summary>
+            获取或设置静态参数值。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Model.BpComponentParameterBinding.value">
+            <summary>
+            保存显式设置的静态参数值。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Model.BpComponentParameterBinding.ShouldSerializeValue">
+            <summary>
+            判断是否序列化静态参数值。
+            </summary>
+            <returns>已显式设置静态值时返回 true，否则返回 false。</returns>
+        </member>
         <member name="T:Bing.EasyPrint.Model.BpCondition">
             <summary>
             定义用于控制模板行或元素显示的声明式条件。
@@ -613,6 +784,11 @@
             获取或设置文字是否加粗。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Model.BpFont.Reverse">
+            <summary>
+            获取或设置文字是否反白。
+            </summary>
+        </member>
         <member name="P:Bing.EasyPrint.Model.BpFont.Mag">
             <summary>
             获取或设置文字的放大系数。
@@ -626,6 +802,34 @@
         <member name="P:Bing.EasyPrint.Model.BpFont.Fit">
             <summary>
             获取或设置是否将文字缩放至可用宽度。
+            </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Model.BpImageCrop">
+            <summary>
+            表示图片源文件中的矩形裁切区域。
+            </summary>
+            <remarks>
+            坐标和尺寸使用源图片像素；渲染器会在按模板目标尺寸缩放前执行裁切。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpImageCrop.X">
+            <summary>
+            获取或设置裁切区域左上角的水平像素坐标。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpImageCrop.Y">
+            <summary>
+            获取或设置裁切区域左上角的垂直像素坐标。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpImageCrop.Width">
+            <summary>
+            获取或设置裁切区域的像素宽度，必须大于零。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Model.BpImageCrop.Height">
+            <summary>
+            获取或设置裁切区域的像素高度，必须大于零。
             </summary>
         </member>
         <member name="T:Bing.EasyPrint.Model.BpMargin">
@@ -1278,12 +1482,14 @@
             按制式校验内容并估算一维条码尺寸。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.BarcodeMetrics.Measure(Bing.EasyPrint.Elements.BpBarcodeElement,System.String)">
+        <member name="M:Bing.EasyPrint.Templates.BarcodeMetrics.Measure(Bing.EasyPrint.Elements.BpBarcodeElement,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
             <summary>
             计算条码、左静区及实际编码数据。
             </summary>
             <param name="element">条码制式和尺寸设置。</param>
             <param name="data">待编码的可打印 ASCII 数据。</param>
+            <param name="narrowModuleWidth">非 CPCL 协议显式指定的窄条点宽。</param>
+            <param name="wideModuleWidth">TSPL 显式指定的宽条点宽。</param>
             <returns>总宽度、左静区宽度及规范化的数据，宽度单位为打印点。</returns>
         </member>
         <member name="M:Bing.EasyPrint.Templates.BarcodeMetrics.InterleavedWidth(System.Int32,System.Int32,System.Int32)">
@@ -1330,40 +1536,49 @@
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.Root">
             <summary>
-            获取本次渲染的根数据。
+            保存本次渲染的根数据。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.Item">
             <summary>
-            获取当前重复行对应的数据项。
+            保存当前重复行对应的数据项。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.Index">
             <summary>
-            获取当前重复项的零基序号；非重复上下文为 -1。
+            保存当前重复项的零基序号。
             </summary>
+            <remarks>
+            非重复上下文使用 -1。
+            </remarks>
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.InstanceIndices">
             <summary>
-            获取嵌套重复行从外到内的零基序号。
+            保存嵌套重复行从外到内的零基序号。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.Properties">
             <summary>
-            获取仅供本次渲染复用的公开属性查找缓存。
+            保存仅供本次渲染复用的公开属性查找缓存。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.Binding.Variables">
             <summary>
-            获取变量名与根数据字段路径的映射。
+            保存变量名与根数据字段路径的映射。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.Binding.#ctor(System.Object,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+        <member name="F:Bing.EasyPrint.Templates.Binding.Parameters">
+            <summary>
+            保存当前组件实例的参数值。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.Binding.#ctor(System.Object,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},Bing.EasyPrint.Core.PrintStorageBudget)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.Binding"/> 类型的实例。
             </summary>
             <param name="root">根业务数据。</param>
             <param name="variables">可选的模板变量定义。</param>
+            <param name="storage">临时模型估计的归属；为空时保留到调用作用域结束。</param>
         </member>
         <member name="M:Bing.EasyPrint.Templates.Binding.Child(System.Object,System.Int32)">
             <summary>
@@ -1373,7 +1588,7 @@
             <param name="index">当前明细的零基序号。</param>
             <returns>指向当前明细项的绑定上下文。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.Binding.#ctor(System.Object,System.Object,System.Int32,System.Collections.Generic.IReadOnlyList{System.Int32},System.Collections.Generic.Dictionary{System.ValueTuple{System.Type,System.String},System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+        <member name="M:Bing.EasyPrint.Templates.Binding.#ctor(System.Object,System.Object,System.Int32,System.Collections.Generic.IReadOnlyList{System.Int32},Bing.EasyPrint.Core.BudgetedDictionary{System.ValueTuple{System.Type,System.String},System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},Bing.EasyPrint.Core.PrintStorageBudget)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.Binding"/> 类型的实例。
             </summary>
@@ -1383,6 +1598,16 @@
             <param name="instanceIndices">各层重复明细的序号。</param>
             <param name="properties">本次渲染共享的属性缓存。</param>
             <param name="variables">可选的模板变量定义。</param>
+            <param name="parameters">当前组件实例的参数值。</param>
+            <param name="storage">与父绑定共享的临时存储归属。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.Binding.Component(System.Object,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+            <summary>
+            创建组件实例的数据及参数绑定上下文。
+            </summary>
+            <param name="item">组件实例使用的当前数据项。</param>
+            <param name="parameters">组件实例解析后的参数值。</param>
+            <returns>包含指定数据及参数上下文的绑定。</returns>
         </member>
         <member name="M:Bing.EasyPrint.Templates.Binding.Resolve(System.String)">
             <summary>
@@ -1443,14 +1668,9 @@
             获取所选字库的半角字符打印点宽度。
             </summary>
         </member>
-        <member name="F:Bing.EasyPrint.Templates.CpclFontMetrics.encoding">
+        <member name="F:Bing.EasyPrint.Templates.CpclFontMetrics.cells">
             <summary>
-            获取非 Unicode 字距计算使用的编码。
-            </summary>
-        </member>
-        <member name="F:Bing.EasyPrint.Templates.CpclFontMetrics.unicode">
-            <summary>
-            获取是否按 Unicode 字符宽度度量。
+            获取共享的半角/全角字符单元分类器。
             </summary>
         </member>
         <member name="M:Bing.EasyPrint.Templates.CpclFontMetrics.#ctor(System.Int32,System.Int32,System.Text.Encoding)">
@@ -1475,12 +1695,47 @@
             <param name="text">待度量文本。</param>
             <returns>文本宽度，单位为打印点。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.CpclFontMetrics.IsWide(System.Int32)">
-            <summary>
-            判断 Unicode 标量是否按全角字距处理。
-            </summary>
-            <param name="value">Unicode 标量值。</param>
-            <returns>全角返回 true，否则返回 false。</returns>
+        <member name="T:Bing.EasyPrint.Templates.DeviceFontCalibration">
+            <summary>目标设备的单个字体在 24 点设置下实测的文字占位，单位为打印点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceFontCalibration.HalfCellWidthAt24">
+            <summary>半角字符占位宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceFontCalibration.FullCellWidthAt24">
+            <summary>全角字符占位宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceFontCalibration.LineHeightAt24">
+            <summary>单行文字占位高度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceFontCalibration.TextElements">
+            <summary>按 Unicode 文本单元精确校准字距和墨迹边界。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.DeviceTextElementCalibration">
+            <summary>目标设备字体在 24 点字号下的单个 Unicode 文本单元校准值。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceTextElementCalibration.AdvanceAt24">
+            <summary>文本单元在 24 点字号下的前进宽度；零表示组合单元不增加字距。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceTextElementCalibration.InkLeftAt24">
+            <summary>可选墨迹矩形相对设备文字命令原点的左边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceTextElementCalibration.InkTopAt24">
+            <summary>可选墨迹矩形相对设备文字命令原点的上边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceTextElementCalibration.InkRightAt24">
+            <summary>可选墨迹矩形相对设备文字命令原点的右边界。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.DeviceTextElementCalibration.InkBottomAt24">
+            <summary>可选墨迹矩形相对设备文字命令原点的下边界。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.IPrintCanvas">
+            <summary>模板布局使用的协议无关绘制目标。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.PrintCanvasFactory">
+            <summary>创建模板使用的协议绘制目标。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.DocumentPrintCanvas">
+            <summary>将模板绘制记录为协议无关的页面，再交给目标 Provider 编码。</summary>
         </member>
         <member name="T:Bing.EasyPrint.Templates.QrMetrics">
             <summary>
@@ -1502,12 +1757,18 @@
             <param name="unit">每模块的打印点数。</param>
             <returns>包含四周静区的打印点边长。</returns>
         </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateBindingDiagnostic">
+            <summary>为已有异常附加绑定字段路径，保持旧调用方观察到的异常类型。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateFontResolver">
+            <summary>将语义字体和旧模板字段转换为协议明确支持的字体选择。</summary>
+        </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateGraph">
             <summary>
             校验模板结构及可渲染元素的边界。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateGraph.Validate(Bing.EasyPrint.Model.BpTemplate,Bing.EasyPrint.Templates.TemplateRenderOptions,System.Boolean,System.Threading.CancellationToken,System.Boolean)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateGraph.Validate(Bing.EasyPrint.Model.BpTemplate,Bing.EasyPrint.Templates.TemplateRenderOptions,System.Boolean,System.Threading.CancellationToken,System.Boolean,System.Boolean)">
             <summary>
             校验模板版本、结构、条件和元素约束。
             </summary>
@@ -1516,12 +1777,18 @@
             <param name="saving">是否检查 JSON 保存约束。</param>
             <param name="cancellation">取消令牌。</param>
             <param name="includePaths">是否在结构错误中附带节点路径。</param>
+            <param name="checkProtocol">是否同时检查无需绑定数据即可确定的协议能力。</param>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateGraph.Border(Bing.EasyPrint.Model.BpBorder)">
             <summary>
             校验边框颜色和线型是否受打印协议支持。
             </summary>
             <param name="border">可为空的边框定义。</param>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateImageDiagnostic">
+            <summary>
+            为已知图片输入错误附加资源键和像素元数据。
+            </summary>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateLoader">
             <summary>
@@ -1564,7 +1831,7 @@
             <param name="options">可选的 JSON 大小、深度和模板资源限制。</param>
             <returns>保留模板版本号的 JSON 字符串。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateLoader.CreateSerializer">
+        <member name="M:Bing.EasyPrint.Templates.TemplateLoader.CreateSerializer(System.Boolean)">
             <summary>
             创建限制类型元数据并识别模板元素的序列化器。
             </summary>
@@ -1575,6 +1842,12 @@
             将旧元素容器转换为唯一的元素列表。
             </summary>
             <param name="rows">需要递归处理的行。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateLoader.NormalizeElements(System.Collections.Generic.List{Bing.EasyPrint.Elements.BpElement})">
+            <summary>
+            规范化组合中的嵌套行列。
+            </summary>
+            <param name="elements">需要递归处理的元素。</param>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateLoader.ElementConverter">
             <summary>
@@ -1600,7 +1873,7 @@
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateLoader.LimitedWriter.limit">
             <summary>
-            获取允许写入的字符数上限。
+            保存允许写入的字符数上限。
             </summary>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateLoader.LimitedWriter.#ctor(System.Text.StringBuilder,System.Int32)">
@@ -1619,9 +1892,211 @@
         <member name="M:Bing.EasyPrint.Templates.TemplateLoader.LimitedWriter.Write(System.Char[],System.Int32,System.Int32)">
             <inheritdoc />
         </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateProtocolCapabilities">
+            <summary>描述模板层可表达的协议选项；不替代文本、占位、资源及实机校验。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.Protocol">
+            <summary>获取目标协议。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.EscPosLayoutMode">
+            <summary>获取 ESC/POS 布局模式；其他协议为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.NativeFlow">
+            <summary>获取当前 Native 顺序布局方式；其他布局为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.NativeTextProfile">
+            <summary>目标 Native 字库的文字契约副本；未声明或使用 Raster 时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.RasterFonts">
+            <summary>获取不可变的固定 Raster 字体配置；未配置时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.RasterBarcodeHumanReadableFontSize">
+            <summary>获取 ESC/POS Raster 条码可读文字的主机字号；其他布局或协议为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.DeviceProfileName">
+            <summary>标签机型配置名称；未声明时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.DeviceFirmwareVersion">
+            <summary>调用方记录的标签机型固件版本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.MaxPrintableWidthDots">
+            <summary>声明的可打印宽度上限，单位为布局点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.MaxLabelHeightDots">
+            <summary>声明的标签高度上限，单位为布局点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.MaxImageDataBytes">
+            <summary>声明的单条单色图片字节上限。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.MaxGs1LinearPayloadCharacters">
+            <summary>Profile 声明的 GS1-128 payload 字符上限；null 表示未收窄。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.MaxGs1DataBarExpandedPayloadCharacters">
+            <summary>Profile 声明的 GS1 DataBar Expanded payload 字符上限；null 表示未收窄。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.DeviceCharacterRanges">
+            <summary>声明的标签设备公共字库区间。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.JobFeedUnits">
+            <summary>获取显式任务策略支持的进纸单位。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.CutModes">
+            <summary>显式裁切可请求的形状。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.CutFeedUnits">
+            <summary>设备进纸到切刀位置后的补偿单位。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.CutFeedMotionUnits">
+            <summary>补偿量换算为运动单位后的范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.CutFeedDots">
+            <summary>TSPL 实测切刀位置以外可追加的打印点补偿范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.TsplCutter">
+            <summary>TSPL 切刀契约独立副本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.ZplCutter">
+            <summary>ZPL 受控切刀契约独立副本。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsIndependentOutputSegments">
+            <summary>当前配置可能需要独立控制文件。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.Dpi">
+            <summary>获取水平布局 DPI。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsCoordinates">
+            <summary>获取是否支持任意绝对坐标布局；Native 仍可按校准制表位输出文字列。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsExplicitQuietZone">
+            <summary>获取是否支持显式码图静区；空静区仍可用于保留原生命令原点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.ElementTypes">
+            <summary>获取支持的模板元素类型，包括逻辑组合类型 6。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.FontKinds">
+            <summary>获取支持的语义字体来源。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.DeviceFonts">
+            <summary>获取设备字体及其字号范围；字体安装情况需按设备确认。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.TextSizes">
+            <summary>获取离散字号；null 表示使用整数范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.TextSize">
+            <summary>获取默认字体的字号范围；存在离散字号时还需匹配 <see cref="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.TextSizes"/>。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.TextRotations">
+            <summary>获取模板文字接受的旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.BarcodeTypes">
+            <summary>获取模板接受的条码制式。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.BarcodeRotations">
+            <summary>获取模板条码接受的旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.QrCodeRotations">
+            <summary>获取模板二维码接受的旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.ImageRotations">
+            <summary>获取主机单色图片支持的顺时针旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.QrModuleSize">
+            <summary>获取模板二维码的模块尺寸范围；不支持时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.BarcodeModuleWidth">
+            <summary>获取目标 Provider 的条码窄条点宽范围；不支持时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.BarcodeHeight">
+            <summary>获取目标 Provider 的条码条高范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsExplicitBarcodeModuleWidth">
+            <summary>获取模板是否支持显式窄条模块宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsWideModuleWidth">
+            <summary>获取模板是否支持独立宽条模块宽度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsBoldText">
+            <summary>获取是否支持粗体文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsUnderlineText">
+            <summary>获取是否支持下划线文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsReverseText">
+            <summary>获取是否支持反白文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsRotatedUnderlineText">
+            <summary>获取是否支持非零角度文字的下划线。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsHostFontFamily">
+            <summary>获取是否支持主机字体。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsLegacyDeviceFont">
+            <summary>获取是否支持旧 DeviceFontName 字段；CPCL 的设备字体须使用语义字段。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsBarcodeHumanReadable">
+            <summary>获取是否支持启用条码可读文字。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportedNativeBarcodeHumanReadableTypes">
+            <summary>获取已确认支持原生 HRI 的条码制式；Raster 模式的主机 HRI 不受此列表限制。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportedNativeQrCodeRotations">
+            <summary>获取标签机型已确认支持的原生二维码非零旋转角度；未按角度收窄时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportedNativeBarcodeHumanReadablePositions">
+            <summary>获取 ESC/POS Native 已确认支持的 HRI 位置；Raster 模式由主机绘制。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsCut">
+            <summary>获取是否支持切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsExtraFeed">
+            <summary>获取是否支持按行额外进纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsFilledRectangles">
+            <summary>获取是否支持填充矩形。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.Create(Bing.EasyPrint.Templates.TemplateRenderOptions)">
+            <summary>从输出配置建立能力快照；不会读取模板、业务数据或图片资源。</summary>
+            <remarks>机型能力与输出参数沿用实际 Provider 校验。后续修改配置不会改变此快照。</remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsElementType(System.Int32)">
+            <summary>判断模板是否支持指定元素类型。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsFont(Bing.EasyPrint.PrintFont,System.Int32)">
+            <summary>判断模板字体和字号是否受支持；主机字体的字形仍在渲染时校验。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsTextRotation(Bing.EasyPrint.RotationAngle)">
+            <summary>判断模板文字旋转角度是否受支持。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsBarcodeRotation(Bing.EasyPrint.RotationAngle)">
+            <summary>判断模板条码旋转角度是否受支持。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsBarcodeHumanReadableType(Bing.EasyPrint.BarcodeType)">
+            <summary>判断指定条码制式是否可启用可读文字。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsNativeBarcodeHumanReadablePosition(Bing.EasyPrint.Protocols.EscPosBarcodeTextPosition)">
+            <summary>判断 ESC/POS Native 是否支持指定的 HRI 位置。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsQrCodeRotation(Bing.EasyPrint.RotationAngle)">
+            <summary>判断模板二维码旋转角度是否受支持。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsImageRotation(Bing.EasyPrint.RotationAngle)">
+            <summary>判断当前模板输出是否支持指定图片角度；图片元素能力仍须单独检查。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateDeviceFontCapability">
+            <summary>描述模板设备字体及其主机侧请求字号范围。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateDeviceFontCapability.Name">
+            <summary>获取设备字体名称。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateDeviceFontCapability.Size">
+            <summary>获取请求字号范围；CPCL 还需匹配离散字号与字体的对应关系。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateDeviceFontCapability.Sizes">
+            <summary>获取该字体的离散字号；null 表示仅使用范围。</summary>
+        </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateRenderer">
             <summary>
-            将模板与业务数据渲染为 CPCL 页面。
+            将模板与业务数据渲染为目标协议页面。
             </summary>
             <remarks>
             渲染器不维护共享的可变状态；调用方不得在渲染期间修改传入的模板、数据或选项。
@@ -1636,7 +2111,7 @@
             <param name="resources">按资源键提供图片内容的可选资源提供器。</param>
             <param name="options">本次渲染的可选资源限制及编码配置。</param>
             <param name="cancellationToken">取消渲染的令牌。</param>
-            <returns>包含所有 CPCL 页面的渲染结果。</returns>
+            <returns>包含所有目标协议页面的渲染结果。</returns>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.RenderWithLayout(Bing.EasyPrint.Model.BpTemplate,System.Object,Bing.EasyPrint.Templates.ITemplateResourceProvider,Bing.EasyPrint.Templates.TemplateRenderOptions,System.Threading.CancellationToken)">
             <summary>
@@ -1647,7 +2122,7 @@
             <param name="resources">按资源键提供图片内容的可选资源提供器。</param>
             <param name="options">本次渲染的可选资源限制及编码配置。</param>
             <param name="cancellationToken">取消渲染的令牌。</param>
-            <returns>包含 CPCL 页面及可定位布局节点的渲染结果。</returns>
+            <returns>包含目标协议页面及可定位布局节点的渲染结果。</returns>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.RenderCore(Bing.EasyPrint.Model.BpTemplate,System.Object,Bing.EasyPrint.Templates.ITemplateResourceProvider,Bing.EasyPrint.Templates.TemplateRenderOptions,System.Threading.CancellationToken,System.Boolean)">
             <summary>
@@ -1661,7 +2136,7 @@
             <param name="captureLayout">是否同时记录布局轨迹。</param>
             <returns>完整的逐页渲染结果。</returns>
         </member>
-        <member name="T:Bing.EasyPrint.Templates.TemplateRenderer.Atom">
+        <member name="T:Bing.EasyPrint.Templates.TemplateRenderer.TemplateDraft">
             <summary>
             保存可直接绘制的单个布局元素。
             </summary>
@@ -1688,17 +2163,27 @@
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.SourcePath">
             <summary>
-            保存模板路径、可选显示文字及图片资源键。
+            保存模板源路径、组件定义路径、实例路径、显示文字及图片资源键。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.DefinitionPath">
+            <summary>
+            保存模板源路径、组件定义路径、实例路径、显示文字及图片资源键。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.ComponentInstancePath">
+            <summary>
+            保存模板源路径、组件定义路径、实例路径、显示文字及图片资源键。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.Text">
             <summary>
-            保存模板路径、可选显示文字及图片资源键。
+            保存模板源路径、组件定义路径、实例路径、显示文字及图片资源键。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.ResourceKey">
             <summary>
-            保存模板路径、可选显示文字及图片资源键。
+            保存模板源路径、组件定义路径、实例路径、显示文字及图片资源键。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Atom.Type">
@@ -1748,12 +2233,22 @@
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Frame.SourcePath">
             <summary>
-            保存对应模板路径与布局节点类别。
+            保存对应模板路径、组件关联路径与布局节点类别。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Frame.DefinitionPath">
+            <summary>
+            保存对应模板路径、组件关联路径与布局节点类别。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Frame.ComponentInstancePath">
+            <summary>
+            保存对应模板路径、组件关联路径与布局节点类别。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Frame.Kind">
             <summary>
-            保存对应模板路径与布局节点类别。
+            保存对应模板路径、组件关联路径与布局节点类别。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Frame.InstanceIndices">
@@ -1771,6 +2266,11 @@
             保存当前布局块占用的打印点高度。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Block.FlowHeight">
+            <summary>
+            记录流式元素的实际结束位置。
+            </summary>
+        </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Block.Atoms">
             <summary>
             保存当前布局块中的可绘制元素。
@@ -1781,6 +2281,11 @@
             保存当前布局块中的行、单元格和组合边界。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Block.TableScopes">
+            <summary>
+            保存组合内部表格明细与所属表头的分页作用域。
+            </summary>
+        </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Block.Append(Bing.EasyPrint.Templates.TemplateRenderer.Block,System.Int32,System.Int32)">
             <summary>
             将子布局块放入指定偏移位置。
@@ -1788,6 +2293,42 @@
             <param name="child">待追加的子布局块。</param>
             <param name="x">水平打印点偏移。</param>
             <param name="y">垂直打印点偏移。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Block.Copy">
+            <summary>
+            复制当前布局块，保留表头续页所需的相对坐标。
+            </summary>
+            <returns>包含独立布局集合的副本。</returns>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.TemplateRenderer.TableScope">
+            <summary>
+            保存跨页表格明细与可重复表头之间的布局作用域。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.TableScope.Start">
+            <summary>
+            保存明细作用域的起止位置、表头横向位置和宽度，单位为打印点。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.TableScope.End">
+            <summary>
+            保存明细作用域的起止位置、表头横向位置和宽度，单位为打印点。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.TableScope.HeaderX">
+            <summary>
+            保存明细作用域的起止位置、表头横向位置和宽度，单位为打印点。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.TableScope.Width">
+            <summary>
+            保存明细作用域的起止位置、表头横向位置和宽度，单位为打印点。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.TableScope.Header">
+            <summary>
+            保存明细作用域关联的表头布局块。
+            </summary>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateRenderer.Session">
             <summary>
@@ -1839,6 +2380,16 @@
             缓存按资源键及尺寸识别的已解码图片，由会话释放。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Session.encodedLeases">
+            <summary>
+            记录编码图片缓存对应的资源租约；缓存清理时立即归还。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Session.imageLeases">
+            <summary>
+            记录解码图片对应的 RGBA 资源租约；图片清理时立即归还。
+            </summary>
+        </member>
         <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Session.payloadBytes">
             <summary>
             记录本次渲染的字段字节数和当前图片像素数。
@@ -1864,6 +2415,16 @@
             保存正在生成的页面布局轨迹；未请求轨迹时为 null。
             </summary>
         </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Session.storage">
+            <summary>
+            保存供协议校验错误回溯的页面布局归属；不改变普通渲染的公开结果。
+            </summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Templates.TemplateRenderer.Session.pageIndex">
+            <summary>
+            记录当前页面在输出中的零基序号。
+            </summary>
+        </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.#ctor(Bing.EasyPrint.Model.BpTemplate,Bing.EasyPrint.Templates.TemplateRenderOptions,Bing.EasyPrint.Templates.ITemplateResourceProvider,System.Threading.CancellationToken,System.Boolean)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.TemplateRenderer.Session"/> 类型的实例。
@@ -1873,6 +2434,9 @@
             <param name="resources">可选的图片资源提供器。</param>
             <param name="cancellation">取消渲染的令牌。</param>
             <param name="captureLayout">是否记录布局轨迹。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.BindRoot(System.Object)">
+            <summary>创建与布局会话一起释放的根绑定上下文。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Render(Bing.EasyPrint.Templates.Binding)">
             <summary>
@@ -1905,6 +2469,16 @@
             <param name="binding">当前数据绑定上下文。</param>
             <param name="sourcePath">模板行的节点路径。</param>
             <returns>包含行元素及边界的布局块。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.AppendRows(Bing.EasyPrint.Templates.TemplateRenderer.Block,System.Collections.Generic.List{Bing.EasyPrint.Model.BpRow},System.Int32,Bing.EasyPrint.Templates.Binding,System.String)">
+            <summary>
+            展开嵌套行并保留表格表头的分页作用域。
+            </summary>
+            <param name="content">接收展开内容的布局块。</param>
+            <param name="childRows">待展开的嵌套行。</param>
+            <param name="width">嵌套行可用的打印点宽度。</param>
+            <param name="binding">当前数据绑定上下文。</param>
+            <param name="parentPath">嵌套行父节点的模板路径。</param>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Place(Bing.EasyPrint.Templates.TemplateRenderer.Block,Bing.EasyPrint.Elements.BpElement,System.Int32,Bing.EasyPrint.Templates.Binding,System.String)">
             <summary>
@@ -1947,7 +2521,35 @@
             <param name="sourcePath">组合元素的节点路径。</param>
             <returns>包含全部子元素的组合布局块。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Shape(System.Int32,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,Bing.EasyPrint.Templates.Binding)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.ComponentError(System.String,System.ArgumentException,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.Int32})">
+            <summary>
+            创建带组件归属的错误；CPCL 普通渲染继续保留旧的原始异常行为。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.MapDefinitionPath(System.String,System.String,System.String)">
+            <summary>
+            将组件实例错误路径映射为对应的定义路径。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Mark(Bing.EasyPrint.Templates.TemplateRenderer.Block,System.Int32,System.Int32,System.String,System.String,System.String)">
+            <summary>
+            关联组合子节点的实例路径和定义路径。
+            </summary>
+            <param name="block">包含待关联布局节点的块。</param>
+            <param name="atomStart">需要处理的元素节点起始索引。</param>
+            <param name="frameStart">需要处理的边界节点起始索引。</param>
+            <param name="instancePath">组合实例的模板路径。</param>
+            <param name="childPath">组合子节点的模板路径前缀。</param>
+            <param name="definitionPath">组合定义的模板路径前缀；没有定义时为 null。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.ParameterValue(Newtonsoft.Json.Linq.JToken)">
+            <summary>
+            将 JSON 参数值转换为绑定时使用的标量或结构。
+            </summary>
+            <param name="token">待转换的 JSON 值。</param>
+            <returns>转换后的标量值或 JSON 结构。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Shape(System.Int32,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,Bing.EasyPrint.Templates.Binding,System.Boolean)">
             <summary>
             生成矩形或椭圆轮廓的布局块。
             </summary>
@@ -1955,6 +2557,7 @@
             <param name="shapeHeight">图形打印点高度。</param>
             <param name="stroke">轮廓线打印点宽度。</param>
             <param name="ellipse">为 true 时绘制椭圆，为 false 时绘制矩形。</param>
+            <param name="filled">为 true 时绘制占位内的黑色填充；轮廓线宽不影响填充尺寸。</param>
             <param name="available">可用打印点宽度。</param>
             <param name="sourcePath">模板元素的节点路径。</param>
             <param name="binding">当前重复数据的绑定上下文。</param>
@@ -1992,7 +2595,7 @@
             <param name="binding">当前重复数据的绑定上下文。</param>
             <returns>由文字行组成的布局块。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Wrap(System.String,Bing.EasyPrint.Templates.CpclFontMetrics,System.Int32,System.Boolean)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Wrap(System.String,Bing.EasyPrint.Templates.ProtocolTextMetrics,System.Int32,System.Boolean)">
             <summary>
             按字体字距与可用宽度拆分文字行。
             </summary>
@@ -2002,14 +2605,26 @@
             <param name="wrap">是否允许按宽度换行。</param>
             <returns>保持 Unicode 字符边界的文字行。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.LoadImage(System.String,System.Int32,System.Int32)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.LoadImage(System.String,System.Int32,System.Int32,Bing.EasyPrint.Model.BpImageCrop)">
             <summary>
             从资源提供器加载并缓存指定尺寸的图片。
             </summary>
             <param name="key">图片资源键。</param>
             <param name="width">要求的打印点宽度；为零时由原图或指定高度按比例计算。</param>
             <param name="height">要求的打印点高度；为零时按目标宽度等比例计算。</param>
+            <param name="crop">可选的源图片像素裁切区域。</param>
             <returns>由当前会话管理生命周期的图片。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.EnsureImageStreamCapacity(System.IO.MemoryStream,System.IDisposable@,System.Int64)">
+            <summary>
+            将图片输入流扩容到足够容纳下一次读取的数据，并在扩容成功后替换旧租约。
+            </summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.ClearEncodedResources">
+            <summary>清理编码图片缓存并归还其资源租约。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.RemoveImage(System.ValueTuple{System.String,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32})">
+            <summary>清理指定解码图片并归还其资源租约。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Reserve(System.Int64)">
             <summary>
@@ -2024,7 +2639,7 @@
             <param name="bytes">待检查的 WebP 编码字节。</param>
             <returns>包含多帧时为 true，否则为 false。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.DrawSlice(Bing.EasyPrint.CPCL.CPCLPrintCommand,Bing.EasyPrint.Templates.TemplateRenderer.Block,System.Int32,System.Int32,System.Int32)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.DrawSlice(Bing.EasyPrint.Templates.IPrintCanvas,Bing.EasyPrint.Templates.TemplateRenderer.Block,System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
             将布局块的指定垂直片段绘制到当前页。
             </summary>
@@ -2033,8 +2648,9 @@
             <param name="start">片段在布局块中的起始打印点。</param>
             <param name="end">片段在布局块中的结束打印点。</param>
             <param name="destination">片段在当前页中的起始打印点。</param>
+            <param name="horizontal">片段的水平打印点偏移。</param>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.DrawBorder(Bing.EasyPrint.CPCL.CPCLPrintCommand,Bing.EasyPrint.Templates.TemplateRenderer.Frame,System.Int32,System.Int32,System.Int32)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.DrawBorder(Bing.EasyPrint.Templates.IPrintCanvas,Bing.EasyPrint.Templates.TemplateRenderer.Frame,System.Int32,System.Int32,System.Int32)">
             <summary>
             为跨页布局片段绘制对应的边框部分。
             </summary>
@@ -2053,6 +2669,9 @@
             <param name="index">子节点在集合中的序号。</param>
             <returns>可映射回模板结构的节点路径。</returns>
         </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.NewLayout">
+            <summary>创建由布局会话持有的临时归属集合。</summary>
+        </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Dispose">
             <inheritdoc />
         </member>
@@ -2063,6 +2682,64 @@
             <remarks>
             调用方不应在渲染期间修改此实例。
             </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.Protocol">
+            <summary>
+            获取或设置目标打印协议。默认保持现有 CPCL 输出。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.EscPosLayout">
+            <summary>
+            获取或设置 ESC/POS 的布局模式。默认 Native；Raster 需显式选择。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.Copies">
+            <summary>获取或设置每页打印份数，默认为一份。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.FeedLines">
+            <summary>获取或设置打印后的额外进纸行数。未指定时 ESC/POS 为一行，其他协议为零。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.CutAfterPrint">
+            <summary>获取或设置打印后是否切纸。未指定时 ESC/POS 切纸，其他协议不切纸。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.CutOptions">
+            <summary>可选页面裁切形状和补偿；与任务裁切参数互斥，省略保留原输出。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.Job">
+            <summary>显式任务级份数、顺序和收尾策略；为空时保留旧页面行为。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.EscPosDevice">
+            <summary>获取或设置 ESC/POS 设备专用设置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.TsplMedia">
+            <summary>获取或设置 TSPL 介质和设备设置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.ZplMedia">
+            <summary>获取或设置 ZPL 介质和设备设置。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.DeviceHalfCellWidthAt24">
+            <summary>
+            获取或设置 TSPL/ZPL 设备内置字体在 24 点字号下的半角字宽。
+            未指定时按 18 点估算；全角按两个半角单元计算。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.DeviceFullCellWidthAt24">
+            <summary>
+            获取或设置 TSPL/ZPL 设备内置字体在 24 点字号下的全角字宽。
+            未指定时使用半角字宽的两倍；用于校准中英混排的换行和分页。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.DeviceLineHeightAt24">
+            <summary>获取或设置 TSPL/ZPL 设备字体在 24 点字号下实测的行高，用于分页和文字预留高度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.DeviceFontCalibrations">
+            <summary>
+            获取或设置按设备字体标识索引的实测占位；匹配时优先于全局 24 点校准值。
+            未显式指定设备字体的文字使用键 "0"。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.RequireDeclaredNativeBounds">
+            <summary>要求 TSPL/ZPL 模板明确声明设备文字度量和原生条码宽度；默认关闭以兼容旧模板。</summary>
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.MaxJsonBytes">
             <summary>
@@ -2086,13 +2763,22 @@
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.MaxOutputBytes">
             <summary>
-            获取或设置 CPCL 输出的最大字节数，默认 32 MiB。
+            获取或设置打印输出的最大字节数，默认 32 MiB。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.MaxWorkingBytes">
+            <summary>
+            可选的受管缓冲区和图像像素预留上限（字节）；为空时保留原资源限制。
+            同时计算活动临时资源与保留结果，不能作为进程实际峰值内存数值。
             </summary>
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.MaxImageBytes">
             <summary>
             获取或设置单张图片编码数据的最大字节数，默认 10 MiB。
             </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.ImageThreshold">
+            <summary>获取或设置非 CPCL 图片的黑白阈值；合成到白纸后的亮度低于此值时输出黑点。默认 128。</summary>
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateRenderOptions.MaxImagePixels">
             <summary>
@@ -2127,6 +2813,78 @@
             获取导致错误的模板节点路径。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.FieldPath">
+            <summary>获取绑定失败的业务字段路径；非绑定错误返回 null。</summary>
+            <remarks>元数据沿内部异常链保留，不依赖错误文案解析。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.ResourceName">
+            <summary>
+            获取已知图片输入错误对应的资源键；其他错误返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.SourcePixelWidth">
+            <summary>
+            获取已识别图片源图的像素宽度；资源缺失、损坏或尚未识别时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.SourcePixelHeight">
+            <summary>
+            获取已识别图片源图的像素高度；资源缺失、损坏或尚未识别时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.RenderedPixelWidth">
+            <summary>
+            获取图片解码、裁切和缩放后实际输出的像素宽度；无法完成处理时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.RenderedPixelHeight">
+            <summary>
+            获取图片解码、裁切和缩放后实际输出的像素高度；无法完成处理时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.CropX">
+            <summary>
+            获取请求裁切区域的源图像素 X 坐标；未请求裁切时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.CropY">
+            <summary>
+            获取请求裁切区域的源图像素 Y 坐标；未请求裁切时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.CropWidth">
+            <summary>
+            获取请求裁切区域的源图像素宽度；未请求裁切时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.CropHeight">
+            <summary>
+            获取请求裁切区域的源图像素高度；未请求裁切时返回空值。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.DefinitionPath">
+            <summary>
+            获取导致错误的组件定义路径。
+            </summary>
+            <remarks>普通模板节点或内联组合没有组件定义路径时返回 null。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.ComponentInstancePath">
+            <summary>
+            获取触发错误的组件实例路径。
+            </summary>
+            <remarks>错误发生在共享组件内部时返回引用该组件的模板节点路径。</remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.InstanceIndices">
+            <summary>
+            获取错误所在重复数据源的各层项序号。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.PageIndex">
+            <summary>获取实际输出页面的零基序号；静态预检或尚未分页时为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderException.ElementIndex">
+            <summary>获取页面内实际打印元素的零基序号；页级错误或尚未输出时为 null。</summary>
+        </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderException.#ctor(System.String,System.String,System.Exception)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.TemplateRenderException"/> 类型的实例。
@@ -2134,6 +2892,29 @@
             <param name="sourcePath">发生错误的模板节点路径。</param>
             <param name="message">供调用方显示的错误原因。</param>
             <param name="innerException">导致当前错误的异常。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderException.#ctor(System.String,System.String,System.Exception,System.String,System.String,System.Collections.Generic.IReadOnlyList{System.Int32})">
+            <summary>
+            使用可选的组件归属元数据初始化渲染错误。
+            </summary>
+            <param name="sourcePath">发生错误的模板节点路径。</param>
+            <param name="message">供调用方显示的错误原因。</param>
+            <param name="innerException">导致当前错误的异常。</param>
+            <param name="definitionPath">组件定义节点路径。</param>
+            <param name="componentInstancePath">组件实例节点路径。</param>
+            <param name="instanceIndices">重复数据源的各层项序号。</param>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderException.WithOwnership(System.String,System.String,System.Collections.Generic.IReadOnlyList{System.Int32})">
+            <summary>
+            用外层组件上下文补充当前错误，但保留已经由内层组件设置的字段。
+            </summary>
+            <param name="definitionPath">可补充的组件定义路径。</param>
+            <param name="componentInstancePath">可补充的组件实例路径。</param>
+            <param name="instanceIndices">可补充的重复数据项序号。</param>
+            <returns>包含最内层已知归属的错误实例。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderException.WithLocation(System.Nullable{System.Int32},System.Nullable{System.Int32})">
+            <summary>为 Provider 阶段错误补充实际页面位置，保留原有模板归属。</summary>
         </member>
         <member name="T:Bing.EasyPrint.Templates.ITemplateResourceProvider">
             <summary>
@@ -2150,7 +2931,7 @@
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplatePage">
             <summary>
-            保存单页的 CPCL 数据与布局结果。
+            保存单页的协议数据与布局结果。
             </summary>
         </member>
         <member name="F:Bing.EasyPrint.Templates.TemplatePage.EmptyElements">
@@ -2168,24 +2949,53 @@
             获取以打印点表示的页高。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.Protocol">
+            <summary>获取当前页使用的打印协议。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.Templates.TemplatePage.Data">
             <summary>
-            获取当前页的 CPCL 指令字节。
+            获取单文件页的目标协议字节；多文件页抛错，须使用 Segments。
             </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.Output">
+            <summary>当前页有序输出；多文件页面不能通过 Data 合并发送。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.Segments">
+            <summary>须按顺序独立发送的命令文件。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.ByteLength">
+            <summary>全部命令文件字节数。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.SourcePageIndex">
+            <summary>显式任务输出对应的原逻辑页序号；旧页面模式为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.CopyIndex">
+            <summary>显式任务输出对应的零基份数序号；旧页面模式为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.FeedAfterPrint">
+            <summary>显式任务是否在本页后额外进纸；旧页面模式为 null。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplatePage.CutAfterPrint">
+            <summary>显式任务是否在本页后切纸；旧页面模式为 null。</summary>
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplatePage.Elements">
             <summary>
             获取当前页的布局节点；普通渲染返回空集合。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplatePage.#ctor(System.Int32,System.Int32,System.Byte[],System.Collections.Generic.List{Bing.EasyPrint.Templates.TemplateLayoutElement})">
+        <member name="M:Bing.EasyPrint.Templates.TemplatePage.#ctor(System.Int32,System.Int32,System.Byte[],System.Collections.Generic.IEnumerable{Bing.EasyPrint.Templates.TemplateLayoutElement},Bing.EasyPrint.PrintProtocol,System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.Boolean},System.Nullable{System.Boolean})">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.TemplatePage"/> 类型的实例。
             </summary>
             <param name="width">打印点页宽。</param>
             <param name="height">打印点页高。</param>
-            <param name="data">当前页的 CPCL 字节。</param>
+            <param name="data">当前页的协议字节。</param>
             <param name="elements">可选的布局节点集合。</param>
+            <param name="protocol">当前页使用的打印协议。</param>
+            <param name="sourcePageIndex">显式任务对应的原逻辑页序号。</param>
+            <param name="copyIndex">显式任务对应的份数序号。</param>
+            <param name="feedAfterPrint">显式任务是否在本页后额外进纸。</param>
+            <param name="cutAfterPrint">显式任务是否在本页后切纸。</param>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateLayoutElement">
             <summary>
@@ -2195,6 +3005,27 @@
         <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.SourcePath">
             <summary>
             获取对应模板定义的节点路径。
+            </summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.DefinitionPath">
+            <summary>
+            获取节点所属的组件定义路径。
+            </summary>
+            <remarks>
+            内联节点返回 null。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.ComponentInstancePath">
+            <summary>
+            获取节点所属的组件实例路径。
+            </summary>
+            <remarks>
+            普通节点返回 null。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.FragmentIndex">
+            <summary>
+            获取该节点所在的零基页面片段序号。
             </summary>
         </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.Kind">
@@ -2242,7 +3073,10 @@
             获取图片资源键；其他节点返回 null。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateLayoutElement.#ctor(System.String,System.String,System.Int32,System.Collections.Generic.IReadOnlyList{System.Int32},System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.String)">
+        <member name="P:Bing.EasyPrint.Templates.TemplateLayoutElement.Rotation">
+            <summary>获取元素的逻辑顺时针旋转角度；宽高已经是旋转后的占位。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateLayoutElement.#ctor(System.String,System.String,System.Int32,System.Collections.Generic.IReadOnlyList{System.Int32},System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.String,System.String,System.String,System.Int32,Bing.EasyPrint.RotationAngle)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.TemplateLayoutElement"/> 类型的实例。
             </summary>
@@ -2256,6 +3090,10 @@
             <param name="height">打印点高度。</param>
             <param name="text">可选的文字或码图内容。</param>
             <param name="resourceKey">可选的图片资源键。</param>
+            <param name="definitionPath">组件定义节点路径。</param>
+            <param name="componentInstancePath">组件实例节点路径。</param>
+            <param name="fragmentIndex">零基页面片段序号。</param>
+            <param name="rotation">元素的逻辑顺时针旋转角度。</param>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateRenderResult">
             <summary>
@@ -2270,16 +3108,20 @@
             获取已生成的所有打印页。
             </summary>
         </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateRenderResult.Protocol">
+            <summary>获取本次渲染使用的打印协议。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateRenderResult.PageCount">
             <summary>
             获取已生成的页数。
             </summary>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderResult.#ctor(System.Collections.Generic.List{Bing.EasyPrint.Templates.TemplatePage})">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderResult.#ctor(System.Collections.Generic.IEnumerable{Bing.EasyPrint.Templates.TemplatePage},Bing.EasyPrint.PrintProtocol)">
             <summary>
             初始化一个 <see cref="T:Bing.EasyPrint.Templates.TemplateRenderResult"/> 类型的实例。
             </summary>
             <param name="pages">已生成的完整页面集合。</param>
+            <param name="protocol">本次渲染使用的打印协议。</param>
         </member>
         <member name="T:Bing.EasyPrint.Templates.TemplateTableFactory">
             <summary>
@@ -2288,6 +3130,17 @@
             <remarks>
             明细沿用模板的重复与分页能力。
             </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateTableFactory.CreateGroup(System.String,System.Collections.Generic.IReadOnlyList{Bing.EasyPrint.Templates.TemplateTableColumn},System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            创建可插入单元格或组件定义的流式表格组合。
+            </summary>
+            <param name="repeatSource">明细集合的字段路径。</param>
+            <param name="columns">表格列定义。</param>
+            <param name="headerHeight">表头高度，单位为打印点。</param>
+            <param name="detailHeight">明细高度，单位为打印点。</param>
+            <param name="repeatHeader">是否在跨页时重复表头。</param>
+            <returns>包含表头和明细行的组合。</returns>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateTableFactory.Create(System.String,System.Collections.Generic.IReadOnlyList{Bing.EasyPrint.Templates.TemplateTableColumn},System.Int32,System.Int32,System.Boolean)">
             <summary>
@@ -2324,6 +3177,9 @@
             <summary>
             获取或设置单元格中文字的对齐方式。
             </summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Templates.TextCellMetrics">
+            <summary>按输出编码计算文本元素占用的半角字符单元数。</summary>
         </member>
     </members>
 </doc>

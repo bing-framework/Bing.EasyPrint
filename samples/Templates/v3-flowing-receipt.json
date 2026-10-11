@@ -1,0 +1,61 @@
+{
+  "Version": 3,
+  "Width": 320,
+  "Height": 120,
+  "Components": [
+    {
+      "Id": "orderLines",
+      "Width": 320,
+      "Height": 0,
+      "Parameters": {
+        "heading": { "Required": true }
+      },
+      "Rows": [
+        {
+          "Section": "TableHeader",
+          "Height": 28,
+          "Cells": [
+            { "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "$param.heading" } }] }
+          ]
+        },
+        {
+          "Section": "Body",
+          "RepeatSource": "Items",
+          "Height": 28,
+          "Cells": [
+            { "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "Name" } }] }
+          ]
+        }
+      ]
+    }
+  ],
+  "Rows": [
+    {
+      "Height": 28,
+      "Cells": [
+        { "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "Shop" } }] }
+      ]
+    },
+    {
+      "Cells": [
+        {
+          "Elements": [
+            {
+              "Type": 6,
+              "ComponentId": "orderLines",
+              "DataPath": "Order",
+              "Pagination": "Split",
+              "Parameters": { "heading": { "Path": "Labels.ItemTitle" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Height": 28,
+      "Cells": [
+        { "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "Footer" } }] }
+      ]
+    }
+  ]
+}

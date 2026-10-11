@@ -29,6 +29,8 @@ public class TemplateBarcodeTests
     [InlineData(BarcodeType.Msi, "123", 217, 30, "MSI")]
     [InlineData(BarcodeType.Postnet, "12345", 249, 30, "POSTNET")]
     [InlineData(BarcodeType.Fim, "A", 111, 30, "FIM")]
+    [InlineData(BarcodeType.Fim, "D", 111, 30, "FIM")]
+    [InlineData(BarcodeType.Fim, "E", 111, 30, "FIM")]
     public void Each_symbology_fits_its_reserved_width_and_rejects_one_dot_less(BarcodeType type, string data, int width, int left, string command)
     {
         var element = Barcode(type, data);
@@ -79,7 +81,7 @@ public class TemplateBarcodeTests
     [InlineData(BarcodeType.Msi, "12345678901234")]
     [InlineData(BarcodeType.Postnet, "---")]
     [InlineData(BarcodeType.Postnet, "1234")]
-    [InlineData(BarcodeType.Fim, "D")]
+    [InlineData(BarcodeType.Fim, "F")]
     public void Invalid_barcode_data_fails_before_output(BarcodeType type, string data) =>
         Assert.Throws<ArgumentException>(() => new TemplateRenderer().Render(Template(Barcode(type, data), 2000), null, options: Options()));
 

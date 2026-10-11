@@ -1,0 +1,13 @@
+{
+  "Version": 3,
+  "Width": 384,
+  "Height": 512,
+  "AutoHeight": true,
+  "Rows": [
+    { "Cells": [{ "Elements": [{ "Type": 1, "FontSize": 24, "Bold": true, "Field": { "Name": "Title" } }] }] },
+    { "RepeatSource": "Items", "Cells": [{ "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "Description" } }] }] },
+    { "Cells": [{ "Elements": [{ "Type": 4, "LineWidth": 1, "Height": 60, "Field": { "Name": "Code" } }] }] },
+    { "Cells": [{ "Elements": [{ "Type": 3, "UnitWidth": 2, "Field": { "Name": "Code" } }] }] },
+    { "Cells": [{ "Elements": [{ "Type": 1, "FontSize": 24, "Field": { "Name": "Footer" } }] }] }
+  ]
+}

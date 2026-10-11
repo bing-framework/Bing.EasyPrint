@@ -30,6 +30,7 @@ partial class CPCLPrintCommand
     /// <inheritdoc />
     public CPCLPrintCommand SetQty(int qty)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         CommandInfo.Qty = qty < 1 ? 1 : qty > 1024 ? 1024 : qty;
         return this;
     }
@@ -37,6 +38,7 @@ partial class CPCLPrintCommand
     /// <inheritdoc />
     public CPCLPrintCommand SetOffset(int offset)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         CommandInfo.Offset = offset < 0 ? 0 : offset;
         return this;
     }
@@ -204,6 +206,7 @@ partial class CPCLPrintCommand
     /// <returns>当前打印命令实例。</returns>
     public CPCLPrintCommand DrawImage(int startX, int startY, Image bitmap, ImageProcessingOptions options)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         Content.Add(ImageComponent.CreateFromImage(bitmap, options).InitPosition(startX, startY));
         return this;
     }
@@ -211,6 +214,7 @@ partial class CPCLPrintCommand
     /// <inheritdoc />
     public CPCLPrintCommand DrawImage(int startX, int startY, string imageUrl)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         Content.Add(ImageComponent.CreateFromFile(imageUrl).InitPosition(startX, startY));
         return this;
     }
@@ -231,6 +235,7 @@ partial class CPCLPrintCommand
     /// <returns>当前打印命令实例。</returns>
     public CPCLPrintCommand DrawImage(int startX, int startY, byte[] bytes, ImageProcessingOptions options)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         Content.Add(ImageComponent.CreateFromBytes(bytes, options).InitPosition(startX, startY));
         return this;
     }
@@ -251,6 +256,7 @@ partial class CPCLPrintCommand
     /// <returns>当前打印命令实例。</returns>
     public CPCLPrintCommand DrawImage(int startX, int startY, Stream stream, ImageProcessingOptions options)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         Content.Add(ImageComponent.CreateFromStream(stream, options).InitPosition(startX, startY));
         return this;
     }
@@ -264,6 +270,7 @@ partial class CPCLPrintCommand
             Rotate = rotation, Bold = bold, Reverse = reverse, 
             Underline = underline
         });
+        _restrictedFormatState.SetMagnification(0, 0);
         return this;
     }
 

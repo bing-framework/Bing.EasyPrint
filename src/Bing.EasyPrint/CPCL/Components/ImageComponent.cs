@@ -1,14 +1,14 @@
 using System;
 using System.IO;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Processing.Processors.Dithering;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Metadata;
+using Bing.EasyPrint.Printing;
+using Bing.EasyPrint.Core;
+using System.Threading;
 
 // ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint.CPCL;
@@ -53,13 +53,27 @@ internal class ImageComponent : ComponentMetadata
     /// </summary>
     private ImageComponent() { }
 
+    internal static ImageComponent CreateFromRaster(int width, int height, byte[] raster)
+    {
+        if (width <= 0 || height <= 0) throw new ArgumentOutOfRangeException();
+        if (raster == null) throw new ArgumentNullException(nameof(raster));
+        if (raster.Length != checked(((width + 7) / 8) * height))
+            throw new ArgumentException("图片数据长度与尺寸不匹配。", nameof(raster));
+        return new ImageComponent { Width = width, Height = height,
+            Data = BudgetedBuffer.Copy(raster, "Cpcl.ImageSnapshot", CancellationToken.None) };
+    }
+
     /// <inheritdoc />
     public override void Build(CPCLPrintCommand command)
     {
         var byteCountW = checked((int)(((long)Width + 7) / 8));
-        var data = ToHex(Data);
+        var cancellationToken = (command.Writer as BufferWriter)?.BuildCancellationToken ?? CancellationToken.None;
+        var data = ToHex(Data, cancellationToken);
         var cmd = Helper.GetImageRotateCommand(Rotate);
-        command.Writer.WriteLine($"{cmd} {byteCountW} {Height} {X} {Y} {data}");
+        var prefix = $"{cmd} {byteCountW} {Height} {X} {Y} ";
+        PrintResourceScope.Retain(checked((long)(prefix.Length + data.Length) * 2), "Cpcl.ImageCommand");
+        cancellationToken.ThrowIfCancellationRequested();
+        command.Writer.WriteLine(prefix + data);
     }
 
     /// <summary>
@@ -124,6 +138,7 @@ internal class ImageComponent : ComponentMetadata
         options.Validate();
 
         var originalPosition = stream.CanSeek ? (long?)stream.Position : null;
+        OffsetReadStream offsetStream = null;
         MemoryStream bufferedStream = null;
         try
         {
@@ -131,6 +146,8 @@ internal class ImageComponent : ComponentMetadata
             if (stream.CanSeek)
             {
                 ValidateEncodedLength(stream.Length - originalPosition.Value, options.MaxEncodedBytes);
+                offsetStream = new OffsetReadStream(stream, originalPosition.Value);
+                source = offsetStream;
             }
             else
             {
@@ -149,6 +166,8 @@ internal class ImageComponent : ComponentMetadata
                 source.Position = sourcePosition;
 
             var decoder = GetSingleFrameDecoder(format);
+            using (var decoderMemory = PrintResourceScope.Reserve(
+                       checked((long)imageInfo.Width * imageInfo.Height * 4), "Cpcl.ImageDecodeRgba"))
             using (var image = Image.Load(Configuration.Default, source, decoder))
             {
                 ValidateDimensions(image.Width, image.Height, options);
@@ -156,15 +175,22 @@ internal class ImageComponent : ComponentMetadata
                 {
                     Width = image.Width,
                     Height = image.Height,
-                    Data = GetImageData(image)
+                    Data = PrintImageRasterizer.ToCpclMonochrome(image)
                 };
             }
         }
         finally
         {
-            if (originalPosition.HasValue)
-                stream.Position = originalPosition.Value;
-            bufferedStream?.Dispose();
+            try
+            {
+                if (originalPosition.HasValue)
+                    stream.Position = originalPosition.Value;
+            }
+            finally
+            {
+                offsetStream?.Dispose();
+                bufferedStream?.Dispose();
+            }
         }
     }
 
@@ -223,58 +249,12 @@ internal class ImageComponent : ComponentMetadata
         if (image.Frames.Count != 1)
             throw new ArgumentException("不支持多帧图片。", nameof(image));
 
-        using (var copy = image.CloneAs<Rgba32>())
+        return new ImageComponent
         {
-            return new ImageComponent
-            {
-                Width = copy.Width,
-                Height = copy.Height,
-                Data = GetImageData(copy)
-            };
-        }
-    }
-
-    /// <summary>
-    /// 将独立图片副本转换为按行打包的单色像素。
-    /// </summary>
-    /// <param name="image">允许原地转换的内部图片副本。</param>
-    /// <returns>每行按八像素对齐的单色字节。</returns>
-    private static byte[] GetImageData(Image image)
-    {
-        image.Mutate(context =>
-        {
-            context.Grayscale(GrayscaleMode.Bt601);
-            context.BinaryDither(ErrorDither.FloydSteinberg);
-        });
-        // 直接打包二值像素，避免 BMP 往返及编码器对不足八像素行的越界问题。
-        if (image is Image<Rgba32> rgba)
-            return PackPixels(rgba);
-        using (var copy = image.CloneAs<Rgba32>())
-            return PackPixels(copy);
-    }
-
-    /// <summary>
-    /// 将黑白像素按每字节八位写入行缓冲区。
-    /// </summary>
-    /// <param name="image">已完成二值化的图片。</param>
-    /// <returns>每行按八像素对齐的单色字节。</returns>
-    private static byte[] PackPixels(Image<Rgba32> image)
-    {
-        var rowBytes = checked((int)(((long)image.Width + 7) / 8));
-        var result = new byte[checked(rowBytes * image.Height)];
-        image.ProcessPixelRows(accessor =>
-        {
-            for (var y = 0; y < accessor.Height; y++)
-            {
-                var pixels = accessor.GetRowSpan(y);
-                var offset = y * rowBytes;
-                for (var x = 0; x < pixels.Length; x++)
-                    if (pixels[x].R < 128)
-                        result[offset + x / 8] |= (byte)(0x80 >> (x % 8));
-            }
-        });
-        // 数组初始为零，末字节未使用的低位保持白色。
-        return result;
+            Width = image.Width,
+            Height = image.Height,
+            Data = PrintImageRasterizer.ToCpclMonochrome(image)
+        };
     }
 
     /// <summary>
@@ -373,29 +353,221 @@ internal class ImageComponent : ComponentMetadata
     /// <returns>定位至起始位置且由调用方释放的缓冲流。</returns>
     private static MemoryStream CopyToBoundedStream(Stream source, long maxEncodedBytes)
     {
-        var copy = new MemoryStream();
-        var buffer = new byte[81920];
+        using (PrintResourceScope.Reserve(81920, "Cpcl.ImageReadBuffer"))
+        {
+            var copy = new BudgetedMemoryStream();
+            var buffer = new byte[81920];
+            try
+            {
+                while (true)
+                {
+                    var remaining = maxEncodedBytes - copy.Length;
+                    var readLimit = remaining >= buffer.Length ? buffer.Length : (int)remaining + 1;
+                    var read = source.Read(buffer, 0, readLimit);
+                    if (read == 0)
+                        break;
+                    if (read > remaining)
+                        throw new ArgumentException("图片编码数据超过配置的字节数限制。", nameof(source));
+
+                    EnsureCopyStreamCapacity(copy, checked(copy.Length + read));
+                    copy.Write(buffer, 0, read);
+                }
+
+                copy.Position = 0;
+                return copy;
+            }
+            catch
+            {
+                copy.Dispose();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 将非定位图片缓冲流扩容到能够容纳下一次读取的数据，并在扩容成功后释放旧容量租约。
+    /// </summary>
+    /// <param name="target">受预算管理的目标缓冲流。</param>
+    /// <param name="required">下一次写入完成后需要的容量。</param>
+    private static void EnsureCopyStreamCapacity(BudgetedMemoryStream target, long required)
+    {
+        if (required <= target.Capacity)
+            return;
+        if (required > int.MaxValue)
+            throw new ArgumentException("图片编码数据超过流容量限制。", nameof(required));
+
+        var current = target.Capacity;
+        var doubled = current == 0 ? 8192L : current > int.MaxValue / 2 ? int.MaxValue : (long)current * 2;
+        var requested = Math.Min((long)int.MaxValue, Math.Max(required, doubled));
+        var nextLease = PrintResourceScope.Reserve(requested, "Cpcl.ImageReadStream");
         try
         {
-            while (true)
+            // Capacity 的实际分配发生在旧租约仍然存活时，避免低估扩容峰值。
+            target.Capacity = checked((int)requested);
+            target.ReplaceCapacityLease(nextLease);
+            nextLease = null;
+        }
+        finally
+        {
+            nextLease?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// 为非 seek 输入流持有当前 MemoryStream 容量租约的私有实现。
+    /// </summary>
+    private sealed class BudgetedMemoryStream : MemoryStream
+    {
+        private IDisposable capacityLease;
+
+        internal void ReplaceCapacityLease(IDisposable nextLease)
+        {
+            if (nextLease == null)
+                throw new ArgumentNullException(nameof(nextLease));
+
+            var previousLease = capacityLease;
+            capacityLease = nextLease;
+            previousLease?.Dispose();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!disposing)
             {
-                var remaining = maxEncodedBytes - copy.Length;
-                var readLimit = remaining >= buffer.Length ? buffer.Length : (int)remaining + 1;
-                var read = source.Read(buffer, 0, readLimit);
-                if (read == 0)
-                    break;
-                if (read > remaining)
-                    throw new ArgumentException("图片编码数据超过配置的字节数限制。", nameof(source));
-                copy.Write(buffer, 0, read);
+                base.Dispose(disposing);
+                return;
             }
 
-            copy.Position = 0;
-            return copy;
+            var lease = capacityLease;
+            capacityLease = null;
+            try
+            {
+                base.Dispose(true);
+            }
+            finally
+            {
+                lease?.Dispose();
+            }
         }
-        catch
+    }
+
+    /// <summary>
+    /// 将可定位调用方流的剩余区间映射为从零开始的只读图片流视图。
+    /// </summary>
+    private sealed class OffsetReadStream : Stream
+    {
+        private readonly Stream inner;
+        private readonly long offset;
+        private readonly long length;
+        private bool disposed;
+
+        internal OffsetReadStream(Stream inner, long offset)
         {
-            copy.Dispose();
-            throw;
+            this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
+            if (!inner.CanSeek)
+                throw new ArgumentException("图片输入流必须支持定位。", nameof(inner));
+            if (offset < 0 || offset > inner.Length)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+
+            this.offset = offset;
+            length = inner.Length - offset;
+            inner.Position = offset;
+        }
+
+        public override bool CanRead => !disposed && inner.CanRead;
+        public override bool CanSeek => !disposed && inner.CanSeek;
+        public override bool CanWrite => false;
+
+        public override long Length
+        {
+            get
+            {
+                EnsureNotDisposed();
+                return length;
+            }
+        }
+
+        public override long Position
+        {
+            get
+            {
+                EnsureNotDisposed();
+                return checked(inner.Position - offset);
+            }
+            set
+            {
+                EnsurePosition(value);
+                inner.Position = checked(offset + value);
+            }
+        }
+
+        public override int Read(byte[] buffer, int bufferOffset, int count)
+        {
+            EnsureNotDisposed();
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+            if (bufferOffset < 0 || count < 0 || buffer.Length - bufferOffset < count)
+                throw new ArgumentOutOfRangeException();
+            if (count == 0)
+                return 0;
+
+            var remaining = length - Position;
+            if (remaining <= 0)
+                return 0;
+            var readCount = (int)Math.Min((long)count, remaining);
+            return inner.Read(buffer, bufferOffset, readCount);
+        }
+
+        public override int ReadByte()
+        {
+            EnsureNotDisposed();
+            return Position >= length ? -1 : inner.ReadByte();
+        }
+
+        public override long Seek(long seekOffset, SeekOrigin origin)
+        {
+            EnsureNotDisposed();
+            var basePosition = origin switch
+            {
+                SeekOrigin.Begin => 0,
+                SeekOrigin.Current => Position,
+                SeekOrigin.End => length,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+            var target = checked(basePosition + seekOffset);
+            EnsurePosition(target);
+            inner.Position = checked(offset + target);
+            return target;
+        }
+
+        public override void Flush()
+        {
+            EnsureNotDisposed();
+        }
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int bufferOffset, int count) =>
+            throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            disposed = true;
+            // 视图不得关闭调用方持有的底层流。
+            base.Dispose(disposing);
+        }
+
+        private void EnsureNotDisposed()
+        {
+            if (disposed)
+                throw new ObjectDisposedException(nameof(OffsetReadStream));
+        }
+
+        private void EnsurePosition(long value)
+        {
+            EnsureNotDisposed();
+            if (value < 0 || value > length)
+                throw new ArgumentOutOfRangeException(nameof(value));
         }
     }
 
@@ -429,16 +601,23 @@ internal class ImageComponent : ComponentMetadata
     /// 将图形字节转换为十六进制文本。
     /// </summary>
     /// <param name="data">待转换的图形字节。</param>
+    /// <param name="cancellationToken">转换过程中检查的取消令牌。</param>
     /// <returns>每字节对应两个大写十六进制字符的文本。</returns>
-    private static string ToHex(byte[] data)
+    private static string ToHex(byte[] data, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var memory = PrintResourceScope.Reserve(checked(data.LongLength * 4), "Cpcl.HexCharacters");
         const string digits = "0123456789ABCDEF";
         var chars = new char[checked(data.Length * 2)];
         for (var i = 0; i < data.Length; i++)
         {
+            if ((i & 4095) == 0) cancellationToken.ThrowIfCancellationRequested();
             chars[i * 2] = digits[data[i] >> 4];
             chars[i * 2 + 1] = digits[data[i] & 0x0F];
         }
-        return new string(chars);
+        PrintResourceScope.Retain(checked(data.LongLength * 4), "Cpcl.HexString");
+        var result = new string(chars);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 }

@@ -1,4 +1,6 @@
 using System.Text;
+using Bing.EasyPrint;
+using Bing.EasyPrint.Protocols;
 using Bing.EasyPrint.Elements;
 using Bing.EasyPrint.Model;
 using Bing.EasyPrint.Templates;
@@ -37,6 +39,23 @@ for (var i = 0; i < jsonPages.PageCount; i++) File.WriteAllBytes(Path.Combine(ou
 File.WriteAllText(Path.Combine(output, "label-roundtrip.json"), loader.SaveJson(label));
 File.WriteAllText(Path.Combine(output, "receipt-roundtrip.json"), receiptRoundTripJson);
 PriceLabelSamples.WriteTo(output, loader);
+V3Samples.WriteTo(output, loader, renderer);
+PrintJobSamples.WriteTo(output, renderer);
+TsplCutterSamples.WriteTo(output, renderer);
+ZplCutterSamples.WriteTo(output, renderer);
+if (args.Length > 1) FixedFontSamples.WriteTo(output, renderer, args[1], args.Length > 2 ? args[2] : null);
+var nativeTemplate = loader.LoadJson(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "native-mixed-receipt.json")));
+var nativeReceipt = renderer.Render(nativeTemplate, new
+{
+    Title = "SHOP", Items = new[] { new { Description = "Apple  2.00" }, new { Description = "Tea    3.00" } },
+    Code = "A-100", Footer = "Thank you"
+}, options: new TemplateRenderOptions
+{
+    Protocol = PrintProtocol.EscPos, Encoding = Encoding.ASCII,
+    EscPosDevice = new EscPosDeviceOptions { NativeFlow = EscPosNativeFlowMode.Sequential }
+});
+for (var i = 0; i < nativeReceipt.PageCount; i++)
+    File.WriteAllBytes(Path.Combine(output, $"native-mixed-{i + 1}.escpos"), nativeReceipt.Pages[i].Data);
 Console.WriteLine($"已生成标签 1 页、小票 {jsonPages.PageCount} 页；C#、JSON 与往返输出一致：{output}");
 
 static BpTemplate CreateReceiptTemplate() => new BpTemplate

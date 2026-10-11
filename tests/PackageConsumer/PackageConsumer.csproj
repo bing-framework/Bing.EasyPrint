@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Bing.EasyPrint.PackageConsumer</AssemblyName>
+    <RootNamespace>Bing.EasyPrint.PackageConsumer</RootNamespace>
+    <TargetFramework Condition="'$(ConsumerTargetFramework)' != ''">$(ConsumerTargetFramework)</TargetFramework>
+    <TargetFramework Condition="'$(ConsumerTargetFramework)' == ''">net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <UseAppHost>false</UseAppHost>
+    <EasyPrintPackageVersion Condition="'$(EasyPrintPackageVersion)' == ''">1.0.0</EasyPrintPackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bing.EasyPrint" Version="$(EasyPrintPackageVersion)">
+      <ExcludeAssets Condition="'$(ConsumerPackageAsset)' != ''">compile</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Bing.EasyPrint.Templates" Version="$(EasyPrintPackageVersion)">
+      <ExcludeAssets Condition="'$(ConsumerPackageAsset)' != ''">compile</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- 默认 NuGet 选择会遮蔽 netstandard2.1；显式模式从同一已校验包引用该资产。 -->
+  <ItemGroup Condition="'$(ConsumerPackageAsset)' != ''">
+    <Reference Include="Bing.EasyPrint">
+      <HintPath>$(RestorePackagesPath)/bing.easyprint/$(EasyPrintPackageVersion)/lib/$(ConsumerPackageAsset)/Bing.EasyPrint.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Bing.EasyPrint.Templates">
+      <HintPath>$(RestorePackagesPath)/bing.easyprint.templates/$(EasyPrintPackageVersion)/lib/$(ConsumerPackageAsset)/Bing.EasyPrint.Templates.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="FilterExplicitPackageRuntimeCopies"
+          BeforeTargets="_CopyFilesMarkedCopyLocal"
+          Condition="'$(ConsumerPackageAsset)' != ''">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.Extensions.DependencyInjection.Abstractions'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

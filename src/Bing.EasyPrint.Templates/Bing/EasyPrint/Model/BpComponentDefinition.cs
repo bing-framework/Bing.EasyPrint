@@ -30,5 +30,15 @@ namespace Bing.EasyPrint.Model
         /// 获取或设置相对于组件原点布局的子元素。
         /// </summary>
         public List<BpElement> Elements { get; set; }
+
+        /// <summary>
+        /// 获取或设置相对于组件原点布局的行列内容。
+        /// </summary>
+        public List<BpRow> Rows { get; set; }
+
+        /// <summary>
+        /// 获取或设置组件的参数定义。
+        /// </summary>
+        public Dictionary<string, BpComponentParameterDefinition> Parameters { get; set; }
     }
 }

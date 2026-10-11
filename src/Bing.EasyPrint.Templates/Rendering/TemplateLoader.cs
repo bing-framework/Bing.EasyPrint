@@ -53,13 +53,19 @@ public sealed class TemplateLoader
         {
             var root = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
             if (reader.Read()) throw new JsonSerializationException("模板后存在额外 JSON 内容。");
-            if (root["Version"]?.Type != JTokenType.Integer || (root.Value<int>("Version") != 1 && root.Value<int>("Version") != 2))
-                throw new JsonSerializationException("必须指定 Version: 1 或 2。");
+            if (root["Version"]?.Type != JTokenType.Integer || (root.Value<int>("Version") != 1 && root.Value<int>("Version") != 2 && root.Value<int>("Version") != 3))
+                throw new JsonSerializationException("必须指定 Version: 1、2 或 3。");
             foreach (var property in root.Descendants().OfType<JProperty>())
                 if (property.Name.StartsWith("$", StringComparison.Ordinal) || string.Equals(property.Name, "ValueFunc", StringComparison.OrdinalIgnoreCase))
                     throw new JsonSerializationException("JSON 不允许类型元数据、引用或委托。");
-            var template = root.ToObject<BpTemplate>(CreateSerializer());
+            var template = root.ToObject<BpTemplate>(CreateSerializer(includePaths));
             Normalize(template.Rows);
+            if (template.Components != null) foreach (var component in template.Components)
+            {
+                if (component == null) continue;
+                Normalize(component.Rows);
+                NormalizeElements(component.Elements);
+            }
             TemplateGraph.Validate(template, options, false, includePaths: includePaths);
             return template;
         }
@@ -89,7 +95,7 @@ public sealed class TemplateLoader
     /// 创建限制类型元数据并识别模板元素的序列化器。
     /// </summary>
     /// <returns>模板专用序列化器。</returns>
-    private static JsonSerializer CreateSerializer()
+    private static JsonSerializer CreateSerializer(bool includePaths = false)
     {
         var serializer = new JsonSerializer
         {
@@ -100,7 +106,7 @@ public sealed class TemplateLoader
             DateParseHandling = DateParseHandling.None,
             FloatParseHandling = FloatParseHandling.Decimal
         };
-        serializer.Converters.Add(new ElementConverter());
+        serializer.Converters.Add(new ElementConverter(includePaths));
         return serializer;
     }
 
@@ -130,8 +136,41 @@ public sealed class TemplateLoader
                 }
                 cell.ElementAlls = null;
                 Normalize(cell.Rows);
+                NormalizeElements(cell.Elements);
             }
         }
+    }
+
+    /// <summary>
+    /// 规范化组合中的嵌套行列。
+    /// </summary>
+    /// <param name="elements">需要递归处理的元素。</param>
+    private static void NormalizeElements(System.Collections.Generic.List<BpElement> elements)
+    {
+        if (elements == null) return;
+        foreach (var group in elements.OfType<BpGroupElement>())
+        {
+            Normalize(group.Rows);
+            NormalizeElements(group.Elements);
+        }
+    }
+
+    private const string QuietZoneError = "QuietZone 仅用于二维码或条码，且只能包含非负整数打印点 Left、Top、Right、Bottom。";
+
+    // 只检查实际元素，组件参数中的同名业务字段不属于打印设置。
+    private static string InvalidQuietZonePath(JObject token)
+    {
+        var quietZone = token["QuietZone"];
+        if (quietZone == null || quietZone.Type == JTokenType.Null) return null;
+        var type = token["Type"];
+        if (type?.Type != JTokenType.Integer || type.ToString() != "3" && type.ToString() != "4" ||
+            !(quietZone is JObject zone)) return quietZone.Path;
+        foreach (var property in zone.Properties())
+            if (property.Name != "Left" && property.Name != "Top" && property.Name != "Right" && property.Name != "Bottom" ||
+                property.Value.Type != JTokenType.Integer ||
+                !long.TryParse(property.Value.ToString(), out var dots) || dots < 0 || dots > int.MaxValue)
+                return property.Path;
+        return null;
     }
 
     /// <summary>
@@ -139,6 +178,11 @@ public sealed class TemplateLoader
     /// </summary>
     private sealed class ElementConverter : JsonConverter
     {
+        private readonly bool includePaths;
+        private string parentPath;
+
+        internal ElementConverter(bool includePaths) => this.includePaths = includePaths;
+
         /// <inheritdoc />
         public override bool CanConvert(Type objectType) => objectType == typeof(BpElement);
         /// <inheritdoc />
@@ -146,8 +190,44 @@ public sealed class TemplateLoader
         /// <inheritdoc />
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
+            var elementPath = string.IsNullOrEmpty(parentPath) ? reader.Path : parentPath + "." + reader.Path;
             var token = JObject.Load(reader);
             if (token["Type"]?.Type != JTokenType.Integer) throw new JsonSerializationException("元素必须指定整数 Type。");
+            var quietZonePath = InvalidQuietZonePath(token);
+            if (quietZonePath != null)
+            {
+                if (includePaths)
+                    throw new TemplateRenderException(elementPath + "." + quietZonePath, QuietZoneError,
+                        new JsonSerializationException(QuietZoneError));
+                throw new JsonSerializationException(QuietZoneError);
+            }
+            if (token.Value<int>("Type") == 1 && token.Property("Font") != null)
+            {
+                if (!(token["Font"] is JObject font) || font["Kind"]?.Type != JTokenType.Integer ||
+                    (font["Kind"].ToString() != "0" && font["Kind"].ToString() != "1" && font["Kind"].ToString() != "2") ||
+                    font.Properties().Any(property => property.Name != "Kind" && property.Name != "Name"))
+                    throw new JsonSerializationException("Font 必须仅包含整数 Kind（0、1、2）及可选 Name。");
+                if (font.Value<int>("Kind") == 0 ? font.Property("Name") != null :
+                    font["Name"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace(font.Value<string>("Name")))
+                    throw new JsonSerializationException("默认字体不能包含 Name；设备或主机字体必须提供非空字符串 Name。");
+                if (token.Property("DeviceFontName") != null ||
+                    token.Property("FontName") != null && (token["FontName"].Type != JTokenType.Integer || token["FontName"].ToString() != "0") ||
+                    token["FontFamily"] != null && token["FontFamily"].Type != JTokenType.Null &&
+                    (token["FontFamily"].Type != JTokenType.String || token.Value<string>("FontFamily") != ""))
+                    throw new JsonSerializationException("Font 不能同时指定旧版字体字段。");
+            }
+            if (token["Filled"] is JToken filled &&
+                (filled.Type != JTokenType.Boolean || token.Value<int>("Type") != 7 && filled.Value<bool>()))
+                throw new JsonSerializationException("Filled 必须为布尔值，且仅矩形元素支持填充。");
+            if (token.Value<int>("Type") == 2 && token["Rotation"] is JToken imageRotation &&
+                (imageRotation.Type != JTokenType.Integer ||
+                 !new long[] { 0, 90, 180, 270 }.Contains(imageRotation.Value<long>())))
+                throw new JsonSerializationException("图片 Rotation 必须为整数 0、90、180 或 270。");
+            if (token["Rotation"] is JToken rotation && token.Value<int>("Type") != 1 &&
+                token.Value<int>("Type") != 4 && token.Value<int>("Type") != 2 &&
+                token.Value<int>("Type") != 3 &&
+                (rotation.Type != JTokenType.Integer || rotation.Value<long>() != 0))
+                throw new JsonSerializationException("此元素类型不支持 Rotation；旋转仅用于文字、图片、二维码和一维条码。");
             BpElement element;
             switch (token.Value<int>("Type"))
             {
@@ -163,7 +243,14 @@ public sealed class TemplateLoader
                 case 10: element = new BpMatrixCodeElement(); break;
                 default: throw new JsonSerializationException("不支持的元素 Type。");
             }
-            using (var childReader = token.CreateReader()) serializer.Populate(childReader, element);
+            // Populate 会从局部 token 创建读取器，嵌套组的路径须加上当前元素的外层路径。
+            var previousPath = parentPath;
+            parentPath = elementPath;
+            try
+            {
+                using (var childReader = token.CreateReader()) serializer.Populate(childReader, element);
+            }
+            finally { parentPath = previousPath; }
             return element;
         }
         /// <inheritdoc />
@@ -176,7 +263,7 @@ public sealed class TemplateLoader
     private sealed class LimitedWriter : StringWriter
     {
         /// <summary>
-        /// 获取允许写入的字符数上限。
+        /// 保存允许写入的字符数上限。
         /// </summary>
         private readonly int limit;
         /// <summary>

@@ -7,6 +7,15 @@ namespace Bing.EasyPrint.CPCL;
 /// </summary>
 partial class CPCLPrintCommand
 {
+    internal CPCLPrintCommand DrawRasterImage(int x, int y, int width, int height, byte[] raster, bool compressed)
+    {
+        EnsureRestrictedRawProgramCanBeMixed();
+        var image = ImageComponent.CreateFromRaster(width, height, raster);
+        if (compressed) Content.Add(new BinaryImageMetadata { X = x, Y = y, Image = image });
+        else Content.Add(image.InitPosition(x, y));
+        return this;
+    }
+
     /// <summary>
     /// 将图片转换为 CPCL 二进制图形命令。
     /// </summary>
@@ -20,6 +29,7 @@ partial class CPCLPrintCommand
     /// </remarks>
     public CPCLPrintCommand DrawCompressedImage(int x, int y, Image bitmap, ImageProcessingOptions options = null)
     {
+        EnsureRestrictedRawProgramCanBeMixed();
         var image = ImageComponent.CreateFromImage(bitmap, options ?? new ImageProcessingOptions());
         Content.Add(new BinaryImageMetadata { X = x, Y = y, Image = image });
         return this;
