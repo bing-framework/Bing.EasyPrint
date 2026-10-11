@@ -6,6 +6,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DesignerHost.Tests</_Parameter1>
+    </AssemblyAttribute>
     <ProjectReference Include="../../src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj" />
     <Content Include="../../samples/Templates/label.json" Link="Samples/label.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../samples/Templates/receipt.json" Link="Samples/receipt.json" CopyToOutputDirectory="PreserveNewest" />
