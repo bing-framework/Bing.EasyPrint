@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { Grid2X2, Minus, Plus, Ruler } from '@lucide/vue'
-import type { BpTemplate, PreviewElement, PreviewPage, TemplateElement, TemplateResource } from '../model'
+import type { BpTemplate, PreviewElement, PreviewPage, RotationAngle, TemplateElement, TemplateResource } from '../model'
 import { dotsToMm, getAlignmentSnap, snapDeltaToGrid } from '../coordinates'
 import { findCell, findElement, findRow } from '../tree'
 
@@ -12,14 +12,16 @@ const props = defineProps<{
   selectedPaths?: string[]
   zoom: number
   unit: 'pt' | 'mm'
+  targetDpi: number
   source: 'service' | 'local'
+  pageContext?: string
   pageIndex: number
   pageCount: number
   resources: TemplateResource[]
   mode: 'select' | 'pan'
 }>()
 const emit = defineEmits<{
-  select: [path: string, additive?: boolean]
+  select: [path: string, additive?: boolean, occurrencePath?: string]
   move: [value: { path: string; dx: number; dy: number; rendered?: PreviewElement }]
   resize: [value: { path: string; width: number; height: number }]
   'update:zoom': [zoom: number]
@@ -32,8 +34,15 @@ const pageWidth = computed(() => props.page?.width || props.template.Width)
 const pageHeight = computed(() => props.page?.height || props.template.Height || 420)
 const stageWidth = computed(() => Math.ceil(pageWidth.value * scale.value))
 const stageHeight = computed(() => Math.ceil(pageHeight.value * scale.value))
-const elements = computed(() => (props.page?.elements ?? [])
-  .filter((element) => element.kind !== 'row' && element.kind !== 'cell' && element.type >= 1 && element.type <= 10))
+const elements = computed(() => {
+  const all = props.page?.elements ?? []
+  const groups = all.filter((element) => (element.kind === 'group' || element.kind === 'component') &&
+    !all.some((other) => other.type === 6 && other.sourcePath === element.sourcePath &&
+      other.instanceIndices?.join(',') === element.instanceIndices?.join(',')))
+    .map((element) => ({ ...element, type: 6 }))
+  return [...groups, ...all.filter((element) => element.kind !== 'row' && element.kind !== 'cell' &&
+    element.type >= 1 && element.type <= 10)]
+})
 const frames = computed(() => (props.page?.elements ?? []).filter((element) => element.kind === 'row' || element.kind === 'cell'))
 const borderSides = ['Top', 'Right', 'Bottom', 'Left'] as const
 const ticks = computed(() => Array.from({ length: Math.ceil(pageWidth.value / 40) + 1 }, (_, index) => index * 40).filter((value) => value <= pageWidth.value))
@@ -62,7 +71,7 @@ onBeforeUnmount(() => {
 })
 
 function nodeRect(element: PreviewElement) {
-  const selected = element.sourcePath === props.selectedPath || Boolean(props.selectedPaths?.includes(element.sourcePath))
+  const selected = selectionPath(element) === props.selectedPath || Boolean(props.selectedPaths?.includes(selectionPath(element)))
   const color = selected ? '#0a8792' : element.type === 1 ? '#315e64' : element.type === 2 ? '#9d6836' : element.type === 3 ? '#4f6e9e' : element.type === 4 ? '#587a5b' : '#79868a'
   return {
     x: element.x * scale.value,
@@ -77,17 +86,57 @@ function nodeRect(element: PreviewElement) {
   }
 }
 
+function contentDimensions(element: PreviewElement): { width: number; height: number } {
+  const rotation = element.rotation ?? 0
+  return rotation === 90 || rotation === 270
+    ? { width: element.height, height: element.width }
+    : { width: element.width, height: element.height }
+}
+
+function contentRotationConfig(element: PreviewElement) {
+  const frame = nodeRect(element)
+  const content = contentDimensions(element)
+  const rotation = (element.rotation ?? 0) as RotationAngle
+  return {
+    x: frame.width / 2,
+    y: frame.height / 2,
+    offsetX: content.width * scale.value / 2,
+    offsetY: content.height * scale.value / 2,
+    rotation,
+    listening: false,
+  }
+}
+
 type KonvaDragEvent = { target: { x: { (): number; (value: number): unknown }; y: { (): number; (value: number): unknown } } }
+
+function selectionPath(element: PreviewElement): string {
+  return element.definitionPath && element.componentInstancePath !== element.sourcePath
+    ? element.definitionPath : element.sourcePath
+}
+
+function elementDefinition(element: PreviewElement): TemplateElement | undefined {
+  for (const path of [element.definitionPath, element.sourcePath]) {
+    if (!path) continue
+    const definition = findElement(props.template, path)
+    if (definition) return definition
+  }
+  return undefined
+}
+
+function rectangleFilled(element: PreviewElement): boolean {
+  const definition = elementDefinition(element)
+  return definition?.Type === 7 && definition.Filled === true
+}
 
 function groupConfig(element: PreviewElement) {
   return {
     ...nodeRect(element),
     draggable: props.mode === 'select',
     listening: props.mode === 'select',
-    onClick: (event: { evt?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } }) => emit('select', element.sourcePath,
-      Boolean(event.evt?.ctrlKey || event.evt?.metaKey || event.evt?.shiftKey)),
-    onTap: () => emit('select', element.sourcePath),
-    onDragStart: () => emit('select', element.sourcePath),
+    onClick: (event: { evt?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } }) => emit('select', selectionPath(element),
+      Boolean(event.evt?.ctrlKey || event.evt?.metaKey || event.evt?.shiftKey), element.sourcePath),
+    onTap: () => emit('select', selectionPath(element), false, element.sourcePath),
+    onDragStart: () => emit('select', selectionPath(element), false, element.sourcePath),
     onDragMove: (event: KonvaDragEvent) => onDragMove(element, event),
     onDragEnd: (event: KonvaDragEvent) => onDragEnd(element, event),
   }
@@ -119,17 +168,22 @@ function onDragEnd(element: PreviewElement, event: KonvaDragEvent) {
     ? snapDeltaToGrid(definition?.StartCoordinate?.Y ?? element.y, rawDy)
     : Math.round(rawDy)
   guides.value = {}
-  if (dx || dy) emit('move', { path: element.sourcePath, dx, dy, rendered: element })
+  if (dx || dy) emit('move', { path: selectionPath(element), dx, dy, rendered: element })
 }
 
 function textConfig(element: PreviewElement) {
   const definition = findElement(props.template, element.sourcePath)
   const fontSize = definition?.Type === 1 ? (definition.FontSize || 24) : 14
+  const content = contentDimensions(element)
+  const frame = nodeRect(element)
   return {
-    x: 0,
-    y: 0,
-    width: Math.max(1, element.width * scale.value + 2),
-    height: Math.max(1, element.height * scale.value),
+    x: frame.width / 2,
+    y: frame.height / 2,
+    offsetX: content.width * scale.value / 2,
+    offsetY: content.height * scale.value / 2,
+    width: Math.max(1, content.width * scale.value + 2),
+    height: Math.max(1, content.height * scale.value),
+    rotation: (element.rotation ?? 0) as RotationAngle,
     text: element.text || (element.type === 1 ? '文字' : ''),
     fontSize: Math.max(8, fontSize * scale.value * 0.7),
     fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
@@ -158,7 +212,8 @@ function lineWidth(element: PreviewElement): number {
 }
 
 function strokeWidth(element: PreviewElement): number {
-  const definition = findElement(props.template, element.sourcePath)
+  if (rectangleFilled(element)) return 0
+  const definition = elementDefinition(element)
   return definition && 'LineWidth' in definition ? Math.max(1, (definition.LineWidth ?? 1) * scale.value) : 1
 }
 
@@ -190,6 +245,7 @@ function iconKind(element: PreviewElement) {
 }
 
 function resizable(element: PreviewElement) {
+  if (element.type === 6 && !findElement(props.template, element.sourcePath)?.StartCoordinate) return false
   return [2, 3, 4, 6, 7, 8, 9, 10].includes(element.type)
 }
 
@@ -207,7 +263,7 @@ function resizeConfig(element: PreviewElement) {
     onDragEnd: (event: { cancelBubble: boolean; target: { x: () => number; y: () => number } }) => {
       event.cancelBubble = true
       emit('resize', {
-        path: element.sourcePath,
+        path: selectionPath(element),
         width: Math.max(8, Math.round(event.target.x() / scale.value)),
         height: Math.max(8, Math.round(event.target.y() / scale.value)),
       })
@@ -224,6 +280,24 @@ function resourceImage(element: PreviewElement): HTMLImageElement | undefined {
   const key = element.resourceKey ?? element.text ?? ''
   const image = imageAssets.value[key]
   return image?.complete && image.naturalWidth > 0 ? image : undefined
+}
+
+function imageConfig(element: PreviewElement) {
+  const image = resourceImage(element)
+  const content = contentDimensions(element)
+  const definition = elementDefinition(element)
+  const crop = definition?.Type === 2 ? definition.Crop : undefined
+  const cropValid = Boolean(image && crop && crop.X >= 0 && crop.Y >= 0 && crop.Width > 0 && crop.Height > 0 &&
+    crop.X + crop.Width <= image.naturalWidth && crop.Y + crop.Height <= image.naturalHeight)
+  return {
+    x: 0,
+    y: 0,
+    width: content.width * scale.value,
+    height: content.height * scale.value,
+    image,
+    ...(cropValid ? { crop: { x: crop!.X, y: crop!.Y, width: crop!.Width, height: crop!.Height } } : {}),
+    listening: false,
+  }
 }
 
 function zoomBy(amount: number) {
@@ -268,7 +342,7 @@ function dropTool(event: DragEvent) {
 <template>
     <section class="canvas-workspace" title="拖动对象吸附至 4 点网格；选择对象后使用方向键微调，Shift + 方向键移动 10 点">
     <div class="canvas-header">
-      <div class="canvas-breadcrumb"><span>画布</span><span class="breadcrumb-sep">/</span><strong>{{ pageWidth }} × {{ pageHeight }} 点</strong><span class="dimension-conversion">{{ dotsToMm(pageWidth) }} × {{ dotsToMm(pageHeight) }} mm</span></div>
+      <div class="canvas-breadcrumb"><span>画布</span><span class="breadcrumb-sep">/</span><strong>{{ pageWidth }} × {{ pageHeight }} 点</strong><span class="dimension-conversion">{{ dotsToMm(pageWidth, targetDpi) }} × {{ dotsToMm(pageHeight, targetDpi) }} mm</span></div>
       <div class="canvas-controls">
         <span class="preview-source" :class="source"><i></i>{{ source === 'service' ? '引擎预览' : '本地近似' }}</span>
         <span class="control-divider"></span>
@@ -279,8 +353,8 @@ function dropTool(event: DragEvent) {
         <span class="canvas-unit"><Ruler :size="14" />{{ unit === 'pt' ? '打印点' : '毫米' }}</span>
       </div>
     </div>
-    <div class="ruler-label horizontal"><span v-for="tick in ticks" :key="tick" :style="{ left: `${tick * scale + 34}px` }">{{ unit === 'mm' ? dotsToMm(tick) : tick }}</span></div>
-    <div class="ruler-label vertical"><span v-for="tick in verticalTicks" :key="tick" :style="{ top: `${tick * scale + 34}px` }">{{ unit === 'mm' ? dotsToMm(tick) : tick }}</span></div>
+    <div class="ruler-label horizontal"><span v-for="tick in ticks" :key="tick" :style="{ left: `${tick * scale + 34}px` }">{{ unit === 'mm' ? dotsToMm(tick, targetDpi) : tick }}</span></div>
+    <div class="ruler-label vertical"><span v-for="tick in verticalTicks" :key="tick" :style="{ top: `${tick * scale + 34}px` }">{{ unit === 'mm' ? dotsToMm(tick, targetDpi) : tick }}</span></div>
     <div class="canvas-scroll" ref="stageHost" :class="{ 'pan-mode': mode === 'pan' }" @pointerdown="panDown" @pointermove="panMove" @pointerup="panUp" @pointercancel="panUp" @dragover.prevent @drop.prevent="dropTool">
       <div class="canvas-origin"><Ruler :size="13" /><span>{{ unit === 'mm' ? 'mm' : 'pt' }}</span></div>
       <div class="page-frame" ref="pageFrame" :style="{ width: `${stageWidth}px`, height: `${stageHeight}px` }">
@@ -299,7 +373,7 @@ function dropTool(event: DragEvent) {
                   dash: borderStyle(frame, side) === 2 ? [4, 3] : [], listening: false }" />
               </template>
             </template>
-            <v-group v-for="element in elements" :key="`${element.sourcePath}-${element.instanceIndices?.join('.') ?? ''}`" :config="groupConfig(element)">
+            <v-group v-for="(element, index) in elements" :key="`${element.sourcePath}-${element.componentInstancePath ?? ''}-${element.instanceIndices?.join('.') ?? ''}-${element.fragmentIndex ?? pageIndex}-${index}`" :config="groupConfig(element)">
               <template v-if="element.type === 1">
                 <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: nodeRect(element).fill, stroke: nodeRect(element).stroke, strokeWidth: nodeRect(element).strokeWidth, dash: nodeRect(element).dash, listening: false }" />
                 <v-text :config="textConfig(element)" />
@@ -308,7 +382,7 @@ function dropTool(event: DragEvent) {
                 <v-line :config="{ points: linePoints(element), stroke: '#73584c', strokeWidth: Math.max(1, lineWidth(element) * scale), lineCap: 'round', listening: false }" />
               </template>
               <template v-else-if="element.type === 7">
-                <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, stroke: '#53656a', strokeWidth: strokeWidth(element), listening: false }" />
+                <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: rectangleFilled(element) ? '#000000' : undefined, stroke: '#53656a', strokeWidth: strokeWidth(element), listening: false }" />
               </template>
               <template v-else-if="element.type === 8">
                 <v-ellipse :config="{ x: nodeRect(element).width / 2, y: nodeRect(element).height / 2, radiusX: nodeRect(element).width / 2, radiusY: nodeRect(element).height / 2, stroke: '#53656a', strokeWidth: strokeWidth(element), listening: false }" />
@@ -333,10 +407,15 @@ function dropTool(event: DragEvent) {
               </template>
               <template v-else-if="element.type === 4">
                 <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#fff', stroke: nodeRect(element).stroke, strokeWidth: 1, listening: false }" />
-                <v-line v-for="bar in 20" :key="bar" :config="{ points: [bar * nodeRect(element).width / 21, 5 * scale, bar * nodeRect(element).width / 21, Math.max(8 * scale, nodeRect(element).height - 5 * scale)], stroke: bar % 3 ? '#253b33' : '#83918a', strokeWidth: bar % 4 === 0 ? 2 * scale : 1 * scale, listening: false }" />
+                <v-group :config="contentRotationConfig(element)">
+                  <v-line v-for="bar in 20" :key="bar" :config="{ points: [bar * contentDimensions(element).width * scale / 21, 5 * scale, bar * contentDimensions(element).width * scale / 21, Math.max(8 * scale, contentDimensions(element).height * scale - 5 * scale)], stroke: bar % 3 ? '#253b33' : '#83918a', strokeWidth: bar % 4 === 0 ? 2 * scale : 1 * scale, listening: false }" />
+                </v-group>
               </template>
               <template v-else-if="element.type === 2">
-                <v-image v-if="resourceImage(element)" :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, image: resourceImage(element), listening: false }" />
+                <!-- 预览尺寸已经是旋转后的外框；图片本身保持原始宽高，仅在局部组内顺时针旋转。 -->
+                <v-group v-if="resourceImage(element)" :config="contentRotationConfig(element)">
+                  <v-image :config="imageConfig(element)" />
+                </v-group>
                 <template v-else>
                   <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#f4f1e9', stroke: nodeRect(element).stroke, strokeWidth: 1, dash: [4, 3], listening: false }" />
                   <v-text :config="{ ...textConfig(element), text: previewLabel(element), fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#805d35' }" />
@@ -347,8 +426,8 @@ function dropTool(event: DragEvent) {
                 <v-text :config="{ ...textConfig(element), text: previewLabel(element), fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#805d35' }" />
               </template>
               <v-rect :config="{ x: -4, y: -4, width: Math.max(12, nodeRect(element).width + 8), height: Math.max(12, nodeRect(element).height + 8), fill: '#ffffff', opacity: 0.001, listening: true, perfectDrawEnabled: false }" />
-              <v-rect v-if="selectedPath === element.sourcePath || selectedPaths?.includes(element.sourcePath)" :config="{ x: -3, y: -3, width: nodeRect(element).width + 6, height: nodeRect(element).height + 6, stroke: '#0a8792', strokeWidth: 1, dash: [3, 2], listening: false }" />
-              <v-circle v-if="selectedPath === element.sourcePath && resizable(element) && mode === 'select'" :config="resizeConfig(element)" />
+              <v-rect v-if="selectedPath === selectionPath(element) || selectedPaths?.includes(selectionPath(element))" :config="{ x: -3, y: -3, width: nodeRect(element).width + 6, height: nodeRect(element).height + 6, stroke: '#0a8792', strokeWidth: 1, dash: [3, 2], listening: false }" />
+              <v-circle v-if="selectedPath === selectionPath(element) && resizable(element) && mode === 'select'" :config="resizeConfig(element)" />
             </v-group>
             <v-line v-if="guides.x !== undefined" :config="{ name: 'alignment-guide-x', points: [guides.x * scale, 0, guides.x * scale, stageHeight], stroke: '#d0814f', strokeWidth: 1, dash: [4, 3], listening: false }" />
             <v-line v-if="guides.y !== undefined" :config="{ name: 'alignment-guide-y', points: [0, guides.y * scale, stageWidth, guides.y * scale], stroke: '#d0814f', strokeWidth: 1, dash: [4, 3], listening: false }" />
@@ -363,6 +442,7 @@ function dropTool(event: DragEvent) {
         <span>{{ pageIndex + 1 }} / {{ pageCount }}</span>
         <button class="icon-button" type="button" :disabled="pageIndex >= pageCount - 1" title="下一页" @click="emit('page-change', pageIndex + 1)">›</button>
       </div>
+      <span v-if="pageContext" class="canvas-footer-note">{{ pageContext }}</span>
       <span v-else class="canvas-footer-note">拖动对象调整位置 · 单位以打印点保存</span>
     </footer>
   </section>

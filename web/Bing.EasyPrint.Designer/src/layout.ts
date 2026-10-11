@@ -1,5 +1,6 @@
 import { conditionMatches, resolvePath, valueForField, type BindingContext } from './binding'
-import type { BpTemplate, PreviewElement, Row, TemplateElement } from './model'
+import { barcodeAutoOccupiedSize, quietZoneHorizontalExtent, quietZoneVerticalExtent } from './coordinates'
+import type { BpTemplate, PreviewElement, RotationAngle, Row, TemplateElement } from './model'
 
 export type LocalLayout = { pages: Array<{ width: number; height: number; elements: PreviewElement[] }>; errors: Array<{ sourcePath: string; message: string }> }
 
@@ -18,24 +19,65 @@ function safeCondition(rowOrElement: { Condition?: Row['Condition'] }, ctx: Layo
   catch (error) { errors.push({ sourcePath: path, message: error instanceof Error ? error.message : '条件预览失败。' }); return true }
 }
 
+function rotationOf(element: TemplateElement): RotationAngle {
+  return element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4 ? element.Rotation ?? 0 : 0
+}
+
+function occupiedSize(width: number, height: number, rotation: RotationAngle): { width: number; height: number } {
+  return rotation === 90 || rotation === 270 ? { width: height, height: width } : { width, height }
+}
+
 function dimension(element: TemplateElement, cellWidth: number, text: string): { width: number; height: number } {
   const start = element.StartCoordinate ?? { X: 0, Y: 0 }
   const end = element.EndCoordinate
   if (element.Type === 1) {
+    // EndCoordinate 保存的是旋转后的占位框；已有端点时直接使用，不能再次交换宽高。
+    if (end) return { width: Math.max(1, end.X - start.X), height: Math.max(1, end.Y - start.Y) }
     const size = (element.FontSize || 24)
     const characters = [...text].length
     const estimated = Math.ceil(characters * size * 0.72)
-    const width = end ? Math.max(1, end.X - start.X) : Math.max(size, cellWidth - start.X)
+    const width = element.Width !== undefined && element.Width > 0
+      ? element.Width
+      : Math.max(size, cellWidth - start.X)
     const lineCount = element.Field?.NeedFeedLine === false ? 1 : Math.max(1, Math.ceil(estimated / Math.max(width, 1)))
-    return { width, height: end ? Math.max(1, end.Y - start.Y) : lineCount * (size + 2) }
+    return occupiedSize(width, lineCount * (size + 2), rotationOf(element))
   }
   if (element.Type === 5) {
     const endPoint = element.LineEndCoordinate ?? end ?? start
     return { width: Math.abs(endPoint.X - start.X) + (element.LineWidth || 1), height: Math.abs(endPoint.Y - start.Y) + (element.LineWidth || 1) }
   }
+  if (element.Type === 4 && end)
+    return { width: Math.max(1, end.X - start.X), height: Math.max(1, end.Y - start.Y) }
   const width = element.Type === 9 ? element.Size : element.Width
   const height = element.Type === 9 ? element.Size : element.Height
-  return { width: width || (end ? end.X - start.X : 112), height: height || (end ? end.Y - start.Y : 112) }
+  const widthMissing = !width || width <= 0
+  const heightMissing = !height || height <= 0
+  const fallbackWidth = width || (end ? end.X - start.X : 112)
+  const fallbackHeight = height || (end ? end.Y - start.Y : 112)
+  if (element.Type === 2 && end && (widthMissing || heightMissing)) {
+    // 图片的 EndCoordinate 是旋转后的外占位；缺少原始宽高时先还原资源尺寸，
+    // 避免 90/270 度在离线布局中再次交换轴。
+    const occupiedWidth = Math.max(1, end.X - start.X)
+    const occupiedHeight = Math.max(1, end.Y - start.Y)
+    const quarterTurn = rotationOf(element) === 90 || rotationOf(element) === 270
+    const rawWidth = widthMissing ? (quarterTurn ? occupiedHeight : occupiedWidth) : fallbackWidth
+    const rawHeight = heightMissing ? (quarterTurn ? occupiedWidth : occupiedHeight) : fallbackHeight
+    return occupiedSize(rawWidth, rawHeight, rotationOf(element))
+  }
+  if (element.Type === 3) {
+    // EndCoordinate 是既有外占位时直接沿用；没有端点的自动尺寸才在编码体估算上追加显式静区。
+    const widthWithQuiet = widthMissing && !end ? fallbackWidth + quietZoneHorizontalExtent(element.QuietZone) : fallbackWidth
+    const heightWithQuiet = heightMissing && !end ? fallbackHeight + quietZoneVerticalExtent(element.QuietZone) : fallbackHeight
+    return { width: widthWithQuiet, height: heightWithQuiet }
+  }
+  if (element.Type === 4)
+    return barcodeAutoOccupiedSize(fallbackWidth, fallbackHeight, element.HumanReadableReserveHeight || 0,
+      rotationOf(element), element.QuietZone, !widthMissing, {
+        barcodeType: element.BarcodeType,
+        lineWidth: element.LineWidth,
+        narrowModuleWidth: element.NarrowModuleWidth,
+      })
+  return occupiedSize(fallbackWidth, fallbackHeight, rotationOf(element))
 }
 
 export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayout {
@@ -56,7 +98,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
       const childX = x + start.X + (child.Margin?.Left ?? 0)
       const childY = y + start.Y + (child.Margin?.Top ?? 0)
       elements.push({ sourcePath: childPath, instanceIndices: [...ctx.instanceIndices], type: child.Type,
-        x: childX, y: childY, width: box.width, height: box.height,
+        rotation: rotationOf(child), x: childX, y: childY, width: box.width, height: box.height,
         text: child.Type === 1 || child.Type === 3 || child.Type === 4 || child.Type === 10 ? display : undefined,
         resourceKey: child.Type === 2 ? display : undefined })
       if (child.Type === 6) appendGroupChildren(child, childPath, childX, childY, ctx, depth + 1)
@@ -109,6 +151,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
           sourcePath: node.path,
           instanceIndices: [...node.context.instanceIndices],
           type: node.element.Type,
+          rotation: rotationOf(node.element),
           x: offsetX + start.X + left,
           y: y + start.Y + top,
           width: box.width,

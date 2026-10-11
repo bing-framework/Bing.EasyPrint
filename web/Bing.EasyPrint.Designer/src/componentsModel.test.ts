@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { appendComponent, appendDataTable, appendStaticTable, detachComponent, groupCellElements, removeComponent, renameComponent, saveGroupComponent, ungroupElement } from './componentsModel'
+import { appendComponent, appendDataTable, appendStaticTable, componentLibraryTargetVersion, defaultGroupPagination, detachComponent, groupCellElements, groupConsecutiveRows, removeComponent, renameComponent, saveGroupComponent, ungroupElement } from './componentsModel'
 import { resolvePath } from './binding'
-import { findElement, listTemplateTree } from './tree'
-import type { BpTemplate } from './model'
+import { findElement, findRow, listTemplateTree } from './tree'
+import { assertTemplate, type BpTemplate } from './model'
 
 function template(): BpTemplate {
   return { Version: 1, Width: 300, Height: 180, Rows: [{ Height: 180, Cells: [{ Width: 300, Elements: [
@@ -27,7 +27,64 @@ describe('V2 composition', () => {
     expect(findElement(value, `${groupPath}.Elements[0]`)?.Type).toBe(1)
     const second = appendComponent(value, 'Rows[0].Cells[0]', 'badge')
     expect(findElement(value, second)?.Type).toBe(6)
-    expect(listTemplateTree(value).filter((entry) => entry.kind === 'element')).toHaveLength(6)
+    expect(listTemplateTree(value).filter((entry) => entry.kind === 'element')).toHaveLength(8)
+  })
+
+  it('keeps V3 context and declares supplied parameters when saving a group component', () => {
+    const value = template()
+    const path = groupCellElements(value, 'Rows[0].Cells[0]', [0])
+    const group = findElement(value, path)
+    if (group?.Type !== 6) throw new Error('组合不存在。')
+    group.DataPath = 'Product'
+    group.Parameters = { caption: { Path: 'Name' } }
+    group.Elements![0].Field = { Name: '$param.caption' }
+    saveGroupComponent(value, path, 'productName')
+
+    expect(value.Version).toBe(3)
+    expect(group).toMatchObject({ ComponentId: 'productName', Parameters: { caption: { Path: 'Name' } } })
+    expect(value.Components?.[0].Parameters).toEqual({ caption: { Required: true } })
+  })
+
+  it('initializes inserted component instances with defaults and explicit required values', () => {
+    const value = template()
+    value.Version = 3
+    value.Components = [{ Id: 'badge', Width: 100, Height: 40, Elements: [], Parameters: {
+      currency: { Required: true }, unit: { Required: true, DefaultValue: 'kg' }, optional: { DefaultValue: 'x' },
+    } }]
+    const path = appendComponent(value, 'Rows[0].Cells[0]', 'badge')
+    const instance = findElement(value, path)
+    expect(instance?.Type).toBe(6)
+    expect(instance).toMatchObject({ Parameters: {
+      currency: { Value: '' }, unit: { Value: 'kg' }, optional: { Value: 'x' },
+    } })
+    expect(() => assertTemplate(value)).not.toThrow()
+  })
+
+  it('rejects inserting a component that would create a definition cycle', () => {
+    const value: BpTemplate = {
+      Version: 3,
+      Width: 200,
+      Height: 120,
+      Rows: [],
+      Components: [
+        { Id: 'outer', Width: 160, Height: 60, Rows: [{ Cells: [{ Elements: [] }] }] },
+        { Id: 'inner', Width: 160, Height: 60, Elements: [{ Type: 6, ComponentId: 'outer' }] },
+      ],
+    }
+
+    expect(() => appendComponent(value, 'Components[0].Rows[0].Cells[0]', 'inner')).toThrow('循环引用')
+  })
+
+  it('upgrades imported component libraries for declared and nested V3 features', () => {
+    const automatic = [{ Id: 'automatic', Width: 0, Height: 0, Elements: [] }]
+    const automaticVersion = componentLibraryTargetVersion(1, 3, automatic)
+    expect(automaticVersion).toBe(3)
+    expect(() => assertTemplate({ Version: automaticVersion, Width: 100, Height: 100, Rows: [], Components: automatic })).not.toThrow()
+
+    const nested = [{ Id: 'nested', Width: 100, Height: 60,
+      Elements: [{ Type: 6 as const, DataPath: 'Product', Rows: [] }] }]
+    expect(componentLibraryTargetVersion(1, 2, nested)).toBe(3)
+    expect(componentLibraryTargetVersion(1, 2, [{ Id: 'legacy', Width: 100, Height: 60, Elements: [] }])).toBe(2)
   })
 
   it('creates repeatable and pasted tables as editable rows', () => {
@@ -56,7 +113,7 @@ describe('V2 composition', () => {
     expect(detached?.Type).toBe(6)
     if (detached?.Type !== 6) return
     detached.Elements![0].StartCoordinate!.X = 12
-    expect(value.Components![0].Elements[0].StartCoordinate?.X).toBe(0)
+    expect(value.Components![0].Elements![0].StartCoordinate?.X).toBe(0)
     renameComponent(value, 'badge', 'renamed')
     expect(() => removeComponent(value, 'renamed')).toThrow('仍被模板引用')
     ungroupElement(value, path)
@@ -122,6 +179,18 @@ describe('V2 composition', () => {
     expect(children[1].Margin?.Bottom).toBe(32)
   })
 
+  it('refuses to ungroup a context-bound component without mutating the template', () => {
+    const value: BpTemplate = { Version: 3, Width: 200, Height: 100, Rows: [{ Cells: [{ Elements: [
+      { Type: 6, Width: 100, Height: 40, StartCoordinate: { X: 10, Y: 12 }, DataPath: 'Product',
+        Parameters: { caption: { Path: 'Name' } },
+        Elements: [{ Type: 1, Field: { Name: '$param.caption' }, StartCoordinate: { X: 0, Y: 0 } }] },
+    ] }] }] }
+    const before = JSON.stringify(value)
+
+    expect(() => ungroupElement(value, 'Rows[0].Cells[0].Elements[0]')).toThrow('无法安全拆组')
+    expect(JSON.stringify(value)).toBe(before)
+  })
+
   it('retains the original available width when grouping centered automatic text', () => {
     const value: BpTemplate = { Version: 2, Width: 200, Height: 100, Rows: [{ Cells: [{ Width: 200,
       Elements: [{ Type: 1, FontSize: 24, TextAlignment: 1, Field: { Value: 'ONE' } },
@@ -177,5 +246,53 @@ describe('V2 composition', () => {
     const child = value.Rows[0].Cells![0].Elements![0]
     expect(child.StartCoordinate).toEqual({ X: 0, Y: 24 })
     expect(child.Margin?.Bottom).toBe(76)
+  })
+})
+
+describe('V3 flowing composition', () => {
+  it('groups adjacent table rows and keeps row content after detach', () => {
+    const value = template()
+    appendDataTable(value, 'Items', [{ title: 'Name', path: 'Name' }])
+    const path = groupConsecutiveRows(value, [1, 2])
+    expect(value.Version).toBe(3)
+    expect(findElement(value, path)?.Type).toBe(6)
+    expect(findRow(value, `${path}.Rows[1]`)?.RepeatSource).toBe('Items')
+    saveGroupComponent(value, path, 'itemsTable')
+    const copy = appendComponent(value, 'Rows[0].Cells[0]', 'itemsTable')
+    expect(findRow(value, `${copy}.Rows[1]`)?.RepeatSource).toBe('Items')
+    renameComponent(value, 'itemsTable', 'productsTable')
+    expect(findElement(value, copy)).toMatchObject({ ComponentId: 'productsTable' })
+    detachComponent(value, copy)
+    expect(findElement(value, copy)).toMatchObject({ Pagination: 'Split' })
+    const detached = findElement(value, copy)
+    if (detached?.Type !== 6) throw new Error('流式组合不存在。')
+    expect(detached.ComponentId).toBeUndefined()
+    expect(findRow(value, `${copy}.Rows[1]`)?.RepeatSource).toBe('Items')
+    expect(() => removeComponent(value, 'productsTable')).toThrow('仍被模板引用')
+  })
+
+  it('does not mutate an instance when detach fails on a missing required parameter', () => {
+    const value = template()
+    value.Version = 3
+    value.Components = [{ Id: 'pricedItem', Width: 120, Height: 80,
+      Elements: [{ Type: 1, Field: { Value: 'Price' } }], Parameters: { currency: { Required: true } } }]
+    value.Rows[0].Cells![0].Elements![0] = { Type: 6, ComponentId: 'pricedItem', Width: 0, Height: 0 }
+    const before = JSON.stringify(value)
+
+    expect(() => detachComponent(value, 'Rows[0].Cells[0].Elements[0]')).toThrow('缺少组件参数：currency')
+    expect(JSON.stringify(value)).toBe(before)
+  })
+
+  it('derives split pagination from inline or referenced row content', () => {
+    const value = template()
+    value.Version = 3
+    value.Components = [
+      { Id: 'table', Width: 120, Height: 0, Rows: [{ Cells: [] }] },
+      { Id: 'badge', Width: 120, Height: 80, Elements: [] },
+    ]
+    expect(defaultGroupPagination(value, { Type: 6, ComponentId: 'table' })).toBe('Split')
+    expect(defaultGroupPagination(value, { Type: 6, Rows: [] })).toBe('Split')
+    expect(defaultGroupPagination(value, { Type: 6, ComponentId: 'badge' })).toBe('KeepTogether')
+    expect(defaultGroupPagination(value, { Type: 6, ComponentId: 'table', Pagination: 'KeepTogether' })).toBe('KeepTogether')
   })
 })

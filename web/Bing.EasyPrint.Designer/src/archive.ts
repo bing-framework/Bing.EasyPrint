@@ -1,12 +1,176 @@
 import JSZip from 'jszip'
-import { assertTemplate, type BpTemplate, type TemplateResource } from './model'
+import { assertTemplate, cloneTemplate, type BpTemplate, type TemplateElement, type TemplateResource } from './model'
+import { validateDesignerOutputSettings, type DesignerOutputSettings } from './designerProject'
 
 export const MAX_TEMPLATE_JSON_BYTES = 1024 * 1024
 export const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
 export const MAX_EXPANDED_BYTES = 32 * 1024 * 1024
 const MAX_ARCHIVE_ENTRIES = 100
 
-type Manifest = { format: 'Bing.EasyPrint.TemplateBundle'; version: 1; resources: Array<{ key: string; path: string; fileName: string; mimeType: string }> }
+type Manifest = {
+  format: 'Bing.EasyPrint.TemplateBundle'
+  version: 1
+  resources: Array<{ key: string; path: string; fileName: string; mimeType: string }>
+  outputSettings?: unknown
+}
+
+type ComponentDefinition = NonNullable<BpTemplate['Components']>[number]
+type ResourceSelection = { keys: Set<string>; dynamic: boolean }
+type ResourceTraversal = {
+  visitedObjects: Set<object>
+  activeObjects: Set<object>
+  visitedDefinitions: Set<string>
+  activeDefinitions: Set<string>
+}
+
+function collectElementResources(elements: TemplateElement[] | undefined, selection: ResourceSelection,
+  components: Map<string, ComponentDefinition>, traversal: ResourceTraversal): void {
+  if (!Array.isArray(elements)) return
+  for (const element of elements) {
+    if (!element || typeof element !== 'object') continue
+    if (traversal.activeObjects.has(element)) throw new Error('模板存在循环引用。')
+    if (traversal.visitedObjects.has(element)) continue
+    traversal.visitedObjects.add(element)
+    traversal.activeObjects.add(element)
+    try {
+      if (element.Type === 2) {
+        if (element.Field?.Name) selection.dynamic = true
+        else if (element.Field?.Value) selection.keys.add(element.Field.Value)
+      }
+      if (element.Type !== 6) continue
+      if (element.ComponentId) {
+        const definition = components.get(element.ComponentId)
+        if (definition) {
+          if (traversal.activeDefinitions.has(definition.Id)) throw new Error(`组件存在循环引用：${definition.Id}`)
+          if (!traversal.visitedDefinitions.has(definition.Id)) {
+            traversal.visitedDefinitions.add(definition.Id)
+            traversal.activeDefinitions.add(definition.Id)
+            try {
+              collectElementResources(definition.Elements, selection, components, traversal)
+              collectRowResources(definition.Rows, selection, components, traversal)
+            } finally {
+              traversal.activeDefinitions.delete(definition.Id)
+            }
+          }
+        }
+        continue
+      }
+      collectElementResources(element.Elements, selection, components, traversal)
+      collectRowResources(element.Rows, selection, components, traversal)
+    } finally {
+      traversal.activeObjects.delete(element)
+    }
+  }
+}
+
+function collectRowResources(rows: BpTemplate['Rows'] | undefined, selection: ResourceSelection,
+  components: Map<string, ComponentDefinition>, traversal: ResourceTraversal): void {
+  if (!Array.isArray(rows)) return
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    if (traversal.activeObjects.has(row)) throw new Error('模板存在循环引用。')
+    if (traversal.visitedObjects.has(row)) continue
+    traversal.visitedObjects.add(row)
+    traversal.activeObjects.add(row)
+    try {
+      for (const cell of row.Cells ?? []) {
+        if (!cell || typeof cell !== 'object') continue
+        if (traversal.activeObjects.has(cell)) throw new Error('模板存在循环引用。')
+        if (traversal.visitedObjects.has(cell)) continue
+        traversal.visitedObjects.add(cell)
+        traversal.activeObjects.add(cell)
+        try {
+          collectElementResources(cell.Elements, selection, components, traversal)
+          collectRowResources(cell.Rows, selection, components, traversal)
+        } finally {
+          traversal.activeObjects.delete(cell)
+        }
+      }
+    } finally {
+      traversal.activeObjects.delete(row)
+    }
+  }
+}
+
+function componentClosure(template: BpTemplate, roots: string[]): Set<string> {
+  const definitions = new Map((template.Components ?? []).map((definition) => [definition.Id, definition] as const))
+  const included = new Set<string>()
+  const visit = (id: string): void => {
+    if (included.has(id)) return
+    const definition = definitions.get(id)
+    if (!definition) throw new Error(`组件不存在：${id}`)
+    included.add(id)
+    const inspect = (elements: TemplateElement[] | undefined) => {
+      for (const element of elements ?? []) if (element.Type === 6 && element.ComponentId) visit(element.ComponentId)
+      for (const element of elements ?? []) if (element.Type === 6 && !element.ComponentId) {
+        inspect(element.Elements)
+        inspectRows(element.Rows)
+      }
+    }
+    const inspectRows = (rows: BpTemplate['Rows'] | undefined) => {
+      for (const row of rows ?? []) for (const cell of row.Cells ?? []) {
+        inspect(cell.Elements)
+        inspectRows(cell.Rows)
+      }
+    }
+    inspect(definition.Elements)
+    inspectRows(definition.Rows)
+  }
+  for (const root of roots) visit(root)
+  return included
+}
+
+/** 创建只包含指定组件及其传递依赖的组件库模板。未指定根组件时保留全部定义。 */
+export function createComponentTemplate(template: BpTemplate, rootId?: string): BpTemplate {
+  assertTemplate(template)
+  const roots = rootId ? [rootId] : (template.Components ?? []).map((definition) => definition.Id)
+  const included = componentClosure(template, roots)
+  const components = (template.Components ?? [])
+    .filter((definition) => included.has(definition.Id))
+    .map((definition) => cloneTemplate(definition))
+  return {
+    Version: componentLibraryVersion(components),
+    Width: template.Width,
+    Height: template.Height,
+    Rows: [],
+    Components: components,
+  }
+}
+
+function componentLibraryVersion(components: ComponentDefinition[]): 2 | 3 {
+  const containsV3Fields = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(containsV3Fields)
+    if (!value || typeof value !== 'object') return false
+    const node = value as Record<string, unknown>
+    if (node.Type === 6 && ['Rows', 'DataPath', 'Parameters', 'Pagination'].some((key) => key in node)) return true
+    return ['Elements', 'Rows', 'Cells'].some((key) => key in node && containsV3Fields(node[key]))
+  }
+  return components.some((component) => component.Width === undefined || component.Width <= 0 ||
+    component.Height === undefined || component.Height <= 0 || component.Rows !== undefined ||
+    component.Parameters !== undefined || containsV3Fields(component.Elements)) ? 3 : 2
+}
+
+/** 收集模板及所有组件定义中的图片资源键。动态图片绑定会返回 dynamic=true。 */
+export function collectResourceKeys(template: BpTemplate): ResourceSelection {
+  const components = new Map((template.Components ?? []).map((definition) => [definition.Id, definition] as const))
+  const selection: ResourceSelection = { keys: new Set<string>(), dynamic: false }
+  const traversal: ResourceTraversal = {
+    visitedObjects: new Set(), activeObjects: new Set(), visitedDefinitions: new Set(), activeDefinitions: new Set(),
+  }
+  collectRowResources(template.Rows, selection, components, traversal)
+  for (const definition of template.Components ?? []) {
+    if (!definition || traversal.visitedDefinitions.has(definition.Id)) continue
+    traversal.visitedDefinitions.add(definition.Id)
+    traversal.activeDefinitions.add(definition.Id)
+    try {
+      collectElementResources(definition.Elements, selection, components, traversal)
+      collectRowResources(definition.Rows, selection, components, traversal)
+    } finally {
+      traversal.activeDefinitions.delete(definition.Id)
+    }
+  }
+  return selection
+}
 
 function bytesFromDataUrl(dataUrl: string): Uint8Array {
   const separator = dataUrl.indexOf(',')
@@ -39,17 +203,23 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 100) || 'resource.bin'
 }
 
-export async function exportTemplateBundle(template: BpTemplate, resources: TemplateResource[]): Promise<Blob> {
+export async function exportTemplateBundle(template: BpTemplate, resources: TemplateResource[], outputSettings?: DesignerOutputSettings): Promise<Blob> {
   assertTemplate(template)
-  if (resources.length + 2 > MAX_ARCHIVE_ENTRIES) throw new Error('模板资源数量超过限制。')
+  const validatedOutputSettings = outputSettings === undefined ? undefined : validateDesignerOutputSettings(outputSettings)
+  const selection = collectResourceKeys(template)
+  const exportedResources = selection.dynamic ? resources : resources.filter((resource) => selection.keys.has(resource.key))
+  if (exportedResources.length + 2 > MAX_ARCHIVE_ENTRIES) throw new Error('模板资源数量超过限制。')
   const templateText = JSON.stringify(template, null, 2)
   const templateBytes = new TextEncoder().encode(templateText)
   if (templateBytes.byteLength > MAX_TEMPLATE_JSON_BYTES) throw new Error('模板 JSON 超过 1 MiB 上限。')
   const zip = new JSZip()
   zip.file('template.json', templateBytes)
-  const manifest: Manifest = { format: 'Bing.EasyPrint.TemplateBundle', version: 1, resources: [] }
+  const manifest: Manifest = {
+    format: 'Bing.EasyPrint.TemplateBundle', version: 1, resources: [],
+    ...(validatedOutputSettings === undefined ? {} : { outputSettings: validatedOutputSettings }),
+  }
   let expandedSize = templateBytes.byteLength
-  for (const [index, resource] of resources.entries()) {
+  for (const [index, resource] of exportedResources.entries()) {
     if (!resource.key || resource.key.length > 256 || /[\u0000-\u001f]/.test(resource.key)) throw new Error('图片资源键无效。')
     if (!resource.mimeType.startsWith('image/')) throw new Error('模板包仅接受图片资源。')
     const path = `resources/${String(index + 1).padStart(3, '0')}-${sanitizeFileName(resource.fileName)}`
@@ -69,7 +239,7 @@ export async function exportTemplateBundle(template: BpTemplate, resources: Temp
   return blob
 }
 
-export async function importTemplateBundle(file: File): Promise<{ template: BpTemplate; resources: TemplateResource[] }> {
+export async function importTemplateBundle(file: File): Promise<{ template: BpTemplate; resources: TemplateResource[]; outputSettings?: DesignerOutputSettings }> {
   if (file.size > MAX_ARCHIVE_BYTES) throw new Error('模板包超过 20 MiB 上限。')
   const zip = await JSZip.loadAsync(file, { checkCRC32: false, createFolders: false })
   const entries = Object.values(zip.files).filter((entry) => !entry.dir)
@@ -107,6 +277,7 @@ export async function importTemplateBundle(file: File): Promise<{ template: BpTe
   const manifestBytes = await readBytes(manifestEntry)
   const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as Partial<Manifest>
   if (manifest.format !== 'Bing.EasyPrint.TemplateBundle' || manifest.version !== 1 || !Array.isArray(manifest.resources)) throw new Error('模板包清单版本不受支持。')
+  const outputSettings = manifest.outputSettings === undefined ? undefined : validateDesignerOutputSettings(manifest.outputSettings)
   if (manifest.resources.length + 2 > MAX_ARCHIVE_ENTRIES) throw new Error('模板资源数量超过限制。')
   const resources: TemplateResource[] = []
   const usedPaths = new Set(['template.json', 'manifest.json'])
@@ -125,7 +296,7 @@ export async function importTemplateBundle(file: File): Promise<{ template: BpTe
     resources.push({ key: item.key, fileName: item.fileName, mimeType: item.mimeType, dataUrl: dataUrlFromBytes(bytes, item.mimeType) })
   }
   if (entries.some((entry) => !usedPaths.has(entry.name))) throw new Error('模板包包含未列入清单的文件。')
-  return { template: templateValue, resources }
+  return { template: templateValue, resources, ...(outputSettings === undefined ? {} : { outputSettings }) }
 }
 
 export function resourceForImage(key: string, file: File): Promise<TemplateResource> {

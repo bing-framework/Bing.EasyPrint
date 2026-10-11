@@ -1,12 +1,48 @@
 import { translateElement } from './coordinates'
-import type { BpTemplate, Cell, Row, TemplateElement } from './model'
+import type { BpTemplate, Cell, ComponentDefinition, Row, TemplateElement } from './model'
 import { cloneTemplate } from './model'
 import { findCell, findElement } from './tree'
+import { walkTemplateNodes } from './templateTraversal'
 
 export function enableV2(template: BpTemplate): void {
-  template.Version = 2
+  if (template.Version < 2) template.Version = 2
   template.Variables ??= {}
   template.Components ??= []
+}
+
+export function enableV3(template: BpTemplate): void {
+  enableV2(template)
+  template.Version = 3
+}
+
+export function componentLibraryTargetVersion(currentVersion: BpTemplate['Version'], _libraryVersion: number | undefined,
+  components: ComponentDefinition[]): BpTemplate['Version'] {
+  const usesV3Fields = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(usesV3Fields)
+    if (!value || typeof value !== 'object') return false
+    const node = value as Record<string, unknown>
+    if (node.Type === 6 && ['Rows', 'DataPath', 'Parameters', 'Pagination'].some((key) => key in node)) return true
+    return ['Elements', 'Rows', 'Cells'].some((key) => key in node && usesV3Fields(node[key]))
+  }
+  const requiresV3 = components.some((component) =>
+    component.Width === undefined || component.Width <= 0 || component.Height === undefined || component.Height <= 0 ||
+    component.Rows !== undefined || component.Parameters !== undefined || usesV3Fields(component.Elements))
+  return Math.max(currentVersion, requiresV3 ? 3 : 2) as BpTemplate['Version']
+}
+
+export function groupConsecutiveRows(template: BpTemplate, indices: number[]): string {
+  const selected = [...new Set(indices)].sort((left, right) => left - right)
+  if (!selected.length || selected.some((index, position) => index < 0 || index >= template.Rows.length ||
+    position > 0 && index !== selected[position - 1] + 1))
+    throw new Error('请选择连续的顶层行。')
+  const rows = selected.map((index) => template.Rows[index])
+  if (rows.some((row) => row.IsHeader || row.Section && row.Section !== 'Body' && row.Section !== 'TableHeader'))
+    throw new Error('页面页眉、页脚和文档分区不能移入流式组合。')
+  if (rows.at(-1)?.Section === 'TableHeader') throw new Error('表格表头必须连同明细一起组合。')
+  enableV3(template)
+  const group: TemplateElement = { Type: 6, Rows: cloneTemplate(rows), Pagination: 'Split' }
+  template.Rows.splice(selected[0], selected.length, { Cells: [{ Elements: [group] }] })
+  return `Rows[${selected[0]}].Cells[0].Elements[0]`
 }
 
 export type ElementBounds = { left: number; top: number; right: number; bottom: number }
@@ -90,10 +126,33 @@ export function detachComponent(template: BpTemplate, elementPath: string): void
   if (element?.Type !== 6 || !element.ComponentId) throw new Error('请选择组件实例。')
   const definition = template.Components?.find((item) => item.Id === element.ComponentId)
   if (!definition) throw new Error('组件定义不存在。')
+
+  const rows = definition.Rows ? cloneTemplate(definition.Rows) : undefined
+  const elements = definition.Rows ? undefined : Array.isArray(definition.Elements)
+    ? cloneTemplate(definition.Elements) : undefined
+  if (!definition.Rows && !elements) throw new Error('组件定义缺少可解除引用的内容。')
+
+  const parameters: NonNullable<typeof element.Parameters> = {}
+  if (definition.Parameters) {
+    for (const [name, parameter] of Object.entries(definition.Parameters)) {
+      if (element.Parameters?.[name]) continue
+      if ('DefaultValue' in parameter) parameters[name] = { Value: cloneTemplate(parameter.DefaultValue) }
+      else if (parameter.Required) throw new Error(`缺少组件参数：${name}`)
+    }
+  }
+
   if (!element.Width) element.Width = definition.Width
   if (!element.Height) element.Height = definition.Height
-  element.Elements = cloneTemplate(definition.Elements)
+  if (rows) element.Rows = rows
+  else element.Elements = elements
+  if (Object.keys(parameters).length) element.Parameters = { ...element.Parameters, ...parameters }
   delete element.ComponentId
+}
+
+export function defaultGroupPagination(template: BpTemplate, group: Extract<TemplateElement, { Type: 6 }>): 'KeepTogether' | 'Split' {
+  if (group.Pagination) return group.Pagination
+  const definition = group.ComponentId ? template.Components?.find((item) => item.Id === group.ComponentId) : undefined
+  return group.Rows || definition?.Rows ? 'Split' : 'KeepTogether'
 }
 
 export function ungroupElement(template: BpTemplate, elementPath: string, measured?: Map<number, ElementBounds>,
@@ -108,6 +167,10 @@ export function ungroupElement(template: BpTemplate, elementPath: string, measur
   const group = target?.[index]
   if (!target || group?.Type !== 6) throw new Error('请选择组合。')
   const definition = group.ComponentId ? template.Components?.find((item) => item.Id === group.ComponentId) : undefined
+  if (group.Rows || definition?.Rows) throw new Error('流式组合解除引用后仍保留组合容器。')
+  if (group.DataPath !== undefined || Object.keys(group.Parameters ?? {}).length > 0 ||
+    Object.keys(definition?.Parameters ?? {}).length > 0)
+    throw new Error('组合包含独立数据上下文或参数，无法安全拆组。')
   const children = cloneTemplate(definition?.Elements ?? group.Elements ?? [])
   if (!children.length) throw new Error('组合没有子元素。')
   if (group.Margin?.Bottom || group.Margin?.Right || group.EndCoordinate)
@@ -151,50 +214,95 @@ export function renameComponent(template: BpTemplate, oldId: string, newId: stri
   if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(newId)) throw new Error('组件标识无效。')
   const definition = template.Components?.find((item) => item.Id === oldId)
   if (!definition || template.Components?.some((item) => item.Id === newId && item !== definition)) throw new Error('组件不存在或新标识已占用。')
-  const visitElements = (elements: TemplateElement[]) => elements.forEach((element) => {
-    if (element.Type !== 6) return
-    if (element.ComponentId === oldId) element.ComponentId = newId
-    visitElements(element.Elements ?? [])
-  })
-  const visitRows = (rows: Row[]) => rows.forEach((row) => row.Cells?.forEach((cell) => {
-    visitElements(cell.Elements ?? []); visitRows(cell.Rows ?? [])
-  }))
-  visitRows(template.Rows)
-  template.Components?.forEach((item) => visitElements(item.Elements))
+  walkTemplateNodes(template, (node, context) => {
+    if (context.kind === 'element' && (node as TemplateElement).Type === 6 &&
+      (node as Extract<TemplateElement, { Type: 6 }>).ComponentId === oldId)
+      (node as Extract<TemplateElement, { Type: 6 }>).ComponentId = newId
+  }, { expandComponentReferences: false })
   definition.Id = newId
 }
 
 export function removeComponent(template: BpTemplate, id: string): void {
   const index = template.Components?.findIndex((item) => item.Id === id) ?? -1
   if (index < 0) throw new Error('组件不存在。')
-  const referenced = (elements: TemplateElement[]): boolean => elements.some((element) =>
-    element.Type === 6 && (element.ComponentId === id || referenced(element.Elements ?? [])))
-  const rowsReference = (rows: Row[]): boolean => rows.some((row) => row.Cells?.some((cell) =>
-    referenced(cell.Elements ?? []) || rowsReference(cell.Rows ?? [])))
-  if (rowsReference(template.Rows) || template.Components?.some((item) => item.Id !== id && referenced(item.Elements)))
+  let referenced = false
+  walkTemplateNodes(template, (node, context) => {
+    if (context.kind === 'element' && (node as TemplateElement).Type === 6 &&
+      (node as Extract<TemplateElement, { Type: 6 }>).ComponentId === id) referenced = true
+  }, { expandComponentReferences: false })
+  if (referenced)
     throw new Error('组件仍被模板引用，请先删除或解除引用。')
   template.Components!.splice(index, 1)
 }
 
 export function saveGroupComponent(template: BpTemplate, elementPath: string, id: string): void {
   const element = findElement(template, elementPath)
-  if (!element || element.Type !== 6 || !element.Elements?.length) throw new Error('请先选择内联组合。')
+  if (!element || element.Type !== 6 || !element.Elements?.length && !element.Rows?.length) throw new Error('请先选择内联组合。')
   if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(id)) throw new Error('组件标识应以字母开头，只能包含字母、数字、下划线和连字符。')
-  enableV2(template)
+  const isV3 = element.Rows !== undefined || element.DataPath !== undefined || element.Parameters !== undefined ||
+    element.Pagination !== undefined || !element.Width || !element.Height
+  if (isV3) enableV3(template)
+  else enableV2(template)
   if (template.Components!.some((component) => component.Id === id)) throw new Error('组件标识已存在。')
-  template.Components!.push({ Id: id, Width: element.Width || 1, Height: element.Height || 1, Elements: cloneTemplate(element.Elements) })
+  template.Components!.push({ Id: id, Width: element.Width || 0, Height: element.Height || 0,
+    ...(element.Rows ? { Rows: cloneTemplate(element.Rows) } : { Elements: cloneTemplate(element.Elements) }),
+    ...(element.Parameters ? { Parameters: Object.fromEntries(Object.entries(element.Parameters).map(([name, binding]) => [name,
+      binding.Value !== undefined ? { Required: true, DefaultValue: cloneTemplate(binding.Value) } : { Required: true }])) } : {}) })
   element.ComponentId = id
   delete element.Elements
+  delete element.Rows
 }
 
 export function appendComponent(template: BpTemplate, cellPath: string, id: string): string {
   const cell = findCell(template, cellPath)
   const definition = template.Components?.find((item) => item.Id === id)
   if (!cell || !definition) throw new Error('目标单元格或组件不存在。')
+  const ownerMatch = /^Components\[(\d+)\]/.exec(cellPath)
+  const owner = ownerMatch ? template.Components?.[Number(ownerMatch[1])] : undefined
+  if (owner && componentDependsOn(template, id, owner.Id)) throw new Error('插入组件会形成循环引用。')
   cell.Elements ??= []
+  const parameters = definition.Parameters && Object.fromEntries(Object.entries(definition.Parameters)
+    .filter(([, parameter]) => parameter.DefaultValue !== undefined || parameter.Required)
+    .map(([name, parameter]) => [name, parameter.DefaultValue !== undefined
+      ? { Value: cloneTemplate(parameter.DefaultValue) }
+      : { Value: '' }]))
   cell.Elements.push({ Type: 6, ComponentId: id, Width: definition.Width, Height: definition.Height,
-    StartCoordinate: { X: 16, Y: 16 + cell.Elements.length * 12 } })
+    ...(parameters && Object.keys(parameters).length ? { Parameters: parameters } : {}),
+    ...(definition.Rows ? { Pagination: 'Split' as const } : { StartCoordinate: { X: 16, Y: 16 + cell.Elements.length * 12 } }) })
   return `${cellPath}.Elements[${cell.Elements.length - 1}]`
+}
+
+function componentDependsOn(template: BpTemplate, fromId: string, targetId: string, visited = new Set<string>()): boolean {
+  if (fromId === targetId) return true
+  if (visited.has(fromId)) return false
+  visited.add(fromId)
+  const definition = template.Components?.find((item) => item.Id === fromId)
+  if (!definition) return false
+  let depends = false
+  walkElements(definition.Elements)
+  walkRows(definition.Rows)
+  return depends
+
+  function walkElements(elements: TemplateElement[] | undefined): void {
+    for (const element of elements ?? []) {
+      if (element.Type !== 6) continue
+      if (element.ComponentId && componentDependsOn(template, element.ComponentId, targetId, visited)) {
+        depends = true
+        return
+      }
+      walkElements(element.Elements)
+      walkRows(element.Rows)
+      if (depends) return
+    }
+  }
+
+  function walkRows(rows: Row[] | undefined): void {
+    for (const row of rows ?? []) for (const cell of row.Cells ?? []) {
+      walkElements(cell.Elements)
+      walkRows(cell.Rows)
+      if (depends) return
+    }
+  }
 }
 
 function tableCell(width: number, field: { Name?: string; Value?: string }): Cell {
