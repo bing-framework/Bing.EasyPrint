@@ -1,5 +1,7 @@
 # 多协议模板渲染
 
+> 文档定位：本文件是模板版本、元素和兼容规则的详细参考。快速接入请先阅读[模板渲染指南](templates-guide.md)；当前模块关系见[架构与模块](architecture.md)。带 `Rxx` 的段落保留历史实现脉络。
+
 ### R140：ESC/POS Raster GS1 DataBar Stacked
 
 ESC/POS Raster 模板新增 `BarcodeType.Gs1DataBarStacked`，复用 13 位 ASCII 数字 payload 的 DataBar Omnidirectional 编码，生成 50X 宽的两行符号及分隔行；总条高至少为 13X，顶部、分隔和底部行按 5:1:7 输出。HRI 显示隐含 AI `(01)` 和 GTIN 校验位。Native、TSPL、ZPL 和 CPCL 不声明该类型能力，仍会严格拒绝。结构尺寸依据 [GS1 General Specifications](https://ref.gs1.org/standards/genspecs/12.0.0/)，分行和分隔模式参考 [Zint RSS encoder](https://github.com/zint/zint/blob/master/backend/rss.c)；具体设备的模块形状和扫描质量仍需实机验收。
