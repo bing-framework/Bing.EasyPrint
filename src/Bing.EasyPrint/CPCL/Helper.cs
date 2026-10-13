@@ -247,7 +247,11 @@ internal static class Helper
             case BarcodeType.Fim:
                 return "FIM";
         }
-        throw new NotImplementedException($"未实现条码类型 {type.ToString()} ");
+
+        if (!Enum.IsDefined(typeof(BarcodeType), type))
+            throw new ArgumentOutOfRangeException(nameof(type));
+
+        throw new NotSupportedException($"CPCL 尚未映射条码类型 {type}。");
     }
 
     /// <summary>
