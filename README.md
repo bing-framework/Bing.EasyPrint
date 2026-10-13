@@ -1,55 +1,45 @@
 # Bing.EasyPrint
+
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://mit-license.org/)
 
-Bing.EasyPrintÊÇBingÓ¦ÓÃ¿ò¼ÜµÄ±ãĞ¯Ê½´òÓ¡»úÃüÁîÉú³É¿â¡£
-Ö÷ÒªÓÃÓÚÈÈÃô¡¢Ğ¡Æ±´òÓ¡Ïà¹Ø¹¦ÄÜ²Ù×÷¡£ÒÑÖ§³ÖCPCLÖ¸Áî¼¯µÄÉú³É¡£
+Bing.EasyPrint æ˜¯é¢å‘çƒ­æ•æ‰“å°æœºå’Œéƒ¨åˆ†é’ˆå¼æ‰“å°åœºæ™¯çš„ .NET æ‰“å°æŒ‡ä»¤ç”Ÿæˆåº“ã€‚å½“å‰ä»£ç æ”¯æŒ CPCLã€ESC/POSã€TSPL å’Œ ZPLï¼Œå¹¶æä¾›åè®®å‘½ä»¤ã€ç»Ÿä¸€æ‰“å°æ¨¡å‹ã€ç‰ˆæœ¬åŒ–æ¨¡æ¿æ¸²æŸ“ä»¥åŠæµè§ˆå™¨æ¨¡æ¿è®¾è®¡å™¨ã€‚
 
-## Nuget Packages
-|Nuget|°æ±¾ºÅ|ËµÃ÷|
-|---|---|---|
-|Bing.EasyPrint|[![NuGet Badge](https://buildstats.info/nuget/Bing.EasyPrint?includePreReleases=true)](https://www.nuget.org/packages/Bing.EasyPrint)|
+é¡¹ç›®åªç”Ÿæˆåè®®å­—èŠ‚ï¼Œä¸è´Ÿè´£æ‰“å°æœºè¿æ¥ã€é©±åŠ¨ã€è®¾å¤‡å‘ç°ã€æ‰“å°é˜Ÿåˆ—æˆ–çŠ¶æ€æŸ¥è¯¢ã€‚
 
-## ÊµÏÖ¹¦ÄÜ
+## æ–‡æ¡£
 
-## ÒÀÀµÀà¿â
-- System.Drawing.Common
+- [é¡¹ç›®æ–‡æ¡£ç´¢å¼•](docs/README.md)
+- [æ ¸å¿ƒæ‰“å°ä¸åè®®](docs/core-printing.md)
+- [æ¨¡æ¿æ¸²æŸ“æŒ‡å—](docs/templates-guide.md)
+- [è®¾è®¡å™¨ä¸ Host](docs/designer-host.md)
+- [å¼€å‘ä¸éªŒè¯](docs/development.md)
+- [å¾…å®ç°ä¸å¾…ç¡®è®¤](docs/status.md)
 
-## Demo
+## ç›®æ ‡æ¡†æ¶
 
-## ½Ó¿ÚËµÃ÷
+æ ¸å¿ƒåº“å’Œæ¨¡æ¿åº“é¢å‘ `net7.0`ã€`net6.0`ã€`netcoreapp3.1`ã€`netstandard2.0` å’Œ `netstandard2.1`ã€‚DesignerHost ä½¿ç”¨ .NET 8ï¼Œæµè§ˆå™¨è®¾è®¡å™¨ä½¿ç”¨ Vue 3ã€TypeScript å’Œ Viteã€‚
 
+## å¿«é€Ÿç¤ºä¾‹
 
-## ×÷Õß
+```csharp
+using System.Text;
+using Bing.EasyPrint;
+using Bing.EasyPrint.Protocols;
 
-¼òĞş±ù
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-## ¹±Ï×Óë·´À¡
+var bytes = new EscPosPrintCommand(Encoding.GetEncoding("gbk"))
+    .Initialize()
+    .Text("è®¢å•å®Œæˆ")
+    .Feed(2)
+    .Build()
+    .GetBytes();
+```
 
-> Èç¹ûÄãÔÚÔÄ¶Á»òÊ¹ÓÃBingÖĞÈÎÒâÒ»¸ö´úÂëÆ¬¶ÏÊ±·¢ÏÖBug£¬»òÓĞ¸ü¼ÑÊµÏÖ·½Ê½£¬ÇëÍ¨ÖªÎÒÃÇ¡£
+å®Œæ•´çš„åè®®é€‰æ‹©ã€æ¨¡æ¿æ¸²æŸ“ã€è®¾å¤‡ Profile å’Œèµ„æºé™åˆ¶è¯´æ˜è§ `docs` ç›®å½•ã€‚è¾“å‡ºå­—èŠ‚æŠ•å…¥ç”Ÿäº§å‰ï¼Œåº”æŒ‰ç›®æ ‡æ‰“å°æœºå‹å·å’Œå›ºä»¶å®Œæˆå®æœºéªŒæ”¶ã€‚
 
-> ÎªÁË±£³Ö´úÂë¼òµ¥£¬Ä¿Ç°ºÜ¶à¹¦ÄÜÖ»½¨Á¢ÁË»ù±¾½á¹¹£¬Ï¸½ÚÌØĞÔÎ´½øĞĞÇ¨ÒÆ£¬ÔÚºóĞøĞèÒªÊ±½øĞĞÌí¼Ó£¬Èç¹ûÄã·¢ÏÖÄ³¸öÀàÎŞ·¨Âú×ãÄãµÄĞèÇó£¬ÇëÍ¨ÖªÎÒÃÇ¡£
+## å¼€æºåœ°å€ä¸è®¸å¯
 
-> Äã¿ÉÒÔÍ¨¹ıgithubµÄIssue»òPull RequestÏòÎÒÃÇÌá½»ÎÊÌâºÍ´úÂë£¬Èç¹ûÄã¸üÏ²»¶Ê¹ÓÃQQ½øĞĞ½»Á÷£¬Çë¼ÓÈëÎÒÃÇµÄ½»Á÷QQÈº¡£
-
-> ¶ÔÓÚÄãÌá½»µÄ´úÂë£¬Èç¹ûÎÒÃÇ¾ö¶¨²ÉÄÉ£¬¿ÉÄÜ»á½øĞĞÏàÓ¦ÖØ¹¹£¬ÒÔÍ³Ò»´úÂë·ç¸ñ¡£
-
-> ¶ÔÓÚÈÈĞÄµÄÍ¬Ñ§£¬½«»á°ÑÄãµÄÃû×Ö·Åµ½**¹±Ï×Õß**Ãûµ¥ÖĞ¡£
-
-## ÃâÔğÉùÃ÷
-- ËäÈ»ÎÒÃÇ¶Ô´úÂëÒÑ¾­½øĞĞ¸ß¶ÈÉó²é£¬²¢ÓÃÓÚ×Ô¼ºµÄÏîÄ¿ÖĞ£¬µ«ÒÀÈ»¿ÉÄÜ´æÔÚÄ³Ğ©Î´ÖªµÄBUG£¬Èç¹ûÄãµÄÉú²úÏµÍ³ÃÉÊÜËğÊ§£¬Bing ÍÅ¶Ó²»»á¶Ô´Ë¸ºÔğ¡£
-- ³öÓÚ³É±¾µÄ¿¼ÂÇ£¬ÎÒÃÇ²»»á¶ÔÒÑ·¢²¼µÄAPI±£³Ö¼æÈİ£¬Ã¿µ±¸üĞÂ´úÂëÊ±£¬Çë×¢Òâ¸ÃÎÊÌâ¡£
-
-## ¿ªÔ´µØÖ·
-[https://github.com/bing-framework/EasyPrint](https://github.com/bing-framework/EasyPrint)
-
-## License
-
-**MIT**
-
-> ÕâÒâÎ¶×ÅÄã¿ÉÒÔÔÚÈÎÒâ³¡¾°ÏÂÊ¹ÓÃ Bing Ó¦ÓÃ¿ò¼Ü¶ø²»»áÓĞÈËÕÒÄãÒªÇ®¡£
-
-> Bing »á¾¡Á¿ÒıÈë¿ªÔ´Ãâ·ÑµÄµÚÈı·½¼¼Êõ¿ò¼Ü£¬ÈçÓĞÒâÍâ£¬»¹Çë×ÔĞĞÁË½â¡£
-## Template rendering
-
-See [CPCL template rendering](docs/templates.md) for C# and JSON templates, pagination, input limits, and examples.
-Run `dotnet run --project samples/Templates` to generate sample CPCL files without printing.
+- æºç ï¼š[bing-framework/EasyPrint](https://github.com/bing-framework/EasyPrint)
+- NuGetï¼š[Bing.EasyPrint](https://www.nuget.org/packages/Bing.EasyPrint)
+- è®¸å¯ï¼šMIT

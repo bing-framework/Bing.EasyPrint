@@ -7,6 +7,10 @@
 ## 基本用法
 
 ```csharp
+using System.Text;
+using Bing.EasyPrint;
+using Bing.EasyPrint.Templates;
+
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 var loader = new TemplateLoader();
@@ -77,3 +81,4 @@ dotnet run --project samples/Templates -- artifacts/template-samples
 - TSPL/ZPL 设备字体的真实字宽、墨迹和 HRI 需要 Profile 或校准数据；严格模式会拒绝未声明边界。
 - ESC/POS Native 适合顺序小票；坐标图形、图片、旋转和复杂布局应使用 Raster。
 - 详细元素和兼容规则见[模板详细说明](templates.md)。
+- 输入、图片、输出与工作内存限制见[资源限制与错误处理](resource-limits.md)。

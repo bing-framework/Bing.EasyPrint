@@ -14,7 +14,7 @@ Host 默认监听 `http://127.0.0.1:5187`。设计器默认由 Vite 启动：
 
 ```powershell
 cd web/Bing.EasyPrint.Designer
-npm install
+npm ci
 npm run dev
 ```
 
@@ -53,6 +53,8 @@ Host 通过 `X-EasyPrint-Contract-Version`、`X-EasyPrint-Features` 和 `X-EasyP
 | `EASYPRINT_DESIGNER_MAX_QUEUED_REQUESTS` | 最大等待请求数 |
 
 HTTP 请求体上限由 `DesignerRequestProcessor.MaxRequestBytes` 固定为 44 MiB。环境变量解析失败会在启动时明确报错；达到并发或额度上限时返回 503。
+
+资源数量、字节上限和 HTTP 错误映射见[资源限制与错误处理](resource-limits.md)。
 
 ## 依赖与限制
 

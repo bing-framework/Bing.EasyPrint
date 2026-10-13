@@ -12,6 +12,8 @@
 | 统一页面模型、Provider、能力与任务输出 | 已实现 | `src/Bing.EasyPrint/Printing`、`PrintCapabilities.cs` |
 | V1/V2/V3 模板、分页、绑定、资源与价签 | 已实现 | `src/Bing.EasyPrint.Templates` |
 | Vue 设计器、Host 能力/预览/渲染接口 | 已实现 | `web/Bing.EasyPrint.Designer`、`tools/DesignerHost` |
+| 命令工厂、Provider 和校验 API | 已实现 | `IEasyPrint`、`ProtocolCommandFactory`、`PrintProtocolProviderFactory` |
+| Core、模板和 Host 资源限制 | 已实现 | `PrintResourceScope`、`TemplateRenderOptions`、Host 准入控制 |
 | 设备连接、驱动、队列与状态查询 | 待实现 | 当前无传输层；见 [状态清单](status.md) |
 | 实机字体、DPI、走纸、裁切与扫描验收 | 待确认 | 需要目标型号和固件；见 [状态清单](status.md) |
 
@@ -20,11 +22,14 @@
 | 文档 | 适用场景 | 主要代码入口 |
 | --- | --- | --- |
 | [架构与模块](architecture.md) | 了解项目边界、数据流和模块依赖 | `src/`、`tools/`、`web/` |
+| [公开 API 入口](public-api.md) | 选择命令、Provider、模板与验证 API | `IEasyPrint`、工厂和结果类型 |
 | [核心打印与协议](core-printing.md) | 直接生成 CPCL、ESC/POS、TSPL、ZPL 字节，或使用统一打印模型 | `src/Bing.EasyPrint` |
 | [模板渲染指南](templates-guide.md) | 加载 V1/V2/V3 模板、绑定数据、分页和生成多协议输出 | `src/Bing.EasyPrint.Templates` |
 | [设计器与 Host](designer-host.md) | 运行浏览器设计器、调用预览/导出 API、配置资源限制 | `web/Bing.EasyPrint.Designer`、`tools/DesignerHost` |
+| [资源限制与错误处理](resource-limits.md) | 配置 Core、模板与 Host 的资源边界 | `PrintResourceScope`、模板限制和 Host 准入 |
 | [开发与验证](development.md) | 构建、测试、示例和依赖说明 | `tests/`、`samples/`、`tools/PerformanceProbe` |
 | [待实现与待确认](status.md) | 查看尚未落地或必须由设备验证的事项 | 全项目 |
+| [文档与代码对照清单](documentation-audit.md) | 查看本次盘点结论和文档时效 | 全项目 |
 
 ## 详细参考
 

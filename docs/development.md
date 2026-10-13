@@ -17,19 +17,21 @@
 dotnet build src/Bing.EasyPrint/Bing.EasyPrint.csproj
 dotnet build src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj
 dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0
-dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj
+./tools/Verify-DesignerHost.ps1
 dotnet run --project samples/Templates -- artifacts/template-samples
 ```
 
 ```powershell
 cd web/Bing.EasyPrint.Designer
-npm install
+npm ci
 npm run build
 npm run test
 npm run test:e2e
 ```
 
 具体改动应优先运行对应的定向测试，再按影响范围扩展到项目测试和多目标框架构建。文档改动使用 Markdown、链接和编码检查即可。
+
+`Verify-DesignerHost.ps1` 将 Host 测试输出和 TRX 写入独立的 `artifacts` 目录，并串行执行构建。直接运行 `dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj` 也受支持，但工作区内已有嵌套 Host 生成物时，Web SDK 的默认内容 glob 可能产生重复内容错误。
 
 ## 验证重点
 
@@ -43,6 +45,7 @@ npm run test:e2e
 ## 生成物与环境注意事项
 
 - `obj`、`bin`、`output`、`artifacts`、`node_modules`、`.pnpm-store` 和 `.tmp-*` 不属于源文档或功能代码，不应纳入提交。
+- 前端仓库已跟踪 `package-lock.json`，使用 npm 和 `npm ci`；不要同时提交其他包管理器生成的锁文件。
 - 旧目标框架可能需要本机安装相应 targeting pack/runtime。
 - NuGet 漏洞索引不可用时可能出现 `NU1900`；不能把网络失败当作测试通过或功能失败。
 - `tools/DesignerHost` 下遗留的嵌套 `artifacts` 可能被 Web SDK 默认内容 glob 扫描并导致重复内容错误；应清理生成物或在一次性诊断命令中禁用默认内容项。

@@ -8,7 +8,13 @@
 
 具体命令类型为 `CPCLPrintCommand`、`EscPosPrintCommand`、`TsplPrintCommand` 和 `ZplPrintCommand`。`ProtocolCommandFactory.Create` 可按协议返回 `IProtocolPrintCommand`，但协议特有的绘制方法仍应通过具体类型调用。
 
+`DefaultEasyPrint` 和 `IEasyPrint` 扩展方法用于默认构造；需要设备 Profile 或介质选项时不要依赖默认扩展。入口选择见[公开 API 入口](public-api.md)。
+
 ```csharp
+using System.Text;
+using Bing.EasyPrint;
+using Bing.EasyPrint.Protocols;
+
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 var bytes = new EscPosPrintCommand(Encoding.GetEncoding("gbk"))
@@ -33,6 +39,10 @@ var bytes = new EscPosPrintCommand(Encoding.GetEncoding("gbk"))
 `PrintDocument` 包含一个或多个 `PrintPage`；页面可加入文字、线、矩形、条码、二维码和图片元素。Provider 在输出前调用同一套能力和边界校验。
 
 ```csharp
+using System.Text;
+using Bing.EasyPrint;
+using Bing.EasyPrint.Printing;
+
 var document = new PrintDocument();
 var page = document.AddPage(576, 320);
 page.Add(new PrintTextElement(20, 20, "SKU-001", 24, width: 180, height: 24));
@@ -74,5 +84,6 @@ byte[] firstPage = pages[0];
 - 默认严格拒绝无法表达的样式、旋转、条码、切纸和介质操作；不要把 `Capabilities` 当作真实固件证明。
 - ESC/POS Native 不能表达通用绝对坐标；需要线框、任意坐标或主机字体时使用 Raster。
 - Raster 输出会增加字节量和主机计算成本，并受图片块、总输出及工作内存预算限制。
+- Core、模板和 Host 的预算并不等价，配置方式见[资源限制与错误处理](resource-limits.md)。
 - Raw 可信入口可以绕过结构化校验，只适合已审查的固定指令。
 - 项目不发送字节到设备，也不读取打印状态。

@@ -29,6 +29,7 @@ Bing.EasyPrint 将打印内容逐层转换为协议字节。调用方可以直�
 - `src/Bing.EasyPrint/Protocols/TsplPrintCommand.cs`：TSPL 标签命令。
 - `src/Bing.EasyPrint/Protocols/ZplPrintCommand.cs`：ZPL 标签命令。
 - `src/Bing.EasyPrint/ProtocolCommandFactory.cs`：按 `PrintProtocol` 创建直接命令。
+- `src/Bing.EasyPrint/IEasyPrint.cs` 与 `Extensions/Extensions.IEasyPrint.cs`：兼容的泛型及便捷创建入口。
 - `src/Bing.EasyPrint/IRestrictedRawPrintCommand.cs`：受限 Raw 文本入口。
 
 ### 统一打印模型
@@ -37,6 +38,7 @@ Bing.EasyPrint 将打印内容逐层转换为协议字节。调用方可以直�
 - `src/Bing.EasyPrint/Printing/IPrintProtocolProvider.cs`：Provider 验证和渲染契约。
 - `src/Bing.EasyPrint/Printing/PrintProtocolProviders.cs`：四协议 Provider 工厂与实现。
 - `src/Bing.EasyPrint/Printing/PrintJobRenderer.cs`：多份、顺序、进纸和裁切编排。
+- `src/Bing.EasyPrint/Printing/PrintResourceScope.cs`：可嵌套的工作资源预留。
 - `src/Bing.EasyPrint/PrintCapabilities.cs`：协议与设备 Profile 的能力快照。
 
 ### 模板库
@@ -67,6 +69,8 @@ Bing.EasyPrint 将打印内容逐层转换为协议字节。调用方可以直�
 ## 依赖方向
 
 `Bing.EasyPrint.Templates` 引用 `Bing.EasyPrint`；DesignerHost 引用 Templates；Vue 设计器只通过 HTTP 调用 Host。核心库不依赖 Host 或浏览器项目，也不包含打印传输实现。
+
+公开入口的选择和错误类型见[公开 API 入口](public-api.md)，资源预算的层级关系见[资源限制与错误处理](resource-limits.md)。
 
 ## 已知限制
 
