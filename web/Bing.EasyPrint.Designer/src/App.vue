@@ -2446,7 +2446,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
             </p>
             <template v-if="usesTsplMedia">
               <div class="output-settings-title">TSPL 介质</div>
-              <label class="raster-line-option" title="允许将粗体、下划线文字转换为主机位图"><input v-model="tsplMedia.allowRasterizedTextStyles" type="checkbox" aria-label="允许 TSPL 文字样式位图" /><span>文字样式位图</span></label>
+              <label class="raster-line-option" title="允许将粗体、下划线和反白文字转换为主机位图"><input v-model="tsplMedia.allowRasterizedTextStyles" type="checkbox" aria-label="允许 TSPL 文字样式位图" /><span>文字样式位图</span></label>
               <label class="field-label">DPI <span>主机元数据</span><input class="field-input" type="number" min="1" step="1" :value="optionalNumberValue(tsplMedia.dpi)" aria-label="TSPL DPI" placeholder="默认 203" @input="setTsplMediaNumber('dpi', $event)" /></label>
               <label class="field-label">标签间隙距离 <span>协议单位</span><input class="field-input" type="number" min="0" step="1" :value="optionalNumberValue(tsplMedia.gapDistance)" aria-label="TSPL 标签间隙距离" placeholder="协议默认" @input="setTsplMediaNumber('gapDistance', $event)" /></label>
               <label class="field-label">标签间隙偏移 <span>协议单位</span><input class="field-input" type="number" min="0" step="1" :value="optionalNumberValue(tsplMedia.gapOffset)" aria-label="TSPL 标签间隙偏移" placeholder="协议默认" @input="setTsplMediaNumber('gapOffset', $event)" /></label>
@@ -2458,7 +2458,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
             </template>
             <template v-else-if="usesZplMedia">
               <div class="output-settings-title">ZPL 介质</div>
-              <label class="raster-line-option" title="允许将粗体、下划线文字转换为主机位图"><input v-model="zplMedia.allowRasterizedTextStyles" type="checkbox" aria-label="允许 ZPL 文字样式位图" /><span>文字样式位图</span></label>
+              <label class="raster-line-option" title="允许将粗体、下划线和反白文字转换为主机位图"><input v-model="zplMedia.allowRasterizedTextStyles" type="checkbox" aria-label="允许 ZPL 文字样式位图" /><span>文字样式位图</span></label>
               <label class="field-label">DPI <span>主机元数据</span><input class="field-input" type="number" min="1" step="1" :value="optionalNumberValue(zplMedia.dpi)" aria-label="ZPL DPI" placeholder="默认 203" @input="setZplMediaNumber('dpi', $event)" /></label>
               <label class="field-label">打印速度 <span>正整数</span><input class="field-input" type="number" min="1" step="1" :value="optionalNumberValue(zplMedia.printSpeed)" aria-label="ZPL 打印速度" placeholder="协议默认" @input="setZplMediaNumber('printSpeed', $event)" /></label>
               <label class="field-label">方向 <span>打印方向</span><select class="field-input" :value="zplMedia.orientation ?? ''" aria-label="ZPL 方向" @change="setZplOrientation"><option value="">协议默认</option><option value="None">默认方向</option><option value="Down">向下</option><option value="Left">向左</option><option value="Right">向右</option></select></label>

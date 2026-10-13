@@ -170,7 +170,7 @@ internal static class TemplateGraph
                 var rasterizedTextStyles =
                     (options.Protocol == PrintProtocol.Tspl && options.TsplMedia?.AllowRasterizedTextStyles == true ||
                      options.Protocol == PrintProtocol.Zpl && options.ZplMedia?.AllowRasterizedTextStyles == true) &&
-                    (font.Bold || (font.FontStyle & 5) != 0);
+                    (font.Bold || (font.FontStyle & 5) != 0 || font.Reverse);
                 if (!string.IsNullOrWhiteSpace(resolvedFont.HostFamily) &&
                     (options.Protocol != PrintProtocol.EscPos && !rasterizedTextStyles ||
                      options.Protocol == PrintProtocol.EscPos && options.EscPosLayout != EscPosLayoutMode.Raster))

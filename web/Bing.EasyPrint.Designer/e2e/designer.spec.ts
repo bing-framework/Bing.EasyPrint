@@ -2363,7 +2363,7 @@ test('TSPL 和 ZPL 文字样式位图开关恢复预览并写入位图字节', a
   const template = {
     Version: 1, Width: 240, Height: 100,
     Rows: [{ Cells: [{ Elements: [{
-      Type: 1, FontSize: 24, FontStyle: 5, Rotation: 90, Field: { Value: 'STYLE' },
+      Type: 1, FontSize: 24, FontStyle: 5, Reverse: true, Rotation: 90, Field: { Value: 'STYLE' },
     }] }] }],
   }
   await openBlankTemplate(page)
@@ -2372,6 +2372,9 @@ test('TSPL 和 ZPL 文字样式位图开关恢复预览并写入位图字节', a
 
   await page.getByRole('combobox', { name: '输出协议' }).selectOption('Tspl')
   await expect(page.getByLabel('允许 TSPL 文字样式位图')).not.toBeChecked()
+  await expect(page.locator('label.raster-line-option').filter({
+    has: page.getByLabel('允许 TSPL 文字样式位图'),
+  })).toHaveAttribute('title', /反白/)
   await expect(page.locator('.diagnostic-panel')).toContainText('Tspl')
 
   const tsplPreview = page.waitForResponse((response) =>
@@ -2394,6 +2397,9 @@ test('TSPL 和 ZPL 文字样式位图开关恢复预览并写入位图字节', a
 
   await page.getByRole('combobox', { name: '输出协议' }).selectOption('Zpl')
   await expect(page.getByLabel('允许 ZPL 文字样式位图')).not.toBeChecked()
+  await expect(page.locator('label.raster-line-option').filter({
+    has: page.getByLabel('允许 ZPL 文字样式位图'),
+  })).toHaveAttribute('title', /反白/)
   await expect(page.locator('.diagnostic-panel')).toContainText('Zpl')
 
   const zplPreview = page.waitForResponse((response) =>

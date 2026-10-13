@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Bing.EasyPrint.Elements;
 using Bing.EasyPrint.Model;
@@ -111,20 +112,24 @@ public sealed class EscPosNativeReverseTextTests
     }
 
     [Fact]
-    public void Raster_template_reverse_is_rejected_during_preflight()
+    public void Raster_template_reverse_renders_bitmap()
     {
-        var error = Assert.Throws<TemplateRenderException>(() => new TemplateRenderer().Render(
-            ReverseTemplate(), null, options: new TemplateRenderOptions
-            {
-                Protocol = PrintProtocol.EscPos,
-                EscPosLayout = EscPosLayoutMode.Raster,
-                Encoding = Encoding.ASCII,
-                FeedLines = 0,
-                CutAfterPrint = false
-            }));
+        var options = new TemplateRenderOptions
+        {
+            Protocol = PrintProtocol.EscPos,
+            EscPosLayout = EscPosLayoutMode.Raster,
+            Encoding = Encoding.ASCII,
+            FeedLines = 0,
+            CutAfterPrint = false
+        };
 
-        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.SourcePath);
-        Assert.Contains("反白", error.Message);
+        var result = new TemplateRenderer().RenderWithLayout(ReverseTemplate(), null, options: options);
+        var page = Assert.Single(result.Pages);
+        var trace = Assert.Single(page.Elements.Where(element => element.Type == 1));
+
+        Assert.True(TemplateProtocolCapabilities.Create(options).SupportsReverseText);
+        Assert.Equal(RotationAngle.None, trace.Rotation);
+        Assert.True(ContainsSequence(page.Data, new byte[] { 0x1D, 0x76, 0x30 }));
     }
 
     private static TemplateRenderOptions NativeTemplateOptions() => new TemplateRenderOptions

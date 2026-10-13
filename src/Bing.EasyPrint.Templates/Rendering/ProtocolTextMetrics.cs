@@ -18,6 +18,7 @@ internal sealed class ProtocolTextMetrics
     private readonly int _fullCellWidth;
     private readonly bool _bold;
     private readonly bool _underline;
+    private readonly bool _reverse;
     private readonly bool _rasterizeTextStyles;
     private readonly long _maxMeasurePixels;
     private readonly EscPosTextProfile _nativeText;
@@ -31,7 +32,7 @@ internal sealed class ProtocolTextMetrics
     internal bool HasDeviceTextElementCalibrations => _deviceTextElements != null && _deviceTextElements.Count > 0;
     internal bool NeedsFullMeasure =>
         _protocol == PrintProtocol.EscPos && _escPosLayout == EscPosLayoutMode.Raster ||
-        _rasterizeTextStyles && (_bold || _underline);
+        _rasterizeTextStyles && (_bold || _underline || _reverse);
 
     internal ProtocolTextMetrics(PrintProtocol protocol, EscPosLayoutMode escPosLayout, int size, int font,
         Encoding encoding, string text, bool bold, double? deviceHalfCellWidthAt24 = null,
@@ -39,7 +40,8 @@ internal sealed class ProtocolTextMetrics
         bool underline = false, long maxMeasurePixels = long.MaxValue, string deviceFontName = null,
         double? deviceLineHeightAt24 = null, DeviceFontCalibration fontCalibration = null,
         EscPosTextProfile nativeText = null, RasterFontCatalog rasterFonts = null,
-        CancellationToken cancellationToken = default(CancellationToken), bool rasterizeTextStyles = false)
+        CancellationToken cancellationToken = default(CancellationToken), bool rasterizeTextStyles = false,
+        bool reverse = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _cancellationToken = cancellationToken;
@@ -48,6 +50,7 @@ internal sealed class ProtocolTextMetrics
         _size = size;
         _bold = bold;
         _underline = underline;
+        _reverse = reverse;
         _rasterizeTextStyles = rasterizeTextStyles && (protocol == PrintProtocol.Tspl || protocol == PrintProtocol.Zpl);
         _maxMeasurePixels = maxMeasurePixels;
         _rasterFonts = rasterFonts;
@@ -109,10 +112,19 @@ internal sealed class ProtocolTextMetrics
             FontFamily = EscPosRasterCanvas.ResolveFontFamilyName(text, fontFamily, bold, _rasterFonts, _cancellationToken);
             if (_rasterizeTextStyles)
             {
-                var ink = EscPosRasterCanvas.MeasureTextInkBounds(text, size, bold, underline, FontFamily,
-                    _maxMeasurePixels, _rasterFonts, _cancellationToken);
-                if (!ink.IsEmpty)
-                    LineHeight = Math.Max(LineHeight, Math.Max(0, ink.Top) + ink.Height);
+                if (_reverse)
+                {
+                    var bounds = EscPosRasterCanvas.MeasureReverseTextBounds(text, size, bold, underline,
+                        FontFamily, _maxMeasurePixels, _rasterFonts, _cancellationToken);
+                    LineHeight = Math.Max(LineHeight, bounds.Height);
+                }
+                else
+                {
+                    var ink = EscPosRasterCanvas.MeasureTextInkBounds(text, size, bold, underline, FontFamily,
+                        _maxMeasurePixels, _rasterFonts, _cancellationToken);
+                    if (!ink.IsEmpty)
+                        LineHeight = Math.Max(LineHeight, Math.Max(0, ink.Top) + ink.Height);
+                }
             }
         }
         if (protocol == PrintProtocol.EscPos && escPosLayout == EscPosLayoutMode.Native && nativeText != null)
@@ -190,6 +202,9 @@ internal sealed class ProtocolTextMetrics
     private int RasterLayoutWidth(string text)
     {
         if (text.Length == 0) return 0;
+        if (_reverse)
+            return EscPosRasterCanvas.MeasureReverseTextBounds(text, _size, _bold, _underline, FontFamily,
+                _maxMeasurePixels, _rasterFonts, _cancellationToken).Width;
         var advance = EscPosRasterCanvas.MeasureTextWidth(text, _size, _bold, FontFamily, _rasterFonts, _cancellationToken);
         var ink = EscPosRasterCanvas.MeasureTextInkBounds(text, _size, _bold, _underline,
             FontFamily, _maxMeasurePixels, _rasterFonts, _cancellationToken);

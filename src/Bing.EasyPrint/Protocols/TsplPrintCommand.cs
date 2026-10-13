@@ -178,10 +178,17 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
     public TsplPrintCommand TextRasterized(int x, int y, string data, int fontSize,
         bool bold = false, bool underline = false, int rotation = 0, string fontFamily = null,
         CancellationToken cancellationToken = default(CancellationToken))
+        => TextRasterized(x, y, data, fontSize, bold, underline, false, rotation, fontFamily,
+            cancellationToken);
+
+    /// <summary>将文字样式光栅化到 TSPL；反白文字使用黑色布局背景和白色字形。</summary>
+    public TsplPrintCommand TextRasterized(int x, int y, string data, int fontSize,
+        bool bold, bool underline, bool reverse, int rotation = 0, string fontFamily = null,
+        CancellationToken cancellationToken = default(CancellationToken))
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if ((bold || underline) && !_allowRasterizedTextStyles)
-            throw new NotSupportedException("TSPL 粗体或下划线需要显式设置 AllowRasterizedTextStyles。");
+        if ((bold || underline || reverse) && !_allowRasterizedTextStyles)
+            throw new NotSupportedException("TSPL 粗体、下划线或反白需要显式设置 AllowRasterizedTextStyles。");
         ValidateCoordinate(x, nameof(x));
         ValidateCoordinate(y, nameof(y));
         ValidateField(data, nameof(data), '"');
@@ -191,7 +198,7 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         _profile?.Require(_profile.Images, "文字样式光栅化");
         if (rotation != 0) _profile?.Require(_profile.Rotation, "文字旋转");
         var raster = EscPosRasterCanvas.RasterizeText(data, fontSize, bold, underline, fontFamily, rotation,
-            cancellationToken: cancellationToken);
+            reverse, cancellationToken: cancellationToken);
         return Bitmap(x, y, raster.RowBytes, raster.Height, 0, raster.Data, cancellationToken);
     }
     public TsplPrintCommand Line(int x0, int y0, int x1, int y1, int width = 1)
@@ -703,6 +710,7 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
             supportsGraphics: profile?.Graphics ?? true, supportsBarcode: profile?.Barcode ?? true,
             supportsNativeLayout: true, supportsRasterLayout: true,
             supportsBoldText: supportsRasterizedTextStyles, supportsUnderlineText: supportsRasterizedTextStyles,
+            supportsReverseText: supportsRasterizedTextStyles,
             supportsHostFontFamily: supportsRasterizedTextStyles)
         { JobFeedUnits = Array.AsReadOnly(new[] { PrintFeedUnit.Dots }) };
         capabilities.ApplyLabelProfile(profile);

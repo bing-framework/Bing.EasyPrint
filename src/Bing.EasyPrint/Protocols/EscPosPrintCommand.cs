@@ -81,8 +81,8 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
             supportsRasterLayout: layoutMode == EscPosLayoutMode.Raster,
             // ESC/POS 的 ESC - n 可在 Native 模式切换单线下划线；Raster 由主机字体绘制。
             supportsUnderlineText: true,
-            // ESC/POS 的 GS B n 可在 Native 模式切换反白；Raster 暂不提供设备级反白语义。
-            supportsReverseText: layoutMode == EscPosLayoutMode.Native,
+            // Native 使用 GS B n；Raster 在主机生成带反白背景的文字位图。
+            supportsReverseText: true,
             supportsHostFontFamily: layoutMode == EscPosLayoutMode.Raster,
             maxRasterRowBytes: layoutMode == EscPosLayoutMode.Raster
                 ? (_profile?.ImageCommand == EscPosImageCommand.BitImageEscStar ? (ushort.MaxValue + 7) / 8 : ushort.MaxValue)
@@ -300,6 +300,22 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         canvas.DrawText(x, y, value, fontSize, rotation, bold, underline, fontFamily);
         return this;
     }
+
+    /// <summary>在 Raster 光栅页绘制反白文字；背景和文字样式会随文字整体旋转。</summary>
+    public EscPosPrintCommand Text(int x, int y, string value, int fontSize, int rotation,
+        bool bold, bool reverse, bool underline, string fontFamily = null)
+    {
+        var canvas = RequireRasterPage("绝对坐标文本");
+        ValidateText(value, nameof(value));
+        ValidateRasterPoint(canvas, x, y);
+        canvas.DrawText(x, y, value, fontSize, rotation, bold, reverse, underline, fontFamily);
+        return this;
+    }
+
+    /// <summary>在 Raster 光栅页绘制不旋转的反白文字。</summary>
+    public EscPosPrintCommand Text(int x, int y, string value, int fontSize,
+        bool bold, bool reverse, bool underline, string fontFamily = null)
+        => Text(x, y, value, fontSize, 0, bold, reverse, underline, fontFamily);
 
     /// <summary>在 Raster 光栅页绘制主机编码的 Code 128 条码。</summary>
     /// <param name="x">旋转后条码外框左上角 X 坐标。</param>

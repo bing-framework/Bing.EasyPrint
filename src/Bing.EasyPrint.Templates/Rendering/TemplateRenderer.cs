@@ -1437,7 +1437,7 @@ public sealed class TemplateRenderer
             var rasterizeTextStyles =
                 (options.Protocol == PrintProtocol.Tspl && options.TsplMedia?.AllowRasterizedTextStyles == true ||
                  options.Protocol == PrintProtocol.Zpl && options.ZplMedia?.AllowRasterizedTextStyles == true) &&
-                (bold || underline);
+                (bold || underline || font.Reverse);
             var fixedAscii = options.Protocol == PrintProtocol.Tspl &&
                 !string.IsNullOrEmpty(resolvedFont.DeviceName) && resolvedFont.DeviceName != "0" &&
                 text.All(character => character >= 32 && character <= 126 ||
@@ -1468,7 +1468,7 @@ public sealed class TemplateRenderer
                     options.EscPosDevice?.NativeTabWidthDots, options.DeviceFullCellWidthAt24,
                     (font.FontStyle & 4) != 0, options.MaxImagePixels, resolvedFont.DeviceName,
                     options.DeviceLineHeightAt24, fontCalibration, options.EscPosDevice?.Profile?.Text,
-                    options.EscPosDevice?.RasterFonts, cancellation, rasterizeTextStyles);
+                    options.EscPosDevice?.RasterFonts, cancellation, rasterizeTextStyles, font.Reverse);
             }
             catch (NotSupportedException error)
             {
@@ -1487,7 +1487,7 @@ public sealed class TemplateRenderer
                             options.DeviceFullCellWidthAt24, (font.FontStyle & 4) != 0,
                             options.MaxImagePixels, resolvedFont.DeviceName, options.DeviceLineHeightAt24,
                             fontCalibration, options.EscPosDevice?.Profile?.Text, options.EscPosDevice?.RasterFonts, cancellation,
-                            rasterizeTextStyles);
+                            rasterizeTextStyles, font.Reverse);
                         if (candidateMetrics.Measure(text) <= width && (!quarterTurn || candidateMetrics.LineHeight <= availableWidth) && text.IndexOfAny(new[] { '\r', '\n' }) < 0)
                         { size = candidate; metrics = candidateMetrics; break; }
                     }
@@ -1507,7 +1507,7 @@ public sealed class TemplateRenderer
                                 options.DeviceFullCellWidthAt24, (font.FontStyle & 4) != 0,
                                 options.MaxImagePixels, resolvedFont.DeviceName, options.DeviceLineHeightAt24,
                                 fontCalibration, options.EscPosDevice?.Profile?.Text, options.EscPosDevice?.RasterFonts, cancellation,
-                                rasterizeTextStyles);
+                                rasterizeTextStyles, font.Reverse);
                             if (candidateMetrics.Measure(text) <= width && (!quarterTurn || candidateMetrics.LineHeight <= availableWidth))
                             { size = candidate; metrics = candidateMetrics; low = candidate + 1; }
                             else high = candidate - 1;
@@ -1538,9 +1538,17 @@ public sealed class TemplateRenderer
                     ? EscPosRasterCanvas.MeasureTextInkBounds(content, fontSize, bold,
                         (font.FontStyle & 4) != 0, fontFamily, options.MaxImagePixels, options.EscPosDevice?.RasterFonts, cancellation)
                     : default(EscPosRasterTextBounds);
-                var rasterLeftPadding = rasterInk.IsEmpty ? 0 : Math.Max(0, -rasterInk.Left);
-                var rasterTopPadding = rasterInk.IsEmpty ? 0 : Math.Max(0, -rasterInk.Top);
-                var lineHeight = rasterInk.IsEmpty ? calibratedBounds.Height : Math.Max(metrics.LineHeight, checked(rasterTopPadding + rasterInk.Bottom));
+                var rasterReverseBounds = font.Reverse && options.Protocol == PrintProtocol.EscPos &&
+                    options.EscPosLayout == EscPosLayoutMode.Raster
+                    ? EscPosRasterCanvas.MeasureReverseTextBounds(content, fontSize, bold,
+                        (font.FontStyle & 4) != 0, fontFamily, options.MaxImagePixels,
+                        options.EscPosDevice?.RasterFonts, cancellation)
+                    : default(EscPosRasterTextBounds);
+                var rasterLeftPadding = font.Reverse ? 0 : rasterInk.IsEmpty ? 0 : Math.Max(0, -rasterInk.Left);
+                var rasterTopPadding = font.Reverse ? 0 : rasterInk.IsEmpty ? 0 : Math.Max(0, -rasterInk.Top);
+                var lineHeight = font.Reverse && !rasterReverseBounds.IsEmpty
+                    ? Math.Max(metrics.LineHeight, rasterReverseBounds.Height)
+                    : rasterInk.IsEmpty ? calibratedBounds.Height : Math.Max(metrics.LineHeight, checked(rasterTopPadding + rasterInk.Bottom));
                 var alignmentOffset = font.TextAlignment == BpTextAlignment.Right
                     ? width - lineWidth
                     : font.TextAlignment == BpTextAlignment.Center ? (width - lineWidth) / 2 : 0;
@@ -1588,12 +1596,22 @@ public sealed class TemplateRenderer
                 var lineHeight = metrics.LineHeight;
                 if (raster)
                 {
-                    var ink = EscPosRasterCanvas.MeasureTextInkBounds(lines[index], size, bold,
-                        (font.FontStyle & 4) != 0, metrics.FontFamily, options.MaxImagePixels,
-                        options.EscPosDevice?.RasterFonts, cancellation);
-                    // Raster rotation draws a tight ink box. Include an underline or
-                    // descender that extends beyond the logical device line height.
-                    if (!ink.IsEmpty) lineHeight = Math.Max(lineHeight, ink.Height);
+                    if (font.Reverse)
+                    {
+                        var bounds = EscPosRasterCanvas.MeasureReverseTextBounds(lines[index], size, bold,
+                            (font.FontStyle & 4) != 0, metrics.FontFamily, options.MaxImagePixels,
+                            options.EscPosDevice?.RasterFonts, cancellation);
+                        lineHeight = Math.Max(lineHeight, bounds.Height);
+                    }
+                    else
+                    {
+                        var ink = EscPosRasterCanvas.MeasureTextInkBounds(lines[index], size, bold,
+                            (font.FontStyle & 4) != 0, metrics.FontFamily, options.MaxImagePixels,
+                            options.EscPosDevice?.RasterFonts, cancellation);
+                        // Raster rotation draws a tight ink box. Include an underline or
+                        // descender that extends beyond the logical device line height.
+                        if (!ink.IsEmpty) lineHeight = Math.Max(lineHeight, ink.Height);
+                    }
                 }
                 lineHeights[index] = lineHeight;
             }

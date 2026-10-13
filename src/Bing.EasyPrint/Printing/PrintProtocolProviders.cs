@@ -691,7 +691,7 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         if (element is PrintTextElement fontText && !string.IsNullOrWhiteSpace(fontText.FontFamily) &&
             (!Capabilities.SupportsHostFontFamily ||
              (Protocol == PrintProtocol.Tspl || Protocol == PrintProtocol.Zpl) &&
-             !fontText.Bold && !fontText.Underline))
+             !fontText.Bold && !fontText.Underline && !fontText.Reverse))
             throw new NotSupportedException($"协议 {Protocol} 不支持系统字体族；请启用显式文字样式光栅化或使用 ESC/POS Raster。");
         if (element is PrintTextElement deviceText && deviceText.DeviceFontName != null)
         {
@@ -948,10 +948,11 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
         base.ValidateElement(element);
         switch (element)
         {
-            case PrintTextElement text when (text.Bold || text.Underline) &&
+            case PrintTextElement text when (text.Bold || text.Underline || text.Reverse) &&
                                              (!Capabilities.SupportsBoldText && text.Bold ||
-                                              !Capabilities.SupportsUnderlineText && text.Underline):
-                throw new NotSupportedException("TSPL 内置字体当前不支持粗体或下划线。");
+                                              !Capabilities.SupportsUnderlineText && text.Underline ||
+                                              !Capabilities.SupportsReverseText && text.Reverse):
+                throw new NotSupportedException("TSPL 内置字体当前不支持请求的文字样式。");
             case PrintBarcodeElement barcode:
                 TsplBarcodeType(barcode.Type);
                 break;
@@ -1004,9 +1005,9 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
                     ? Math.Max(1, (int)Math.Round(text.FontSize * 72.0 / dpi,
                         MidpointRounding.AwayFromZero))
                     : TsplFontSizing.FixedScale(font, text.FontSize);
-                if (text.Bold || text.Underline)
+                if (text.Bold || text.Underline || text.Reverse)
                     command.TextRasterized(text.X, text.Y, text.Text, pointSize, text.Bold, text.Underline,
-                        (int)text.Rotation, text.FontFamily, cancellationToken);
+                        text.Reverse, (int)text.Rotation, text.FontFamily, cancellationToken);
                 else
                 {
                     var textExtent = MeasureTextExtent(text, PrintProtocol.Tspl);
@@ -1123,10 +1124,11 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
         base.ValidateElement(element);
         switch (element)
         {
-            case PrintTextElement text when (text.Bold || text.Underline) &&
+            case PrintTextElement text when (text.Bold || text.Underline || text.Reverse) &&
                                              (!Capabilities.SupportsBoldText && text.Bold ||
-                                              !Capabilities.SupportsUnderlineText && text.Underline):
-                throw new NotSupportedException("ZPL 内置字体当前不支持粗体或下划线。");
+                                              !Capabilities.SupportsUnderlineText && text.Underline ||
+                                              !Capabilities.SupportsReverseText && text.Reverse):
+                throw new NotSupportedException("ZPL 内置字体当前不支持请求的文字样式。");
             case PrintBarcodeElement barcode when barcode.Type != BarcodeType.Code128 &&
                                                   barcode.Type != BarcodeType.Code39 &&
                                                   barcode.Type != BarcodeType.Code93 &&
@@ -1229,9 +1231,10 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
         switch (element)
         {
             case PrintTextElement text:
-                if (text.Bold || text.Underline)
+                if (text.Bold || text.Underline || text.Reverse)
                     command.TextRasterized(text.X, text.Y, text.Text, Math.Max(1, text.FontSize),
-                        text.Bold, text.Underline, (int)text.Rotation, text.FontFamily, cancellationToken);
+                        text.Bold, text.Underline, text.Reverse, (int)text.Rotation, text.FontFamily,
+                        cancellationToken);
                 else
                     command.Text(text.X, text.Y, text.Text, Math.Max(1, text.FontSize),
                         Math.Max(1, text.FontSize), text.DeviceFontName ?? "0", (int)text.Rotation);
@@ -1440,18 +1443,22 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
         switch (element)
         {
             case PrintTextElement text:
-                var ink = EscPosRasterCanvas.MeasureTextInkBounds(text.Text, text.FontSize,
-                    text.Bold, text.Underline, text.FontFamily,
-                    DefaultRasterTextMeasurementMaxPixels, _deviceOptions?.RasterFonts, ValidationCancellationToken);
+                var ink = text.Reverse
+                    ? EscPosRasterCanvas.MeasureReverseTextBounds(text.Text, text.FontSize, text.Bold,
+                        text.Underline, text.FontFamily, DefaultRasterTextMeasurementMaxPixels,
+                        _deviceOptions?.RasterFonts, ValidationCancellationToken)
+                    : EscPosRasterCanvas.MeasureTextInkBounds(text.Text, text.FontSize,
+                        text.Bold, text.Underline, text.FontFamily,
+                        DefaultRasterTextMeasurementMaxPixels, _deviceOptions?.RasterFonts, ValidationCancellationToken);
                 var quarterTurn = text.Rotation == RotationAngle.Rotate90 || text.Rotation == RotationAngle.Rotate270;
                 var inkWidth = quarterTurn ? ink.Height : ink.Width;
                 var inkHeight = quarterTurn ? ink.Width : ink.Height;
                 if (!ink.IsEmpty)
                 {
-                    var left = quarterTurn ? (long)text.X : (long)text.X + ink.Left;
-                    var top = quarterTurn ? (long)text.Y : (long)text.Y + ink.Top;
-                    var right = quarterTurn ? (long)text.X + inkWidth : (long)text.X + ink.Right;
-                    var bottom = quarterTurn ? (long)text.Y + inkHeight : (long)text.Y + ink.Bottom;
+                    var left = text.Reverse || quarterTurn ? (long)text.X : (long)text.X + ink.Left;
+                    var top = text.Reverse || quarterTurn ? (long)text.Y : (long)text.Y + ink.Top;
+                    var right = text.Reverse || quarterTurn ? (long)text.X + inkWidth : (long)text.X + ink.Right;
+                    var bottom = text.Reverse || quarterTurn ? (long)text.Y + inkHeight : (long)text.Y + ink.Bottom;
                     if (left < 0 || top < 0 || right > page.Width || bottom > page.Height)
                         throw new ArgumentOutOfRangeException(nameof(element),
                             $"文字{(text.Rotation == RotationAngle.None ? string.Empty : "旋转后")}墨迹范围 ({left},{top})-({right},{bottom}) 超出打印页 {page.Width}x{page.Height}。");
@@ -1634,8 +1641,8 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
                         switch (element)
                         {
                             case PrintTextElement text:
-                                canvas.DrawText(text.X, text.Y, text.Text, text.FontSize, text.Bold, text.Underline,
-                                    text.FontFamily, (int)text.Rotation);
+                                canvas.DrawText(text.X, text.Y, text.Text, text.FontSize, (int)text.Rotation,
+                                    text.Bold, text.Reverse, text.Underline, text.FontFamily);
                                 break;
                             case PrintLineElement line:
                                 canvas.DrawLine(line.X, line.Y, line.EndX, line.EndY, line.LineWidth);

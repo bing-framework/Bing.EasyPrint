@@ -347,8 +347,8 @@ public sealed class EscPosRasterCanvas
                 _cancellationToken);
             var textX = checked(x + HumanReadableBarcodeTextOffset(type, moduleWidth,
                 encoded.SymbolWidth, textWidth));
-            DrawTextCore(textX, checked(y + encoded.SymbolHeight), readableData, humanReadableFontSize, false, false,
-                fontFamily, 0);
+            DrawTextCore(textX, checked(y + encoded.SymbolHeight), readableData, humanReadableFontSize, false,
+                false, false, fontFamily, 0);
         });
     }
 
@@ -3334,10 +3334,20 @@ public sealed class EscPosRasterCanvas
         string fontFamily = null)
         => DrawText(x, y, text, fontSize, bold, underline, fontFamily, 0);
 
+    /// <summary>将系统字体文字绘制到当前单色画布；反白时以文字布局区域为黑底。</summary>
+    public void DrawText(int x, int y, string text, int fontSize, bool bold, bool reverse, bool underline,
+        string fontFamily = null)
+        => DrawText(x, y, text, fontSize, 0, bold, reverse, underline, fontFamily);
+
     /// <summary>将系统字体文字按顺时针角度绘制；该重载把角度放在字号之后，便于调用方显式指定角度。</summary>
     public void DrawText(int x, int y, string text, int fontSize, int rotation, bool bold = false,
         bool underline = false, string fontFamily = null)
         => DrawText(x, y, text, fontSize, bold, underline, fontFamily, rotation);
+
+    /// <summary>将文字按顺时针角度绘制；反白背景、文字及下划线作为整体旋转。</summary>
+    public void DrawText(int x, int y, string text, int fontSize, int rotation, bool bold, bool reverse,
+        bool underline, string fontFamily = null)
+        => ExecuteDrawing(() => DrawTextCore(x, y, text, fontSize, bold, reverse, underline, fontFamily, rotation));
 
     /// <summary>将系统字体文字按顺时针角度绘制到当前单色画布。</summary>
     /// <param name="x">旋转后文字墨迹外框的左上角 X 坐标。</param>
@@ -3350,7 +3360,7 @@ public sealed class EscPosRasterCanvas
     /// <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
     public void DrawText(int x, int y, string text, int fontSize, bool bold, bool underline,
         string fontFamily, int rotation)
-        => ExecuteDrawing(() => DrawTextCore(x, y, text, fontSize, bold, underline, fontFamily, rotation));
+        => ExecuteDrawing(() => DrawTextCore(x, y, text, fontSize, bold, false, underline, fontFamily, rotation));
 
     /// <summary>
     /// 将文字光栅化为紧致的单色位图，供不具备原生文字样式的标签协议显式降级使用。
@@ -3367,6 +3377,12 @@ public sealed class EscPosRasterCanvas
     internal static (int Width, int Height, int RowBytes, byte[] Data) RasterizeText(
         string text, int fontSize, bool bold, bool underline, string fontFamily, int rotation,
         RasterFontCatalog fonts = null, CancellationToken cancellationToken = default(CancellationToken))
+        => RasterizeText(text, fontSize, bold, underline, fontFamily, rotation, false, fonts,
+            cancellationToken);
+
+    internal static (int Width, int Height, int RowBytes, byte[] Data) RasterizeText(
+        string text, int fontSize, bool bold, bool underline, string fontFamily, int rotation, bool reverse,
+        RasterFontCatalog fonts = null, CancellationToken cancellationToken = default(CancellationToken))
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (text == null) throw new ArgumentNullException(nameof(text));
@@ -3377,17 +3393,65 @@ public sealed class EscPosRasterCanvas
 
         var ink = MeasureTextInkBounds(text, fontSize, bold, underline, fontFamily, long.MaxValue,
             fonts, cancellationToken);
-        if (ink.IsEmpty)
+        if (!reverse && ink.IsEmpty)
             return (1, 1, 1, new byte[] { 0 });
 
-        var left = Math.Min(0, ink.Left);
-        var top = Math.Min(0, ink.Top);
-        var right = Math.Max(0, ink.Right);
-        var bottom = Math.Max(0, ink.Bottom);
-        var sourceWidth = checked(right - left);
-        var sourceHeight = checked(bottom - top);
+        var layout = reverse
+            ? MeasureReverseTextBounds(text, fontSize, bold, underline, fontFamily, long.MaxValue, fonts,
+                cancellationToken)
+            : default(EscPosRasterTextBounds);
+        var left = reverse ? layout.Left : Math.Min(0, ink.Left);
+        var top = reverse ? layout.Top : Math.Min(0, ink.Top);
+        var sourceWidth = reverse ? layout.Width : checked(Math.Max(0, ink.Right) - left);
+        var sourceHeight = reverse ? layout.Height : checked(Math.Max(0, ink.Bottom) - top);
         if (sourceWidth <= 0 || sourceHeight <= 0)
             return (1, 1, 1, new byte[] { 0 });
+
+        if (reverse)
+        {
+            var sourceRowBytes = checked((sourceWidth + 7) / 8);
+            var sourceData = BudgetedBuffer.Allocate(checked(sourceRowBytes * sourceHeight), "Raster.ReverseText");
+            for (var index = 0; index < sourceData.Length; index++) sourceData[index] = 0xff;
+            var originX = checked(-left);
+            var originY = checked(-top);
+            var family = ResolveFontFamily(text, fontFamily, bold, fonts, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            using (var memory = PrintResourceScope.Reserve(checked((long)sourceWidth * sourceHeight * 4),
+                       "Raster.ReverseTextRgba"))
+            using (var image = new Image<Rgba32>(sourceWidth, sourceHeight))
+            {
+                image.Mutate(context =>
+                {
+                    context.Clear(Color.Black);
+                    context.DrawText(text, family.CreateFont(fontSize, bold ? FontStyle.Bold : FontStyle.Regular),
+                        Color.White, new PointF(originX, originY));
+                });
+                if (underline)
+                {
+                    var underlineWidth = GetUnderlineWidth(text, fontSize);
+                    var underlineY = checked(originY + fontSize);
+                    for (var underlineX = originX; underlineX < originX + underlineWidth; underlineX++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (underlineX >= 0 && underlineX < sourceWidth && underlineY >= 0 && underlineY < sourceHeight)
+                            image[underlineX, underlineY] = new Rgba32(255, 255, 255, 255);
+                    }
+                }
+                for (var y = 0; y < sourceHeight; y++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    for (var x = 0; x < sourceWidth; x++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (image[x, y].R >= 128)
+                            sourceData[y * sourceRowBytes + x / 8] &= (byte)~(0x80 >> (x & 7));
+                    }
+                }
+            }
+            ClearRasterPadding(sourceData, sourceRowBytes, sourceWidth, sourceHeight);
+            return RotateTextRaster(sourceWidth, sourceHeight, sourceRowBytes, sourceData, rotation,
+                cancellationToken, opaqueBackground: true);
+        }
 
         var source = new EscPosRasterCanvas(sourceWidth, sourceHeight, fonts, cancellationToken);
         source.DrawText(checked(-left), checked(-top), text, fontSize, bold, underline, fontFamily);
@@ -3427,19 +3491,27 @@ public sealed class EscPosRasterCanvas
             }
         }
 
-        if (rotation == 0)
-            return (croppedWidth, croppedHeight, croppedRowBytes, cropped);
+        return RotateTextRaster(croppedWidth, croppedHeight, croppedRowBytes, cropped, rotation,
+            cancellationToken);
+    }
 
-        var outputWidth = rotation == 90 || rotation == 270 ? croppedHeight : croppedWidth;
-        var outputHeight = rotation == 90 || rotation == 270 ? croppedWidth : croppedHeight;
+    private static (int Width, int Height, int RowBytes, byte[] Data) RotateTextRaster(int width, int height,
+        int rowBytes, byte[] data, int rotation, CancellationToken cancellationToken,
+        bool opaqueBackground = false)
+    {
+        if (rotation == 0) return (width, height, rowBytes, data);
+        var outputWidth = rotation == 90 || rotation == 270 ? height : width;
+        var outputHeight = rotation == 90 || rotation == 270 ? width : height;
         var outputRowBytes = (outputWidth + 7) / 8;
         var output = BudgetedBuffer.Allocate(checked(outputRowBytes * outputHeight), "Raster.StyledTextRotated");
-        for (var y = 0; y < croppedHeight; y++)
+        if (opaqueBackground)
+            for (var index = 0; index < output.Length; index++) output[index] = 0xff;
+        for (var y = 0; y < height; y++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            for (var x = 0; x < croppedWidth; x++)
+            for (var x = 0; x < width; x++)
             {
-                if ((cropped[y * croppedRowBytes + x / 8] & (0x80 >> (x & 7))) == 0) continue;
+                var black = (data[y * rowBytes + x / 8] & (0x80 >> (x & 7))) != 0;
                 int targetX;
                 int targetY;
                 switch (rotation)
@@ -3457,13 +3529,24 @@ public sealed class EscPosRasterCanvas
                         targetY = outputHeight - 1 - x;
                         break;
                 }
-                output[targetY * outputRowBytes + targetX / 8] |= (byte)(0x80 >> (targetX & 7));
+                var mask = (byte)(0x80 >> (targetX & 7));
+                if (black) output[targetY * outputRowBytes + targetX / 8] |= mask;
+                else if (opaqueBackground) output[targetY * outputRowBytes + targetX / 8] &= (byte)~mask;
             }
         }
+        ClearRasterPadding(output, outputRowBytes, outputWidth, outputHeight);
         return (outputWidth, outputHeight, outputRowBytes, output);
     }
 
-    private void DrawTextCore(int x, int y, string text, int fontSize, bool bold, bool underline,
+    private static void ClearRasterPadding(byte[] data, int rowBytes, int width, int height)
+    {
+        var usedBits = width & 7;
+        if (usedBits == 0) return;
+        var paddingMask = (byte)(0xff << (8 - usedBits));
+        for (var y = 0; y < height; y++) data[y * rowBytes + rowBytes - 1] &= paddingMask;
+    }
+
+    private void DrawTextCore(int x, int y, string text, int fontSize, bool bold, bool reverse, bool underline,
         string fontFamily, int rotation)
     {
         ThrowIfCancellationRequested();
@@ -3471,6 +3554,15 @@ public sealed class EscPosRasterCanvas
         if (fontSize <= 0) throw new ArgumentOutOfRangeException(nameof(fontSize));
         ValidateRotation(rotation);
         ValidateOrigin(x, y);
+
+        if (reverse)
+        {
+            if (text.Length == 0) return;
+            var raster = RasterizeText(text, fontSize, bold, underline, fontFamily, rotation, true, _fonts,
+                _cancellationToken);
+            DrawRasterCore(x, y, raster.Width, raster.Height, raster.Data);
+            return;
+        }
 
         if (rotation != 0)
         {
@@ -3720,6 +3812,31 @@ public sealed class EscPosRasterCanvas
     public static EscPosRasterTextBounds MeasureTextInkBounds(string text, int fontSize, bool bold = false,
         bool underline = false, string fontFamily = null, long maxPixels = long.MaxValue)
         => MeasureTextInkBounds(text, fontSize, bold, underline, fontFamily, maxPixels, null);
+
+    /// <summary>测量反白文字的黑色布局外框，包括字体 advance、行高和越界墨迹。</summary>
+    internal static EscPosRasterTextBounds MeasureReverseTextBounds(string text, int fontSize, bool bold,
+        bool underline, string fontFamily, long maxPixels, RasterFontCatalog fonts,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (text == null) throw new ArgumentNullException(nameof(text));
+        if (fontSize <= 0) throw new ArgumentOutOfRangeException(nameof(fontSize));
+        if (maxPixels <= 0) throw new ArgumentOutOfRangeException(nameof(maxPixels));
+        if (text.Length == 0) return new EscPosRasterTextBounds(0, 0, 0, 0);
+
+        var ink = MeasureTextInkBounds(text, fontSize, bold, underline, fontFamily, maxPixels, fonts,
+            cancellationToken);
+        var advance = MeasureTextWidth(text, fontSize, bold, fontFamily, fonts, cancellationToken);
+        var left = ink.IsEmpty ? 0 : Math.Min(0, ink.Left);
+        var top = ink.IsEmpty ? 0 : Math.Min(0, ink.Top);
+        var right = Math.Max(advance, ink.IsEmpty ? 0 : ink.Right);
+        var bottom = Math.Max(fontSize, ink.IsEmpty ? 0 : ink.Bottom);
+        var width = checked(right - left);
+        var height = checked(bottom - top);
+        if ((long)width * height > maxPixels)
+            throw new ArgumentOutOfRangeException(nameof(text), "反白文字位图超过像素预算。");
+        return new EscPosRasterTextBounds(left, top, width, height);
+    }
 
     /// <summary>使用与固定配置画布相同的字体测量实际墨迹范围。</summary>
     public static EscPosRasterTextBounds MeasureTextInkBounds(string text, int fontSize, bool bold,

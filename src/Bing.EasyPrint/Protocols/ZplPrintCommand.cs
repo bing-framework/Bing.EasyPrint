@@ -68,6 +68,7 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
             supportsGraphics: _profile?.Graphics ?? true, supportsBarcode: _profile?.Barcode ?? true,
             supportsBoldText: _allowRasterizedTextStyles && _profile?.Images != false,
             supportsUnderlineText: _allowRasterizedTextStyles && _profile?.Images != false,
+            supportsReverseText: _allowRasterizedTextStyles && _profile?.Images != false,
             supportsHostFontFamily: _allowRasterizedTextStyles && _profile?.Images != false);
         Capabilities.ApplyLabelProfile(_profile);
         Capabilities.ZplCutter = _cutter;
@@ -172,10 +173,17 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
     public ZplPrintCommand TextRasterized(int x, int y, string data, int fontSize,
         bool bold = false, bool underline = false, int rotation = 0, string fontFamily = null,
         CancellationToken cancellationToken = default(CancellationToken))
+        => TextRasterized(x, y, data, fontSize, bold, underline, false, rotation, fontFamily,
+            cancellationToken);
+
+    /// <summary>将文字样式光栅化到 ZPL；反白文字使用黑色布局背景和白色字形。</summary>
+    public ZplPrintCommand TextRasterized(int x, int y, string data, int fontSize,
+        bool bold, bool underline, bool reverse, int rotation = 0, string fontFamily = null,
+        CancellationToken cancellationToken = default(CancellationToken))
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if ((bold || underline) && !_allowRasterizedTextStyles)
-            throw new NotSupportedException("ZPL 粗体或下划线需要显式设置 AllowRasterizedTextStyles。");
+        if ((bold || underline || reverse) && !_allowRasterizedTextStyles)
+            throw new NotSupportedException("ZPL 粗体、下划线或反白需要显式设置 AllowRasterizedTextStyles。");
         ValidateCoordinate(x, nameof(x));
         ValidateCoordinate(y, nameof(y));
         ValidateField(data, nameof(data), '^', '~');
@@ -185,7 +193,7 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         _profile?.Require(_profile.Images, "文字样式光栅化");
         if (rotation != 0) _profile?.Require(_profile.Rotation, "文字旋转");
         var raster = EscPosRasterCanvas.RasterizeText(data, fontSize, bold, underline, fontFamily, rotation,
-            cancellationToken: cancellationToken);
+            reverse, cancellationToken: cancellationToken);
         return GraphicField(x, y, raster.RowBytes, raster.Height, raster.Data, cancellationToken);
     }
     /// <summary>按端点绘制线段；显式启用后斜线以单色位图输出。</summary>

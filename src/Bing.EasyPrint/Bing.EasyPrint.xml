@@ -4621,6 +4621,12 @@
             <param name="underline">是否绘制下划线。</param>
             <param name="fontFamily">可选的系统字体名称或固定 Raster 字体别名。</param>
         </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Text(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.String)">
+            <summary>在 Raster 光栅页绘制反白文字；背景和文字样式会随文字整体旋转。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.Text(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.String)">
+            <summary>在 Raster 光栅页绘制不旋转的反白文字。</summary>
+        </member>
         <member name="M:Bing.EasyPrint.Protocols.EscPosPrintCommand.RasterBarcode(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Int32,System.String,System.Int32,System.Int32)">
             <summary>在 Raster 光栅页绘制主机编码的 Code 128 条码。</summary>
             <param name="x">旋转后条码外框左上角 X 坐标。</param>
@@ -5075,8 +5081,14 @@
         <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String)">
             <summary>将系统字体文字绘制到当前单色画布。</summary>
         </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.String)">
+            <summary>将系统字体文字绘制到当前单色画布；反白时以文字布局区域为黑底。</summary>
+        </member>
         <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.String)">
             <summary>将系统字体文字按顺时针角度绘制；该重载把角度放在字号之后，便于调用方显式指定角度。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.String)">
+            <summary>将文字按顺时针角度绘制；反白背景、文字及下划线作为整体旋转。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.DrawText(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int32)">
             <summary>将系统字体文字按顺时针角度绘制到当前单色画布。</summary>
@@ -5157,6 +5169,9 @@
             <exception cref="T:System.ArgumentNullException"><paramref name="text" /> 为 <c>null</c>。</exception>
             <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="fontSize" /> 不为正数。</exception>
             <exception cref="T:System.NotSupportedException">指定字体不存在，或系统中没有可用于该文本的字体。</exception>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureReverseTextBounds(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int64,Bing.EasyPrint.Protocols.RasterFontCatalog,System.Threading.CancellationToken)">
+            <summary>测量反白文字的黑色布局外框，包括字体 advance、行高和越界墨迹。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.MeasureTextInkBounds(System.String,System.Int32,System.Boolean,System.Boolean,System.String,System.Int64,Bing.EasyPrint.Protocols.RasterFontCatalog)">
             <summary>使用与固定配置画布相同的字体测量实际墨迹范围。</summary>
@@ -5584,6 +5599,9 @@
             输出使用 BITMAP，文字不再依赖打印机内置字体。
             </remarks>
         </member>
+        <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.TextRasterized(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>将文字样式光栅化到 TSPL；反白文字使用黑色布局背景和白色字形。</summary>
+        </member>
         <member name="M:Bing.EasyPrint.Protocols.TsplPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <summary>绘制线段；斜线光栅化过程支持取消。</summary>
         </member>
@@ -5997,6 +6015,9 @@
             只有显式设置 <see cref="P:Bing.EasyPrint.Protocols.ZplMediaOptions.AllowRasterizedTextStyles" /> 后才允许使用；
             输出使用 ^GFA，文字不再依赖打印机内置字体。
             </remarks>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.TextRasterized(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.String,System.Threading.CancellationToken)">
+            <summary>将文字样式光栅化到 ZPL；反白文字使用黑色布局背景和白色字形。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Protocols.ZplPrintCommand.Line(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>按端点绘制线段；显式启用后斜线以单色位图输出。</summary>
