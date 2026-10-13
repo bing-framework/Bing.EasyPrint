@@ -1,5 +1,32 @@
 # 多协议 TODO 当前执行进度
 
+## R153 本轮：多协议反白文字与 CPCL Helper 边界
+
+更新时间：2026-10-13。本轮按已确认的“多协议打印能力与旋转链路完善”计划推进现有能力；GS1 Composite 尚未开始编码，不能视为计划完成。
+
+### 已完成
+
+- [x] ESC/POS Raster 新增反白文字重载：以实际文字布局外框绘制黑底、白字；背景、粗体和下划线整体支持 0/90/180/270 度旋转；空字符串不绘制背景。
+- [x] TSPL/ZPL 仅在 `AllowRasterizedTextStyles` 开启且图片能力可用时光栅化反白；默认仍使用设备内置字体。Provider、模板度量、静态预检、Host 能力响应及设计器选项同步该能力。
+- [x] 更新旧 ESC/POS Raster 模板反白测试，覆盖真实位图输出；新增反白换行、旋转整块分页、标签协议 opt-in 及失败边界回归。
+- [x] CPCL Helper 保持既有支持类型的命令标记；有效但未映射的枚举统一抛出 `NotSupportedException`，无效枚举抛出参数异常。
+
+### 未完成 / OPEN_ACTIONABLE
+
+- [ ] GS1 Composite 尚未实现：缺少 `Gs1CompositeMode`、独立公共元素、CC-A/CC-B 编码矩阵、链接型 DataBar/分隔图案、四协议图片输出、模板 Type=11、Host 能力协商和设计器编辑/往返。现有 ZXing 依赖不提供 MicroPDF417；已核查的纯托管候选库要么只支持 GS1-128 线性组件，要么仅面向 .NET 8，均不能满足 DataBar Omnidirectional/Limited × CC-A/CC-B 和本库五个声明 TFM 的契约。因此本轮没有暴露不完整的 Composite API 或能力标志。下一步仍需完成可在现有 TFM 上运行的托管编码器，并以固定 Zint 2.15.0 四组独立矩阵作逐模块验证。
+- [ ] Composite 输入 AI/GTIN 校验、容量边界、旋转/静区/预算/取消、四 Provider 矩阵一致性、V2/V3 模板绑定与原子分页、Host 协商和设计器往返均未实现。
+
+### 验证
+
+- Core/Templates 完整测试：`net6.0` 3258/3258；`netcoreapp3.1` 3258/3258。
+- Core 与 Templates 五目标框架构建：`net7.0`、`net6.0`、`netcoreapp3.1`、`netstandard2.0`、`netstandard2.1`，均 0 警告、0 错误。
+- DesignerHost `net8.0`：122/122；前端 Vitest：250/250；前端类型检查与生产构建通过。
+- 设计器反白 opt-in 定向 E2E：Playwright 正常退出，1/1 通过。
+- NuGet 漏洞数据源不可访问产生 NU1900；未修改项目、依赖或 CI 配置。
+- 真实设备校准/打印验收按要求暂缓。Host 进程隔离、监听策略和正式性能阈值不在本轮范围。
+
+---
+
 Task：多指令集打印剩余 TODO。Round：R152 GS1 AI 253/254/255 有界扩展。更新时间：2026-10-09。
 
 ## R152 本轮：GS1 AI 253/254/255 有界扩展
