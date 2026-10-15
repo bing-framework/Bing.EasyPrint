@@ -6,7 +6,7 @@ internal static class DesignerContract
     internal const string RequiredFeaturesHeader = "X-EasyPrint-Required-Features";
     internal const string Version = "1";
     private static readonly string[] Features =
-        ["structured-errors", "strict-options", "binding-diagnostics", "multi-protocol", "ordered-output-segments"];
+        ["structured-errors", "strict-options", "binding-diagnostics", "multi-protocol", "ordered-output-segments", "gs1-composite"];
 
     internal static object Description => new { version = 1, features = Features.ToArray() };
 

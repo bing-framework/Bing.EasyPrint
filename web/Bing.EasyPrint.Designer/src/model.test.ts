@@ -21,7 +21,7 @@ describe('template validation', () => {
 
   it('rejects unknown element types and cyclic objects', () => {
     const invalid = baseTemplate()
-    invalid.Rows.push({ Cells: [{ Elements: [{ Type: 11 } as never] }] })
+    invalid.Rows.push({ Cells: [{ Elements: [{ Type: 12 } as never] }] })
     expect(() => assertTemplate(invalid)).toThrow('不支持的元素类型')
 
     const cyclic = baseTemplate() as BpTemplate & Record<string, unknown>

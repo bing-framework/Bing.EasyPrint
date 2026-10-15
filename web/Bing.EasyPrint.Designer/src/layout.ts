@@ -20,7 +20,7 @@ function safeCondition(rowOrElement: { Condition?: Row['Condition'] }, ctx: Layo
 }
 
 function rotationOf(element: TemplateElement): RotationAngle {
-  return element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4 ? element.Rotation ?? 0 : 0
+  return element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4 || element.Type === 11 ? element.Rotation ?? 0 : 0
 }
 
 function occupiedSize(width: number, height: number, rotation: RotationAngle): { width: number; height: number } {
@@ -30,6 +30,8 @@ function occupiedSize(width: number, height: number, rotation: RotationAngle): {
 function dimension(element: TemplateElement, cellWidth: number, text: string): { width: number; height: number } {
   const start = element.StartCoordinate ?? { X: 0, Y: 0 }
   const end = element.EndCoordinate
+  // 仅供离线占位，不用估算模块数冒充真实符号尺寸。
+  if (element.Type === 11) return occupiedSize(120, 80, rotationOf(element))
   if (element.Type === 1) {
     // EndCoordinate 保存的是旋转后的占位框；已有端点时直接使用，不能再次交换宽高。
     if (end) return { width: Math.max(1, end.X - start.X), height: Math.max(1, end.Y - start.Y) }
@@ -89,6 +91,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
     if (!children) { errors.push({ sourcePath: path, message: '组件定义不存在。' }); return }
     children.forEach((child, index) => {
       const childPath = `${path}.Elements[${index}]`
+      if (child.Type === 11) errors.push({ sourcePath: childPath, message: 'GS1 Composite 待 Host 验证；离线仅显示占位，实际尺寸以编码结果为准。' })
       if (!safeCondition(child, ctx, childPath, errors)) return
       let display = ''
       try { display = valueForField(child.Field, bindingContext(ctx)) }
@@ -99,7 +102,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
       const childY = y + start.Y + (child.Margin?.Top ?? 0)
       elements.push({ sourcePath: childPath, instanceIndices: [...ctx.instanceIndices], type: child.Type,
         rotation: rotationOf(child), x: childX, y: childY, width: box.width, height: box.height,
-        text: child.Type === 1 || child.Type === 3 || child.Type === 4 || child.Type === 10 ? display : undefined,
+        text: child.Type === 11 ? 'GS1 Composite（待验证）' : child.Type === 1 || child.Type === 3 || child.Type === 4 || child.Type === 10 ? display : undefined,
         resourceKey: child.Type === 2 ? display : undefined })
       if (child.Type === 6) appendGroupChildren(child, childPath, childX, childY, ctx, depth + 1)
     })
@@ -138,6 +141,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
       ;(cell.Elements ?? []).forEach((element, elementIndex) => localElements.push({ element, path: `${cellPath}.Elements[${elementIndex}]`, context: ctx }))
       for (const node of localElements) {
         if (!safeCondition(node.element, node.context, node.path, errors)) continue
+        if (node.element.Type === 11) errors.push({ sourcePath: node.path, message: 'GS1 Composite 待 Host 验证；离线仅显示占位，实际尺寸以编码结果为准。' })
         let display = ''
         try { display = valueForField(node.element.Field, bindingContext(node.context)) }
         catch (error) { errors.push({ sourcePath: node.path, message: error instanceof Error ? error.message : '字段预览失败。' }) }
@@ -156,7 +160,7 @@ export function buildLocalLayout(template: BpTemplate, data: unknown): LocalLayo
           y: y + start.Y + top,
           width: box.width,
           height: box.height,
-          text: node.element.Type === 1 ? display : node.element.Type === 2 ? (node.element.Field?.Name || 'image') : node.element.Type === 3 ? display : node.element.Type === 4 ? display : null,
+          text: node.element.Type === 11 ? 'GS1 Composite（待验证）' : node.element.Type === 1 ? display : node.element.Type === 2 ? (node.element.Field?.Name || 'image') : node.element.Type === 3 ? display : node.element.Type === 4 ? display : null,
           resourceKey: node.element.Type === 2 ? node.element.Field?.Name : null,
         })
         if (node.element.Type === 6) appendGroupChildren(node.element, node.path,

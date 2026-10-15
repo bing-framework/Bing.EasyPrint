@@ -77,6 +77,18 @@ internal static class DesignerRequestProcessor
                 capabilities.SupportsCoordinates,
                 capabilities.SupportsExplicitQuietZone,
                 capabilities.ElementTypes,
+                capabilities.SupportsGs1Composite,
+                gs1Composite = capabilities.SupportsGs1Composite ? new
+                {
+                    elementType = 11,
+                    linearTypes = new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited" },
+                    modes = new[] { "Auto", "CcA", "CcB" },
+                    rotations = new[] { 0, 90, 180, 270 },
+                    primaryFormats = new[] { "GTIN-13-data", "GTIN-14", "GS1-AI-01" },
+                    secondaryFormat = "bracketed-gs1-ai",
+                    includesHumanReadable = false,
+                    dimensionsFromEncoding = true
+                } : null,
                 capabilities.FontKinds,
                 capabilities.DeviceFonts,
                 capabilities.TextSizes,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { AlignCenter, AlignLeft, AlignRight, Braces, ChevronDown, FileText, Layers3, Ruler, Type } from '@lucide/vue'
-import type { BarcodeElement, BpTemplate, Cell, ComponentDefinition, Condition, FontElement, ImageCrop, ImageElement, QuietZone, QrElement, RotationAngle, Row, TemplateElement } from '../model'
+import type { BarcodeElement, BpTemplate, Cell, ComponentDefinition, Condition, FontElement, Gs1CompositeElement, ImageCrop, ImageElement, QuietZone, QrElement, RotationAngle, Row, TemplateElement } from '../model'
 import { MAX_QUIET_ZONE_DOTS } from '../model'
 import {
   applyDeclaredBarcodeEndCoordinate, applyEndCoordinateDelta, barcodeOccupiedSize, barcodeQuietZoneOccupiedDelta, barcodeRawSizeFromOccupied,
@@ -37,7 +37,7 @@ const props = defineProps<{
   fieldPaths: string[]
 }>()
 const emit = defineEmits<{ 'toggle-condition': [value: boolean]; 'update-condition': [value: Condition | undefined]; 'set-position': [axis: 'X' | 'Y', value: number]; 'add-row': []; 'add-column': []; 'add-nested-row': []; remove: [] }>()
-const typeName: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '一维条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码' }
+const typeName: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '一维条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码', 11: 'GS1 Composite' }
 const variableName = ref('')
 const variablePath = ref('')
 const parameterName = ref('')
@@ -137,12 +137,12 @@ function textSizeMaximum(element: FontElement): number | undefined {
   return fontSizeRule(props.capabilities, element).range?.maximum ?? undefined
 }
 
-function rotationDisabled(element: FontElement | ImageElement | QrElement | BarcodeElement, value: RotationAngle): boolean {
+function rotationDisabled(element: FontElement | ImageElement | QrElement | BarcodeElement | Gs1CompositeElement, value: RotationAngle): boolean {
   return !rotationSupported(props.capabilities, element.Type, value)
 }
 
 function elementRotationSupported(element: TemplateElement): boolean {
-  return (element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4) && rotationSupported(props.capabilities, element.Type, element.Rotation ?? 0)
+  return (element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4 || element.Type === 11) && rotationSupported(props.capabilities, element.Type, element.Rotation ?? 0)
 }
 
 function barcodeTypeDisabled(value: number): boolean {
@@ -238,7 +238,7 @@ function updateTextEndCoordinate(element: FontElement, previousRotation = elemen
   element.EndCoordinate = { X: start.X + occupied.width, Y: start.Y + occupied.height }
 }
 
-function setRotation(element: FontElement | ImageElement | QrElement | BarcodeElement, event: Event) {
+function setRotation(element: FontElement | ImageElement | QrElement | BarcodeElement | Gs1CompositeElement, event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)
   if (![0, 90, 180, 270].includes(value)) return
   if (!rotationSupported(props.capabilities, element.Type, value)) return
@@ -254,7 +254,7 @@ function mmOrDots(value: number) {
   return props.unit === 'mm' ? mmToDots(value, props.targetDpi) : Math.round(value)
 }
 
-type QuietZoneElement = QrElement | BarcodeElement
+type QuietZoneElement = QrElement | BarcodeElement | Gs1CompositeElement
 type QuietZoneSide = keyof QuietZone
 
 function quietZoneMode(element: QuietZoneElement): 'default' | 'explicit' {
@@ -429,6 +429,7 @@ function elementDimensionValue(element: TemplateElement, axis: 'X' | 'Y'): strin
 }
 
 function setElementDimension(element: TemplateElement, axis: 'X' | 'Y', event: Event) {
+  if (element.Type === 11) return
   const input = event.target as HTMLInputElement
   const value = Number(input.value)
   if (!Number.isFinite(value)) return
@@ -811,6 +812,15 @@ function updateFieldName(event: Event) {
   if (props.element?.Field) props.element.Field.Name = (event.target as HTMLInputElement).value
 }
 
+function setSecondaryMode(element: Gs1CompositeElement, bound: boolean) {
+  element.SecondaryField = bound ? { Name: '' } : { Value: '' }
+}
+
+function setCompositeSize(element: Gs1CompositeElement, key: 'ModuleWidth' | 'LinearBarHeight', event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  if (Number.isInteger(value) && value > 0 && value <= 2147483647) element[key] = value
+}
+
 const conditionTarget = computed(() => props.element ?? props.row)
 const conditionValue = computed(() => conditionTarget.value?.Condition)
 const selectedImageMissing = computed(() => props.element?.Type === 2 && !props.element.Field?.Name && Boolean(props.element.Field?.Value) && !props.resources.some((resource) => resource.key === props.element?.Field?.Value))
@@ -952,7 +962,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
       </template>
 
       <template v-else-if="element">
-        <section v-if="[1, 2, 3, 4, 10].includes(element.Type)" class="inspector-section">
+        <section v-if="[1, 2, 3, 4, 10, 11].includes(element.Type)" class="inspector-section">
           <div class="section-title"><span>内容绑定</span><span class="section-kicker">Field</span></div>
           <div class="segmented-control">
             <button type="button" :class="{ active: Boolean(element.Field?.Name) }" @click="setFieldMode('bind')">字段</button>
@@ -975,8 +985,8 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <div class="numeric-grid">
             <label class="field-label">X<input class="field-input" type="number" :value="dimensionValue(element.StartCoordinate?.X ?? (element.Type === 6 ? element.Margin?.Left : 0))" @input="setElementPosition('X', $event)" /></label>
             <label class="field-label">Y<input class="field-input" type="number" :value="dimensionValue(element.StartCoordinate?.Y ?? (element.Type === 6 ? element.Margin?.Top : 0))" @input="setElementPosition('Y', $event)" /></label>
-            <label v-if="element.Type !== 5" class="field-label">宽度<input class="field-input" type="number" min="1" :value="elementDimensionValue(element, 'X')" @input="setElementDimension(element, 'X', $event)" /></label>
-            <label v-if="element.Type !== 5" class="field-label">高度 <span v-if="element.Type === 4 && capabilities?.barcodeHeight">{{ capabilities.barcodeHeight.minimum }}–{{ capabilities.barcodeHeight.maximum ?? '以上' }}</span><input class="field-input" type="number" :min="element.Type === 4 ? capabilities?.barcodeHeight?.minimum ?? 1 : 1" :max="element.Type === 4 ? capabilities?.barcodeHeight?.maximum ?? undefined : undefined" :value="elementDimensionValue(element, 'Y')" :disabled="element.Type === 4 && !capabilitiesReady" @input="setElementDimension(element, 'Y', $event)" /></label>
+            <label v-if="element.Type !== 5 && element.Type !== 11" class="field-label">宽度<input class="field-input" type="number" min="1" :value="elementDimensionValue(element, 'X')" @input="setElementDimension(element, 'X', $event)" /></label>
+            <label v-if="element.Type !== 5 && element.Type !== 11" class="field-label">高度 <span v-if="element.Type === 4 && capabilities?.barcodeHeight">{{ capabilities.barcodeHeight.minimum }}–{{ capabilities.barcodeHeight.maximum ?? '以上' }}</span><input class="field-input" type="number" :min="element.Type === 4 ? capabilities?.barcodeHeight?.minimum ?? 1 : 1" :max="element.Type === 4 ? capabilities?.barcodeHeight?.maximum ?? undefined : undefined" :value="elementDimensionValue(element, 'Y')" :disabled="element.Type === 4 && !capabilitiesReady" @input="setElementDimension(element, 'Y', $event)" /></label>
             <p v-if="element.Type === 4 && capabilitiesReady && !barcodeHeightSupported(element.Height)" class="field-note capability-warning">当前条码高度超出协议范围，请改为支持的值。</p>
             <template v-if="element.Type === 5">
               <label class="field-label">终点 X<input class="field-input" type="number" :value="dimensionValue(element.LineEndCoordinate?.X ?? element.EndCoordinate?.X)" @input="element.LineEndCoordinate ??= { X: 0, Y: 0 }; setDimension(element.LineEndCoordinate as unknown as Record<string, unknown>, 'X', $event)" /></label>
@@ -987,6 +997,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <p v-if="(element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4) && capabilitiesReady && !elementRotationSupported(element)" class="field-note capability-warning">当前旋转值在 {{ capabilities?.protocol === 'EscPos' ? 'ESC/POS' : capabilities?.protocol?.toUpperCase() }} 中不受支持，请改选可用角度。</p>
           <p v-else-if="(element.Type === 1 || element.Type === 2 || element.Type === 3 || element.Type === 4) && !capabilitiesReady" class="field-note capability-warning">{{ capabilityNotice }}</p>
           <label v-if="element.Type === 1" class="field-label">旋转前行宽 <span>{{ unit }} · 0 为自动</span><input class="field-input" type="number" min="0" :value="dimensionValue(element.Width)" @input="setTextWidth(element as FontElement, $event)" /></label>
+          <label v-if="element.Type === 11" class="field-label">旋转<select class="field-input" aria-label="Composite 旋转" :value="element.Rotation ?? 0" :disabled="!capabilitiesReady" @change="setRotation(element, $event)"><option v-for="option in rotationOptions" :key="option.value" :value="option.value" :disabled="rotationDisabled(element, option.value)">{{ option.label }}</option></select></label>
         </section>
 
         <section class="inspector-section">
@@ -1087,7 +1098,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <p v-if="!tsplVariableBarcodeRatioEditor(element as BarcodeElement) && !barcodeRatioIsValid(element.Ratio)" class="field-note">当前模板参数无效，请改选支持的宽窄比。</p>
           <p v-if="tsplVariableBarcodeRatioEditor(element as BarcodeElement) && !tsplBarcodeRatioIsValid(element as BarcodeElement)" class="field-note capability-warning">当前 TSPL 窄宽比或模块宽度不在设备能力范围内，请重新选择比例。</p>
         </section>
-        <section v-if="element.Type === 3 || element.Type === 4" class="inspector-section">
+        <section v-if="element.Type === 3 || element.Type === 4 || element.Type === 11" class="inspector-section">
           <div class="section-title"><span>静区</span><span class="section-kicker">打印点</span></div>
           <label class="field-label">配置方式<select class="field-input"
             aria-label="静区配置方式"
@@ -1156,6 +1167,20 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
         <section v-if="element.Type === 10" class="inspector-section">
           <div class="section-title"><span>二维点阵码</span></div>
           <label class="field-label">制式<select class="field-input" :value="element.Format" @change="setMatrixFormat(element, $event)"><option value="DataMatrix">DataMatrix</option><option value="PDF417">PDF417</option></select></label>
+        </section>
+
+        <section v-if="element.Type === 11" class="inspector-section">
+          <div class="section-title"><span>GS1 Composite</span></div>
+          <label class="field-label">线性组件<select class="field-input" :value="element.LinearType ?? 25" @change="element.LinearType = Number(($event.target as HTMLSelectElement).value) as 25 | 27"><option :value="25">Omnidirectional</option><option :value="27">Limited</option></select></label>
+          <label class="field-label">二维模式<select class="field-input" :value="element.Mode ?? 0" @change="element.Mode = Number(($event.target as HTMLSelectElement).value) as 0 | 1 | 2"><option :value="0">Auto</option><option :value="1">CC-A</option><option :value="2">CC-B</option></select></label>
+          <label class="field-label">模块宽度（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 模块宽度" :value="element.ModuleWidth ?? 2" @input="setCompositeSize(element, 'ModuleWidth', $event)" /></label>
+          <label class="field-label">线性条高（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 线性条高" :value="element.LinearBarHeight ?? 40" @input="setCompositeSize(element, 'LinearBarHeight', $event)" /></label>
+          <div class="section-title"><span>次数据绑定</span><span class="section-kicker">SecondaryField</span></div>
+          <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
+          <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
+          <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
+          <p class="field-note">上方内容绑定为主 GTIN，次数据使用括号式 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
+          <p v-if="!capabilitiesReady || !elementTypeSupported(capabilities, 11)" class="field-note capability-warning">当前 Host 尚未确认 Composite 能力，请更新或连接 Host 后验证。</p>
         </section>
 
         <section class="inspector-section condition-section">

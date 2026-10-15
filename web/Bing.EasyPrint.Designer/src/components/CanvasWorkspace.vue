@@ -272,7 +272,8 @@ function resizeConfig(element: PreviewElement) {
 }
 
 function previewLabel(element: PreviewElement) {
-  const values: Record<number, string> = { 2: '图片资源', 3: 'QR', 4: '条码', 6: '组合', 9: '图标', 10: '二维点阵码' }
+  if (element.type === 11 && element.text?.includes('待验证')) return element.text
+  const values: Record<number, string> = { 2: '图片资源', 3: 'QR', 4: '条码', 6: '组合', 9: '图标', 10: '二维点阵码', 11: 'GS1 Composite' }
   return values[element.type] ?? ''
 }
 

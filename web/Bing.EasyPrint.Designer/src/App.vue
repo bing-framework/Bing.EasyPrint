@@ -1600,6 +1600,8 @@ function defaultElement(type: TemplateElement['Type']): TemplateElement {
   if (type === 8) return { Type: 8, Width: 120, Height: 64, LineWidth: 1, StartCoordinate: start }
   if (type === 9) return { Type: 9, Icon: 'check', Size: 32, LineWidth: 2, StartCoordinate: start }
   if (type === 10) return { Type: 10, Format: 'DataMatrix', Width: 96, Height: 96, Field: { Value: 'DATA' }, StartCoordinate: start }
+  if (type === 11) return { Type: 11, LinearType: 25, Mode: 0, ModuleWidth: 2, LinearBarHeight: 40,
+    Field: { Value: '12345678901231' }, SecondaryField: { Value: '(91)123456' }, StartCoordinate: start }
   return { Type: 5, LineWidth: 2, StartCoordinate: start, EndCoordinate: end, LineEndCoordinate: { X: end.X, Y: start.Y } }
 }
 
@@ -1669,7 +1671,7 @@ function addElement(type: TemplateElement['Type']): boolean {
   target.push(element)
   const parentPath = groupElements || selectedDefinition.value ? selectedPath.value : activeCellPath()
   selectedPath.value = `${parentPath}.Elements[${target.length - 1}]`
-  showToast(`已添加${({ 1: '文字', 2: '图片', 3: '二维码', 4: '条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码' } as Record<number, string>)[type]}`)
+  showToast(`已添加${({ 1: '文字', 2: '图片', 3: '二维码', 4: '条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码', 11: 'GS1 Composite' } as Record<number, string>)[type]}`)
   return true
 }
 
@@ -1836,7 +1838,7 @@ function duplicateSelected() {
 
 function resizeElement(value: { path: string; width: number; height: number }) {
   const element = findElement(template.value, value.path)
-  if (!element) return
+  if (!element || element.Type === 11) return
   const start = element.StartCoordinate ?? { X: 0, Y: 0 }
   if (element.Type === 9) element.Size = Math.max(8, Math.min(value.width, value.height))
   else if (element.Type === 4) {
@@ -2504,6 +2506,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
               <button type="button" :draggable="canDragElement(8)" :disabled="!canAddElement(8)" :title="elementToolTitle(8, '椭圆')" @click="addElement(8)" @dragstart="dragTool($event, 8)"><Circle :size="15" /><span>椭圆</span></button>
               <button type="button" :draggable="canDragElement(9)" :disabled="!canAddElement(9)" :title="elementToolTitle(9, '图标')" @click="addElement(9)" @dragstart="dragTool($event, 9)"><Shapes :size="15" /><span>图标</span></button>
               <button type="button" :draggable="canDragElement(10)" :disabled="!canAddElement(10)" :title="elementToolTitle(10, '二维点阵码')" @click="addElement(10)" @dragstart="dragTool($event, 10)"><QrCode :size="15" /><span>PDF417 / DM</span></button>
+              <button type="button" :draggable="canDragElement(11)" :disabled="!canAddElement(11)" :title="elementToolTitle(11, 'GS1 Composite')" @click="addElement(11)" @dragstart="dragTool($event, 11)"><Barcode :size="15" /><span>GS1 Composite</span></button>
               <button type="button" title="配置动态表格" @click="openTableWizard"><Table2 :size="15" /><span>动态表格</span></button>
               <button type="button" title="将所选元素编组；未多选时组合当前单元格" @click="groupCurrentCell"><Layers :size="15" /><span>组合元素</span></button>
               <button type="button" title="将选中的连续行保存为流式组合" @click="groupSelectedRows"><Layers :size="15" /><span>组合行</span></button>

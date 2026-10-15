@@ -85,6 +85,10 @@ export type DesignerCapabilities = {
   supportsFilledRectangles: boolean
   supportsCoordinates: boolean
   supportsExplicitQuietZone: boolean
+  supportsGs1Composite?: boolean
+  gs1Composite?: { rotations: number[]; modes: string[]; linearTypes: string[] } | null
+  /** 来自协商响应头；旧 Host 或未查询时不视为支持。 */
+  gs1CompositeFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -104,7 +108,7 @@ const knownCutCapabilities = Symbol('knownCutCapabilities')
 export type CapabilityQuery = Pick<DesignerCapabilitiesRequest,
   'protocol' | 'escPosLayoutMode' | 'encoding' | 'escPosDevice' | 'tsplMedia' | 'zplMedia' | 'allowRasterizedLines' | 'requireCutContract'>
 
-export const ELEMENT_TYPES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+export const ELEMENT_TYPES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
 
 const protocolLabels: Record<string, string> = {
   Cpcl: 'CPCL', EscPos: 'ESC/POS', Tspl: 'TSPL', Zpl: 'ZPL',
@@ -583,6 +587,17 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     throw new Error('能力响应的 ESC/POS Native 图片旋转只能包含 0 度。')
   }
   const qrCodeRotations = parseRotationArray(input.qrCodeRotations, 'qrCodeRotations')
+  let gs1Composite: DesignerCapabilities['gs1Composite'] = null
+  if (input.gs1Composite !== undefined && input.gs1Composite !== null) {
+    const composite = input.gs1Composite as Record<string, unknown>
+    if (typeof composite !== 'object' || Array.isArray(composite) || composite.elementType !== 11 ||
+      composite.dimensionsFromEncoding !== true || composite.includesHumanReadable !== false ||
+      !Array.isArray(composite.modes) || composite.modes.join(',') !== 'Auto,CcA,CcB' ||
+      !Array.isArray(composite.linearTypes) || composite.linearTypes.join(',') !== 'Gs1DataBarOmnidirectional,Gs1DataBarLimited')
+      throw new Error('能力响应的 gs1Composite 无效。')
+    gs1Composite = { rotations: parseRotationArray(composite.rotations, 'gs1Composite.rotations'),
+      modes: composite.modes as string[], linearTypes: composite.linearTypes as string[] }
+  }
   const result: DesignerCapabilities = {
     protocol,
     escPosLayoutMode,
@@ -629,6 +644,8 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsFilledRectangles: parseBoolean(input.supportsFilledRectangles, 'supportsFilledRectangles'),
     supportsCoordinates: parseBoolean(input.supportsCoordinates, 'supportsCoordinates'),
     supportsExplicitQuietZone: parseBoolean(input.supportsExplicitQuietZone, 'supportsExplicitQuietZone'),
+    supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
+    gs1Composite,
   }
   const hasEscPosCutFields = Object.prototype.hasOwnProperty.call(input, 'cutModes') &&
     Object.prototype.hasOwnProperty.call(input, 'cutFeedUnits') &&
@@ -664,6 +681,7 @@ export function capabilityFeatureReason(caps: DesignerCapabilities | undefined, 
 
 export function elementTypeSupported(caps: DesignerCapabilities | undefined, type: TemplateElement['Type']): boolean {
   if (type === 6) return true
+  if (type === 11) return Boolean(caps?.gs1CompositeFeature && caps.supportsGs1Composite && caps.gs1Composite && caps.elementTypes.includes(11))
   // ESC/POS Native 只能按流式原生命令输出，图片必须显式切换到 Raster。
   if (type === 2 && caps?.protocol === 'EscPos' && caps.escPosLayoutMode === 'Native') return false
   return Boolean(caps?.elementTypes.includes(type))
@@ -689,8 +707,9 @@ export function valueInRange(value: number | undefined, range: CapabilityRange |
   return value >= range.minimum && (range.maximum === null || value <= range.maximum)
 }
 
-export function rotationSupported(caps: DesignerCapabilities | undefined, type: 1 | 2 | 3 | 4, value: number | undefined): boolean {
+export function rotationSupported(caps: DesignerCapabilities | undefined, type: 1 | 2 | 3 | 4 | 11, value: number | undefined): boolean {
   if (!caps || value === undefined) return false
+  if (type === 11) return elementTypeSupported(caps, 11) && (caps.gs1Composite?.rotations ?? []).includes(value)
   return (type === 1 ? caps.textRotations : type === 2 ? caps.imageRotations : type === 3 ? caps.qrCodeRotations ?? [0] : caps.barcodeRotations).includes(value)
 }
 

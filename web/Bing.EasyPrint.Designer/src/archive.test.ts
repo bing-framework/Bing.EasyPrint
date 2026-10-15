@@ -259,7 +259,7 @@ describe('template resource package', () => {
   it('rejects unsupported template versions and element types', async () => {
     const unsupportedVersion = { ...createProductSample(), Version: 4 }
     const unsupportedType = createProductSample()
-    unsupportedType.Rows[0].Cells![0].Elements![0].Type = 11 as never
+    unsupportedType.Rows[0].Cells![0].Elements![0].Type = 12 as never
 
     for (const template of [unsupportedVersion, unsupportedType]) {
       const zip = await createArchive([['template.json', JSON.stringify(template)]])

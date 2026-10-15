@@ -4,7 +4,7 @@ export type Point = { X: number; Y: number }
 
 export type RotationAngle = 0 | 90 | 180 | 270
 
-/** Type 3/4 的显式静区，单位为打印点；省略的边按 0 处理。 */
+/** Type 3/4/11 的显式静区，单位为打印点；省略的边按 0 处理。 */
 export type QuietZone = { Left?: number; Top?: number; Right?: number; Bottom?: number }
 export const MAX_QUIET_ZONE_DOTS = 2_147_483_647
 
@@ -26,7 +26,7 @@ export type Condition = {
 }
 
 export type BaseElement = {
-  Type: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+  Type: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
   Field?: Field
   Condition?: Condition
   StartCoordinate?: Point
@@ -117,7 +117,18 @@ export type RectangleElement = BaseElement & { Type: 7; Width: number; Height: n
 export type EllipseElement = BaseElement & { Type: 8; Width: number; Height: number; LineWidth?: number }
 export type IconElement = BaseElement & { Type: 9; Icon: 'check' | 'cross' | 'info'; Size: number; LineWidth?: number }
 export type MatrixElement = BaseElement & { Type: 10; Format: 'DataMatrix' | 'PDF417'; Width: number; Height: number }
-export type TemplateElement = FontElement | ImageElement | QrElement | BarcodeElement | LineElement | GroupElement | RectangleElement | EllipseElement | IconElement | MatrixElement
+/** 完整符号的尺寸由 Host 编码决定，不提供任意拉伸宽高或内置 HRI。 */
+export type Gs1CompositeElement = BaseElement & {
+  Type: 11
+  SecondaryField: Field
+  LinearType?: 25 | 27
+  Mode?: 0 | 1 | 2
+  ModuleWidth?: number
+  LinearBarHeight?: number
+  Rotation?: RotationAngle
+  QuietZone?: QuietZone | null
+}
+export type TemplateElement = FontElement | ImageElement | QrElement | BarcodeElement | LineElement | GroupElement | RectangleElement | EllipseElement | IconElement | MatrixElement | Gs1CompositeElement
 export type ComponentDefinition = {
   Id: string
   Width?: number
@@ -354,8 +365,9 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
     }
 
     const element = node as TemplateElement
-    const validTypes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    const validTypes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     if (!Number.isInteger(element.Type) || !validTypes.includes(element.Type)) throw new Error(`不支持的元素类型：${String(element.Type)}`)
+    if (template.Version === 1 && element.Type === 11) throw new Error('Version: 1 使用 Composite 前需要升级至 Version: 2 或 3。')
     if (template.Version === 1 && element.Type > 5) throw new Error('Version: 1 不支持此元素类型。')
     const rawElement = element as unknown as Record<string, unknown>
     if (own(rawElement, 'Filled')) {
@@ -366,8 +378,17 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
       const rotation = rawElement.Rotation
       if (!Number.isInteger(rotation) || ![0, 90, 180, 270].includes(rotation as number))
         throw new Error(`${context.path}.Rotation 必须是 0、90、180 或 270。`)
-      if (element.Type !== 1 && element.Type !== 2 && element.Type !== 3 && element.Type !== 4 && rotation !== 0)
-        throw new Error(`${context.path}.Rotation 仅支持文字、二维码、一维条码以及图片元素。`)
+      if (element.Type !== 1 && element.Type !== 2 && element.Type !== 3 && element.Type !== 4 && element.Type !== 11 && rotation !== 0)
+        throw new Error(`${context.path}.Rotation 仅支持文字、二维码、一维条码、图片以及 Composite 元素。`)
+    }
+    if (element.Type === 11) {
+      if (!element.SecondaryField || typeof element.SecondaryField !== 'object' || Array.isArray(element.SecondaryField))
+        throw new Error(`${context.path}.SecondaryField 必须为字段对象。`)
+      if (![25, 27].includes(element.LinearType ?? 25)) throw new Error(`${context.path}.LinearType 仅支持 Omnidirectional 或 Limited。`)
+      if (![0, 1, 2].includes(element.Mode ?? 0)) throw new Error(`${context.path}.Mode 必须为 Auto、CC-A 或 CC-B。`)
+      for (const [key, value] of [['ModuleWidth', element.ModuleWidth ?? 2], ['LinearBarHeight', element.LinearBarHeight ?? 40]] as const) {
+        if (!Number.isInteger(value) || value < 1 || value > 2147483647) throw new Error(`${context.path}.${key} 必须为正整数打印点。`)
+      }
     }
     if (element.Type === 1 && rawElement.Width !== undefined &&
       (!Number.isInteger(rawElement.Width) || (rawElement.Width as number) < 0))
@@ -426,8 +447,8 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
     }
     const hasQuietZone = own(rawElement, 'QuietZone')
     if (hasQuietZone) {
-      if (element.Type !== 3 && element.Type !== 4)
-        throw new Error(`${context.path}.QuietZone 仅支持二维码和一维条码元素。`)
+      if (element.Type !== 3 && element.Type !== 4 && element.Type !== 11)
+        throw new Error(`${context.path}.QuietZone 仅支持二维码、一维条码和 Composite 元素。`)
       const quietZone = rawElement.QuietZone
       if (quietZone === null) return
       if (!quietZone || typeof quietZone !== 'object' || Array.isArray(quietZone))

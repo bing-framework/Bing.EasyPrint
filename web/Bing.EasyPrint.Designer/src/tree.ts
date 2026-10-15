@@ -32,7 +32,7 @@ export function listTemplateTree(template: BpTemplate): TreeEntry[] {
 }
 
 export function elementLabel(element: TemplateElement): string {
-  const labels: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码' }
+  const labels: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码', 11: 'GS1 Composite' }
   if (element.Type === 6 && element.ComponentId) return `组件 · ${element.ComponentId}`
   return `${labels[element.Type] ?? '元素'}${element.Field?.Name ? ` · ${element.Field.Name}` : element.Field?.Value ? ` · ${element.Field.Value}` : ''}`
 }

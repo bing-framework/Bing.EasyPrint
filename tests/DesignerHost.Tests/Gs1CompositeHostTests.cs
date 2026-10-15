@@ -1,0 +1,216 @@
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using Bing.EasyPrint.Printing;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+public sealed class Gs1CompositeHostTests
+{
+    private const string ContractVersionHeader = "X-EasyPrint-Contract-Version";
+    private const string FeaturesHeader = "X-EasyPrint-Features";
+    private const string RequiredFeaturesHeader = "X-EasyPrint-Required-Features";
+    private const string ValidData =
+        "{\"Primary\":\"1234567890123\",\"Secondary\":\"(91)123456\"}";
+    private const string CompositeTemplate =
+        "{\"Version\":3,\"Width\":500,\"Height\":500,\"Rows\":[{\"Cells\":[{\"Width\":500,\"Elements\":[" +
+        "{\"Type\":11,\"LinearType\":25,\"Mode\":1,\"ModuleWidth\":2,\"LinearBarHeight\":20," +
+        "\"Rotation\":90,\"StartCoordinate\":{\"X\":7,\"Y\":9}," +
+        "\"Field\":{\"Name\":\"Primary\"},\"SecondaryField\":{\"Name\":\"Secondary\"}}]}]}]}";
+
+    [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Composite_capabilities_are_negotiated_for_all_raster_protocols(
+        string protocol, string escPosLayout)
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var context = CreateContext(BuildRequest(protocol, escPosLayout), "gs1-composite");
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Capabilities);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        AssertContractFeature(context);
+        using var response = ReadJson(context);
+        var root = response.RootElement;
+        Assert.True(root.GetProperty("supportsGs1Composite").GetBoolean());
+        Assert.Contains(11, root.GetProperty("elementTypes").EnumerateArray()
+            .Select(value => value.GetInt32()));
+
+        var composite = root.GetProperty("gs1Composite");
+        Assert.Equal(11, composite.GetProperty("elementType").GetInt32());
+        Assert.Equal(new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited" },
+            composite.GetProperty("linearTypes").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(new[] { "Auto", "CcA", "CcB" },
+            composite.GetProperty("modes").EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(new[] { 0, 90, 180, 270 },
+            composite.GetProperty("rotations").EnumerateArray().Select(value => value.GetInt32()));
+        Assert.Equal("GTIN-13-data", composite.GetProperty("primaryFormats")[0].GetString());
+        Assert.Equal("bracketed-gs1-ai", composite.GetProperty("secondaryFormat").GetString());
+        Assert.False(composite.GetProperty("includesHumanReadable").GetBoolean());
+        Assert.True(composite.GetProperty("dimensionsFromEncoding").GetBoolean());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData("EscPos", "Native", "")]
+    [InlineData("Tspl", "", "tsplMedia")]
+    [InlineData("Zpl", "", "zplMedia")]
+    public async Task Native_or_profile_without_images_rejects_composite_before_binding(
+        string protocol, string escPosLayout, string mediaProperty)
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var media = string.IsNullOrEmpty(mediaProperty)
+            ? null
+            : "\"" + mediaProperty + "\":{\"profile\":{\"name\":\"NoImages\",\"supportsImages\":false}}";
+        var request = BuildRequest(protocol, escPosLayout, mediaJson: media);
+
+        var capabilities = CreateContext(request);
+        await DesignerRequestExecution.ExecuteAsync(capabilities, DesignerRequestProcessor.Capabilities);
+        Assert.Equal(StatusCodes.Status200OK, capabilities.Response.StatusCode);
+        using (var response = ReadJson(capabilities))
+        {
+            var root = response.RootElement;
+            Assert.False(root.GetProperty("supportsGs1Composite").GetBoolean());
+            Assert.DoesNotContain(11, root.GetProperty("elementTypes").EnumerateArray()
+                .Select(value => value.GetInt32()));
+            Assert.Equal(JsonValueKind.Null, root.GetProperty("gs1Composite").ValueKind);
+        }
+
+        var preview = CreateContext(request);
+        await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, preview.Response.StatusCode);
+        AssertContractFeature(preview);
+        using var errorResponse = ReadJson(preview);
+        var error = errorResponse.RootElement.GetProperty("errors")[0];
+        Assert.Equal("UnsupportedCapability", error.GetProperty("code").GetString());
+        Assert.Equal("Render", error.GetProperty("phase").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+        Assert.Contains("不支持", error.GetProperty("message").GetString());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Fact]
+    public async Task Preview_reports_the_encoded_composite_size_after_rotation()
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var context = CreateContext(BuildRequest("Cpcl", ""));
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var element = Assert.Single(response.RootElement.GetProperty("pages")[0]
+            .GetProperty("elements").EnumerateArray()
+            .Where(value => value.GetProperty("type").GetInt32() == 11));
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", element.GetProperty("sourcePath").GetString());
+        Assert.Equal(7, element.GetProperty("x").GetInt32());
+        Assert.Equal(9, element.GetProperty("y").GetInt32());
+        Assert.Equal(34, element.GetProperty("width").GetInt32());
+        Assert.Equal(200, element.GetProperty("height").GetInt32());
+        Assert.Equal(90, element.GetProperty("rotation").GetInt32());
+        Assert.Equal("1234567890123", element.GetProperty("text").GetString());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Fact]
+    public async Task Preview_binding_failure_preserves_composite_component_ownership()
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var context = CreateContext(BuildRequest("Cpcl", "", RepeatedCompositeTemplate(),
+            "{\"Items\":[{\"Primary\":\"1234567890123\",\"Secondary\":\"(91)123456\"}," +
+            "{\"Primary\":\"not-a-gtin\",\"Secondary\":\"(91)123456\"}]}"));
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        AssertContractFeature(context);
+        using var response = ReadJson(context);
+        var error = response.RootElement.GetProperty("errors")[0];
+        Assert.Equal("BindingFailed", error.GetProperty("code").GetString());
+        Assert.Equal("Primary", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Components[0].Elements[0]", error.GetProperty("definitionPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("componentInstancePath").GetString());
+        Assert.Equal(new[] { 1 }, error.GetProperty("instanceIndices").EnumerateArray()
+            .Select(value => value.GetInt32()));
+        Assert.Equal("Rows[0].Cells[0].Elements[0].Elements[0]",
+            error.GetProperty("sourcePath").GetString());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "", "page-001.cpcl")]
+    [InlineData("Tspl", "", "page-001.tspl")]
+    [InlineData("Zpl", "", "page-001.zpl")]
+    [InlineData("EscPos", "Raster", "page-001.escpos")]
+    public async Task Render_returns_nonempty_composite_bytes_for_all_protocols(
+        string protocol, string escPosLayout, string expectedFile)
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var context = CreateContext(BuildRequest(protocol, escPosLayout));
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Render);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(context), writable: false),
+            ZipArchiveMode.Read);
+        var page = Assert.Single(archive.Entries, entry => entry.FullName == expectedFile);
+        Assert.True(page.Length > 0);
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    private static string RepeatedCompositeTemplate()
+        => "{\"Version\":3,\"Width\":500,\"Height\":500,\"Components\":[" +
+        "{\"Id\":\"composite\",\"Width\":500,\"Height\":80,\"Elements\":[" +
+        "{\"Type\":11,\"LinearType\":25,\"Mode\":1,\"ModuleWidth\":2,\"LinearBarHeight\":20," +
+        "\"Field\":{\"Name\":\"Primary\"},\"SecondaryField\":{\"Name\":\"Secondary\"}}]}]," +
+        "\"Rows\":[{\"RepeatSource\":\"Items\",\"Cells\":[{\"Elements\":[" +
+        "{\"Type\":6,\"ComponentId\":\"composite\"}]}]}]}";
+
+    private static string BuildRequest(string protocol, string escPosLayout,
+        string template = CompositeTemplate, string data = ValidData, string? mediaJson = null)
+    {
+        var options = "\"protocol\":\"" + protocol + "\",\"encoding\":\"ASCII\"," +
+            "\"feedLines\":0,\"cutAfterPrint\":false";
+        if (!string.IsNullOrEmpty(escPosLayout))
+            options += ",\"escPosLayoutMode\":\"" + escPosLayout + "\"";
+        if (!string.IsNullOrEmpty(mediaJson)) options += "," + mediaJson;
+        return "{\"template\":" + template + ",\"data\":" + data + "," + options + "}";
+    }
+
+    private static DefaultHttpContext CreateContext(string json, string? requiredFeatures = null)
+    {
+        var services = new ServiceCollection()
+            .AddLogging()
+            .AddOptions()
+            .BuildServiceProvider();
+        var body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Body = body;
+        context.Request.ContentLength = body.Length;
+        context.Request.ContentType = "application/json; charset=utf-8";
+        if (requiredFeatures != null)
+            context.Request.Headers[RequiredFeaturesHeader] = requiredFeatures;
+        context.Response.Body = new MemoryStream();
+        return context;
+    }
+
+    private static JsonDocument ReadJson(DefaultHttpContext context)
+    {
+        context.Response.Body.Position = 0;
+        return JsonDocument.Parse(context.Response.Body);
+    }
+
+    private static byte[] ReadResponseBytes(DefaultHttpContext context)
+        => Assert.IsType<MemoryStream>(context.Response.Body).ToArray();
+
+    private static void AssertContractFeature(DefaultHttpContext context)
+    {
+        Assert.Equal("1", context.Response.Headers[ContractVersionHeader].ToString());
+        Assert.Contains("gs1-composite", context.Response.Headers[FeaturesHeader].ToString());
+    }
+}

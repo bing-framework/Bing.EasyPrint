@@ -1,6 +1,7 @@
 import type { BpTemplate, DesignerDiagnostic, PreviewResponse, TemplateResource } from './model'
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
+import { walkTemplateNodes } from './templateTraversal'
 
 export type DesignerSample = { id: string; name: string; template: BpTemplate; data: unknown }
 export type PrintProtocol = 'Cpcl' | 'EscPos' | 'Tspl' | 'Zpl'
@@ -292,11 +293,11 @@ function clientValidationError(message: string, code: string, phase: string): De
   return new DesignerValidationError(message, [{ message, code, phase }])
 }
 
-function designerPostHeaders(): Record<string, string> {
+function designerPostHeaders(requiredFeatures: string[]): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     [DESIGNER_CONTRACT_VERSION_HEADER]: DESIGNER_CONTRACT_VERSION,
-    [DESIGNER_REQUIRED_FEATURES_HEADER]: DESIGNER_REQUIRED_FEATURES.join(','),
+    [DESIGNER_REQUIRED_FEATURES_HEADER]: requiredFeatures.join(','),
   }
 }
 
@@ -304,14 +305,14 @@ function isAbortError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 }
 
-function validateDesignerContract(response: Response): void {
+function validateDesignerContract(response: Response, requiredFeatures: string[]): void {
   if (response.headers.get(DESIGNER_CONTRACT_VERSION_HEADER)?.trim() !== DESIGNER_CONTRACT_VERSION) {
     throw clientValidationError('打印服务版本不兼容，请更新 Host。', 'ContractVersionMismatch', 'Contract')
   }
 
   const availableFeatures = new Set((response.headers.get(DESIGNER_FEATURES_HEADER) ?? '')
     .split(',').map((feature) => feature.trim()).filter((feature) => feature.length > 0))
-  const missingFeatures = DESIGNER_REQUIRED_FEATURES.filter((feature) => !availableFeatures.has(feature))
+  const missingFeatures = requiredFeatures.filter((feature) => !availableFeatures.has(feature))
   if (missingFeatures.length > 0) {
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
       'ContractFeatureUnavailable', 'Contract')
@@ -319,12 +320,18 @@ function validateDesignerContract(response: Response): void {
 }
 
 async function postDesignerJson(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const requiredFeatures: string[] = [...DESIGNER_REQUIRED_FEATURES]
+  const template = (body as { template?: BpTemplate }).template
+  if (template) walkTemplateNodes(template, (node, context) => {
+    if (context.kind === 'element' && 'Type' in node && node.Type === 11 && !requiredFeatures.includes('gs1-composite'))
+      requiredFeatures.push('gs1-composite')
+  })
   const serializedBody = JSON.stringify(body)
   let response: Response
   try {
     response = await fetch(path, {
       method: 'POST',
-      headers: designerPostHeaders(),
+      headers: designerPostHeaders(requiredFeatures),
       body: serializedBody,
       signal,
     })
@@ -337,7 +344,7 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   }
 
   if (!response.ok) throw await responseError(response)
-  validateDesignerContract(response)
+  validateDesignerContract(response, requiredFeatures)
   return response
 }
 
@@ -407,6 +414,8 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   if (labelProfileRequested && capabilities.labelProfile == null) {
     throw new Error('能力服务未返回标签机型配置，请更新 Host。')
   }
+  capabilities.gs1CompositeFeature = (response.headers.get(DESIGNER_FEATURES_HEADER) ?? '').split(',')
+    .some((feature) => feature.trim() === 'gs1-composite')
   return capabilities
 }
 
