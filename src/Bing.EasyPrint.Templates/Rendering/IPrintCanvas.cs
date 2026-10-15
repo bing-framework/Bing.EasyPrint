@@ -28,6 +28,7 @@ internal interface IPrintCanvas
         int reservedWidth = 0, int reservedHeight = 0, PrintQuietZone quietZone = null);
     void DrawImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None);
     void DrawCompressedImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None);
+    void DrawGs1Composite(int x, int y, PrintGs1CompositeElement element);
     byte[] Build();
 }
 
@@ -200,6 +201,11 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
             : PrintCanvasRasterizer.ToMonochrome(image, _options.ImageThreshold, _cancellationToken).Bytes;
         Add(new PrintImageElement(x, y, image.Width, image.Height, raster, rotation, compressed: true));
     }
+
+    public void DrawGs1Composite(int x, int y, PrintGs1CompositeElement element)
+        => Add(new PrintGs1CompositeElement(x, y, element.LinearType, element.PrimaryData,
+            element.SecondaryData, element.LinearBarHeight, element.ModuleWidth, element.Mode,
+            element.Rotation, element.QuietZone));
 
     internal PrintPage AppendPage(PrintDocument document)
     {

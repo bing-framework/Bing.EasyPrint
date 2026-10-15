@@ -15,6 +15,7 @@ internal static class PrintQuietZoneValidator
         CancellationToken cancellationToken, RasterFontCatalog rasterFonts = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ValidateCompositeZones(page, pageIndex, protocol, supported, cancellationToken, rasterFonts);
         var protectedCodes = new List<int>();
         for (var index = 0; index < page.Elements.Count; index++)
         {
@@ -90,6 +91,44 @@ internal static class PrintQuietZoneValidator
         => supported && protocol == PrintProtocol.EscPos &&
            element is PrintBarcodeElement barcode && barcode.Type == BarcodeType.Code49;
 
+    private static void ValidateCompositeZones(PrintPage page, int pageIndex, PrintProtocol protocol,
+        bool supported, CancellationToken cancellationToken, RasterFontCatalog rasterFonts)
+    {
+        for (var index = 0; index < page.Elements.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!(page.Elements[index] is PrintGs1CompositeElement composite) ||
+                composite.QuietZone == null || composite.QuietZone.IsEmpty()) continue;
+            if (!supported)
+                throw new PrintCapabilityException(protocol, Path(page, pageIndex, index),
+                    new NotSupportedException("当前模式不支持 Composite 静区。"), pageIndex, index);
+            using var resources = PrintResourceScope.BeginTemporary();
+            var image = Gs1CompositeEncoder.Rasterize(composite, cancellationToken);
+            var zone = composite.QuietZone.Rotate(composite.Rotation);
+            // Composite's coordinate includes its quiet zone, unlike ordinary
+            // barcodes whose explicit zone expands outside the body coordinate.
+            var areas = zone.Areas((long)image.X + zone.Left, (long)image.Y + zone.Top,
+                image.OutputWidth - zone.Left - zone.Right, image.OutputHeight - zone.Top - zone.Bottom);
+            for (var otherIndex = 0; otherIndex < page.Elements.Count; otherIndex++)
+            {
+                if (otherIndex == index) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                IReadOnlyList<QuietZoneArea> occupied;
+                try { occupied = Occupied(page.Elements[otherIndex], protocol, cancellationToken, rasterFonts); }
+                catch (NotSupportedException error)
+                { throw new PrintCapabilityException(protocol, Path(page, pageIndex, otherIndex), error, pageIndex, otherIndex); }
+                catch (ArgumentException error)
+                { throw new PrintElementValidationException(protocol, Path(page, pageIndex, otherIndex), error, pageIndex, otherIndex); }
+                foreach (var area in areas)
+                    foreach (var other in occupied)
+                        if (area.Intersects(other))
+                            throw new PrintElementValidationException(protocol, Path(page, pageIndex, index),
+                                new ArgumentException("Composite 静区与元素 " + Path(page, pageIndex, otherIndex) + " 的占位相交。"),
+                                pageIndex, index);
+            }
+        }
+    }
+
     private static IReadOnlyList<QuietZoneArea> IntrinsicCode49QuietZones(PrintBarcodeElement barcode,
         CancellationToken cancellationToken)
     {
@@ -157,6 +196,12 @@ internal static class PrintQuietZoneValidator
         cancellationToken.ThrowIfCancellationRequested();
         switch (element)
         {
+            case PrintGs1CompositeElement composite:
+            {
+                using var resources = PrintResourceScope.BeginTemporary();
+                var image = Gs1CompositeEncoder.Rasterize(composite, cancellationToken);
+                return new[] { new QuietZoneArea(image.X, image.Y, image.OutputWidth, image.OutputHeight) };
+            }
             case PrintBarcodeElement barcode:
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -199,19 +244,23 @@ internal static class PrintQuietZoneValidator
                 if (protocol == PrintProtocol.EscPos)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var ink = EscPosRasterCanvas.MeasureTextInkBounds(text.Text, text.FontSize,
-                        text.Bold, text.Underline, text.FontFamily, long.MaxValue, rasterFonts,
-                        cancellationToken);
+                    var ink = text.Reverse
+                        ? EscPosRasterCanvas.MeasureReverseTextBounds(text.Text, text.FontSize,
+                            text.Bold, text.Underline, text.FontFamily, long.MaxValue, rasterFonts,
+                            cancellationToken)
+                        : EscPosRasterCanvas.MeasureTextInkBounds(text.Text, text.FontSize,
+                            text.Bold, text.Underline, text.FontFamily, long.MaxValue, rasterFonts,
+                            cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     if (ink.IsEmpty) return Array.Empty<QuietZoneArea>();
 
-                    // Raster 旋转文字以旋转后的紧致墨迹框左上角为坐标；未旋转文字仍保留
-                    // DrawText 的字体 bearing 偏移，避免改变既有静区边界语义。
+                    // 反白黑底及旋转文字均以实际布局外框左上角定位；普通未旋转文字
+                    // 仍保留字体 bearing 偏移。非空空格的反白背景也必须保护静区。
                     var quarterTurn = text.Rotation == RotationAngle.Rotate90 ||
                                       text.Rotation == RotationAngle.Rotate270;
                     var width = quarterTurn ? ink.Height : ink.Width;
                     var height = quarterTurn ? ink.Width : ink.Height;
-                    return text.Rotation == RotationAngle.None
+                    return !text.Reverse && text.Rotation == RotationAngle.None
                         ? new[] { new QuietZoneArea((long)text.X + ink.Left, (long)text.Y + ink.Top,
                             ink.Width, ink.Height) }
                         : new[] { new QuietZoneArea(text.X, text.Y, width, height) };

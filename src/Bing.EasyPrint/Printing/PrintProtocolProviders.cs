@@ -123,7 +123,25 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
                     throw new PrintCapabilityException(Protocol,
                         element.SourcePath ?? $"Pages[{pageIndex}].Elements[{elementIndex}]", error, pageIndex, elementIndex);
                 }
-                if (Protocol != PrintProtocol.Cpcl || element is PrintImageElement rotatedImage && rotatedImage.Rotation != RotationAngle.None ||
+                if (element is PrintGs1CompositeElement composite)
+                {
+                    try
+                    {
+                        var size = Gs1CompositeEncoder.Measure(composite, cancellationToken);
+                        var quarterTurn = composite.Rotation == RotationAngle.Rotate90 || composite.Rotation == RotationAngle.Rotate270;
+                        if ((long)composite.X + (quarterTurn ? size.Height : size.Width) > page.Width ||
+                            (long)composite.Y + (quarterTurn ? size.Width : size.Height) > page.Height)
+                            throw new ArgumentException("Composite 完整符号及静区超出打印页范围。");
+                        element = Gs1CompositeEncoder.Rasterize(composite, cancellationToken);
+                    }
+                    catch (ArgumentException error)
+                    {
+                        throw new PrintElementValidationException(Protocol,
+                            composite.SourcePath ?? $"Pages[{pageIndex}].Elements[{elementIndex}]", error, pageIndex, elementIndex);
+                    }
+                }
+                if (Protocol != PrintProtocol.Cpcl || page.Elements[elementIndex] is PrintGs1CompositeElement ||
+                    element is PrintImageElement rotatedImage && rotatedImage.Rotation != RotationAngle.None ||
                     element is PrintRectangleElement exactRectangle && exactRectangle.ExactFillBounds)
                 {
                     try { ValidateElementBounds(page, element, Protocol, cancellationToken, Capabilities); }
@@ -635,6 +653,8 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
 
     private void ValidateProfileElementKind(PrintElement element)
     {
+        if (element is PrintGs1CompositeElement && !Capabilities.SupportsGs1Composite)
+            throw new NotSupportedException($"协议 {Protocol} 当前模式或机型不支持 Composite 图片输出。");
         if (Capabilities.DeviceProfileName != null &&
             (element is PrintTextElement && !Capabilities.SupportsText ||
              element is PrintImageElement && !Capabilities.SupportsImages ||
@@ -738,6 +758,11 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
            barcode.HumanReadable == null && (Protocol == PrintProtocol.Tspl || Protocol == PrintProtocol.Zpl);
 
     public abstract IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken));
+
+    // Every provider sends the same encoded raster through its existing image path.
+    protected static PrintElement PrepareComposite(PrintElement element, CancellationToken cancellationToken)
+        => element is PrintGs1CompositeElement composite
+            ? Gs1CompositeEncoder.Rasterize(composite, cancellationToken) : element;
 
     protected static string TsplBarcodeType(BarcodeType type)
     {
@@ -845,6 +870,7 @@ public sealed class CpclPrintProtocolProvider : PrintProtocolProviderBase
 
     private static void Add(CPCLPrintCommand command, PrintElement element, CancellationToken cancellationToken = default(CancellationToken))
     {
+        element = PrepareComposite(element, cancellationToken);
         switch (element)
         {
             case PrintTextElement text:
@@ -997,6 +1023,7 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
 
     private static void Add(TsplPrintCommand command, PrintElement element, int dpi, CancellationToken cancellationToken)
     {
+        element = PrepareComposite(element, cancellationToken);
         switch (element)
         {
             case PrintTextElement text:
@@ -1228,6 +1255,7 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
 
     private static void Add(ZplPrintCommand command, PrintElement element, CancellationToken cancellationToken)
     {
+        element = PrepareComposite(element, cancellationToken);
         switch (element)
         {
             case PrintTextElement text:
@@ -1638,6 +1666,7 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
+                        element = PrepareComposite(element, cancellationToken);
                         switch (element)
                         {
                             case PrintTextElement text:

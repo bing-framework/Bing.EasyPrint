@@ -1060,7 +1060,8 @@ public sealed class EscPosRasterCanvas
         => EncodeGs1DataBarPattern(NormalizeBarcodeData(BarcodeType.Gs1DataBarOmnidirectional, data),
             CancellationToken.None);
 
-    private static string EncodeGs1DataBarPattern(string normalizedData, CancellationToken cancellationToken)
+    private static string EncodeGs1DataBarPattern(string normalizedData, CancellationToken cancellationToken,
+        bool composite = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var value = 0L;
@@ -1070,6 +1071,7 @@ public sealed class EscPosRasterCanvas
             value = checked(value * 10 + normalizedData[index] - '0');
         }
 
+        if (composite) value += 10000000000000L;
         var leftPair = (int)(value / 4537077L);
         var rightPair = (int)(value % 4537077L);
         var dataCharacters = new[]
@@ -1148,8 +1150,16 @@ public sealed class EscPosRasterCanvas
         => EncodeGs1DataBarLimitedPattern(NormalizeBarcodeData(BarcodeType.Gs1DataBarLimited, data),
             CancellationToken.None);
 
-    private static string EncodeGs1DataBarLimitedPattern(string normalizedData,
+    // Composite inputs are validated by the shared composite encoder. Keep the
+    // linkage offset out of ordinary DataBar entry points to preserve their bytes.
+    internal static string EncodeGs1CompositeLinearPattern(BarcodeType type, string normalizedData,
         CancellationToken cancellationToken)
+        => type == BarcodeType.Gs1DataBarLimited
+            ? EncodeGs1DataBarLimitedPattern(normalizedData, cancellationToken, composite: true)
+            : EncodeGs1DataBarPattern(normalizedData, cancellationToken, composite: true);
+
+    private static string EncodeGs1DataBarLimitedPattern(string normalizedData,
+        CancellationToken cancellationToken, bool composite = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var value = 0L;
@@ -1159,6 +1169,7 @@ public sealed class EscPosRasterCanvas
             value = checked(value * 10 + normalizedData[index] - '0');
         }
 
+        if (composite) value += 2015133531096L;
         var pairValues = new[]
         {
             (int)(value / 2013571L),
@@ -1174,8 +1185,10 @@ public sealed class EscPosRasterCanvas
             var widths = new int[2, 7];
             Gs1DataBarGetWidths(widths, 0, odd, Gs1DataBarLimitedModules[group], 7,
                 Gs1DataBarLimitedWidest[group], false, cancellationToken);
+            // Linkage changes the Limited even-character range: allow its
+            // no-narrow patterns while preserving ordinary Limited output.
             Gs1DataBarGetWidths(widths, 1, even, 26 - Gs1DataBarLimitedModules[group], 7,
-                9 - Gs1DataBarLimitedWidest[group], false, cancellationToken);
+                9 - Gs1DataBarLimitedWidest[group], composite, cancellationToken);
             for (var element = 0; element < 7; element++)
             {
                 pairWidths[pair, element * 2] = widths[0, element];
@@ -1505,10 +1518,11 @@ public sealed class EscPosRasterCanvas
     }
 
     /// <summary>按 ISO/IEC 24724 的 Expanded 通用字段状态机追加编码位。</summary>
-    private static void EncodeGs1DataBarExpandedGeneralField(string normalizedData, int startIndex,
-        StringBuilder binary, CancellationToken cancellationToken, out int mode, out char lastDigit)
+    internal static void EncodeGs1DataBarExpandedGeneralField(string normalizedData, int startIndex,
+        StringBuilder binary, CancellationToken cancellationToken, out int mode, out char lastDigit,
+        int initialMode = ExpandedGeneralFieldNumeric)
     {
-        mode = ExpandedGeneralFieldNumeric;
+        mode = initialMode;
         lastDigit = '\0';
         var end = normalizedData.Length;
         for (var index = startIndex; index < end;)

@@ -60,6 +60,8 @@ public sealed class TemplateProtocolCapabilities
     public bool SupportsCoordinates => _provider.SupportsCoordinates;
     /// <summary>获取是否支持显式码图静区；空静区仍可用于保留原生命令原点。</summary>
     public bool SupportsExplicitQuietZone => _provider.SupportsExplicitQuietZone;
+    /// <summary>获取是否支持 GS1 Composite 模板元素。</summary>
+    public bool SupportsGs1Composite => _provider.SupportsGs1Composite;
     /// <summary>获取支持的模板元素类型，包括逻辑组合类型 6。</summary>
     public IReadOnlyList<int> ElementTypes { get; }
     /// <summary>获取支持的语义字体来源。</summary>
@@ -124,14 +126,15 @@ public sealed class TemplateProtocolCapabilities
         _provider = provider;
         EscPosLayoutMode = Protocol == PrintProtocol.EscPos ? layout : (EscPosLayoutMode?)null;
         var native = Protocol == PrintProtocol.EscPos && layout == Bing.EasyPrint.EscPosLayoutMode.Native;
-        ElementTypes = Array.AsReadOnly(Enumerable.Range(1, 10).Where(type =>
+        ElementTypes = Array.AsReadOnly(Enumerable.Range(1, 11).Where(type =>
             (!native || type == 1 || type == 6 || type == 3 && provider.SupportsQrCode || type == 4 && provider.SupportsBarcode) &&
             (type == 6 || type == 1 && provider.SupportsText || type == 2 && provider.SupportsImages ||
              type == 3 && provider.SupportsQrCode || type == 4 && provider.SupportsBarcode ||
              (type == 5 || type == 7) && provider.SupportsGraphics ||
              type == 8 && provider.SupportsGraphics && provider.SupportsImages ||
              type == 9 && provider.SupportsGraphics ||
-             type == 10 && provider.SupportsImages)).ToArray());
+             type == 10 && provider.SupportsImages ||
+             type == 11 && provider.SupportsGs1Composite)).ToArray());
         FontKinds = provider.FontKinds;
         TextSizes = Protocol == PrintProtocol.Cpcl
             ? Array.AsReadOnly(Enum.GetValues(typeof(FontSize)).Cast<FontSize>().Select(size => (int)size).ToArray())

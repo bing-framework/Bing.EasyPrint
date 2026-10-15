@@ -62,6 +62,8 @@ public sealed class PrintCapabilities
     public bool SupportsExplicitQuietZone => SupportsCoordinates;
     /// <summary>获取是否支持图片。</summary>
     public bool SupportsImages { get; }
+    /// <summary>获取是否支持通过共享主机位图输出 DataBar Omnidirectional/Limited Composite。</summary>
+    public bool SupportsGs1Composite => SupportsImages && SupportsCoordinates;
     /// <summary>获取是否支持二维码。</summary>
     public bool SupportsQrCode { get; }
     /// <summary>获取是否支持旋转。</summary>

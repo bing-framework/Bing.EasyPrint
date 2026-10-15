@@ -3604,6 +3604,9 @@
         <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsImages">
             <summary>获取是否支持图片。</summary>
         </member>
+        <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsGs1Composite">
+            <summary>获取是否支持通过共享主机位图输出 DataBar Omnidirectional/Limited Composite。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.PrintCapabilities.SupportsQrCode">
             <summary>获取是否支持二维码。</summary>
         </member>
@@ -3889,6 +3892,18 @@
             <param name="name">主机字体名称或设备字体标识；默认字体必须为 <see langword="null" />。</param>
             <exception cref="T:System.ArgumentOutOfRangeException">字体来源类型不是已定义的 <see cref="T:Bing.EasyPrint.PrintFontKind" /> 值。</exception>
             <exception cref="T:System.ArgumentException">名称与字体来源类型的约束不匹配。</exception>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.Gs1CompositeMode">
+            <summary>GS1 Composite 二维组件的编码模式。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Printing.Gs1CompositeMode.Auto">
+            <summary>优先 CC-A；容量不足时改用 CC-B。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Printing.Gs1CompositeMode.CcA">
+            <summary>仅使用 CC-A，超过容量时失败。</summary>
+        </member>
+        <member name="F:Bing.EasyPrint.Printing.Gs1CompositeMode.CcB">
+            <summary>仅使用 CC-B，超过容量时失败。</summary>
         </member>
         <member name="T:Bing.EasyPrint.Printing.IPrintProtocolProvider">
             <summary>将协议无关打印文档编码为目标指令集的 Provider。</summary>
@@ -4179,6 +4194,38 @@
         </member>
         <member name="P:Bing.EasyPrint.Printing.PrintElementValidationException.ElementIndex">
             <summary>获取失败元素在页面中的零基序号；页级错误为 null。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Printing.PrintGs1CompositeElement">
+            <summary>由 DataBar 线性组件、分隔图案和 CC-A/CC-B 组成的独立复合码。</summary>
+            <remarks>
+            坐标为含静区的旋转后完整符号左上角。模块宽度、线性条高和静区均以打印点计；
+            二维组件每行高为两倍模块宽度，分隔行高为模块宽度。尺寸由实际编码结果决定，
+            不内置 HRI；需要可读文字时使用独立文字元素。
+            </remarks>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.LinearType">
+            <summary>获取线性制式，仅支持 Omnidirectional 和 Limited。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.PrimaryData">
+            <summary>获取主数据：13 位 GTIN 数据、有效 14 位 GTIN 或单个 (01) 元素串。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.SecondaryData">
+            <summary>获取次数据：当前共享解析器支持的括号式 GS1 AI 元素串。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.Mode">
+            <summary>获取二维组件模式。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.ModuleWidth">
+            <summary>获取模块宽度，单位为打印点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.LinearBarHeight">
+            <summary>获取线性组件条高，单位为打印点。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Printing.PrintGs1CompositeElement.QuietZone">
+            <summary>获取随整个符号旋转的四边静区；null 表示未增加显式静区。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Printing.PrintGs1CompositeElement.#ctor(System.Int32,System.Int32,Bing.EasyPrint.BarcodeType,System.String,System.String,System.Int32,System.Int32,Bing.EasyPrint.Printing.Gs1CompositeMode,Bing.EasyPrint.RotationAngle,Bing.EasyPrint.PrintQuietZone)">
+            <summary>创建独立复合码，主次数据的语义和容量在编码时校验。</summary>
         </member>
         <member name="T:Bing.EasyPrint.Printing.PrintImageRasterizer">
             <summary>将图片按 CPCL 兼容的抖动规则转换为 MSB 优先单色位图。</summary>
@@ -5028,7 +5075,7 @@
             <param name="name">异常中的参数名称。</param>
             <param name="requireFnc1">是否要求元素串包含 FNC1 分隔符。</param>
         </member>
-        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarExpandedGeneralField(System.String,System.Int32,System.Text.StringBuilder,System.Threading.CancellationToken,System.Int32@,System.Char@)">
+        <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeGs1DataBarExpandedGeneralField(System.String,System.Int32,System.Text.StringBuilder,System.Threading.CancellationToken,System.Int32@,System.Char@,System.Int32)">
             <summary>按 ISO/IEC 24724 的 Expanded 通用字段状态机追加编码位。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Protocols.EscPosRasterCanvas.EncodeIntelligentMailPattern(System.String)">
@@ -5329,6 +5376,18 @@
         </member>
         <member name="T:Bing.EasyPrint.Protocols.Gs1BarcodeCapacity">
             <summary>校验设备 Profile 声明的 GS1 单符号 payload 字符上限。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1CompositeEncoder.Encode(Bing.EasyPrint.Printing.PrintGs1CompositeElement,System.Threading.CancellationToken)">
+            <summary>生成真实模块矩阵；二维行、分隔行、线性行分别占用一行。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1CompositeEncoder.Measure(Bing.EasyPrint.Printing.PrintGs1CompositeElement,System.Threading.CancellationToken)">
+            <summary>只编码模块矩阵，测量含静区的旋转前实际尺寸。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Protocols.Gs1CompositeEncoder.Rasterize(Bing.EasyPrint.Printing.PrintGs1CompositeElement,System.Threading.CancellationToken)">
+            <summary>以实际码图尺寸、完整静区和旋转生成不可拆分的图片模型。</summary>
+        </member>
+        <member name="T:Bing.EasyPrint.Protocols.Gs1CompositeTables">
+            <summary>Fixed tables used by the managed GS1 Composite encoder.</summary>
         </member>
         <member name="T:Bing.EasyPrint.Protocols.NativeBarcodeHumanReadableOverhang">
             <summary>声明原生条码可读文字（HRI）超出估算条码矩形的页面边距。</summary>

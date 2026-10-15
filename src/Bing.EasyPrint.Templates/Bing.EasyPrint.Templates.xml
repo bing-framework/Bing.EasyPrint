@@ -271,6 +271,33 @@
             获取或设置组合的分页策略。
             </summary>
         </member>
+        <member name="T:Bing.EasyPrint.Elements.BpGs1CompositeElement">
+            <summary>绑定主次 GS1 数据的不可拆分复合码模板元素，支持 V2/V3。</summary>
+        </member>
+        <member name="M:Bing.EasyPrint.Elements.BpGs1CompositeElement.#ctor">
+            <summary>初始化复合码元素。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.SecondaryField">
+            <summary>获取或设置绑定次数据的字段；继承的 Field 绑定主数据。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.LinearType">
+            <summary>获取或设置线性制式，默认 Omnidirectional。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.Mode">
+            <summary>获取或设置 CC-A/CC-B 编码模式，默认自动选择。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.ModuleWidth">
+            <summary>获取或设置模块宽度，单位为打印点，默认 2。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.LinearBarHeight">
+            <summary>获取或设置线性条高，单位为打印点，默认 40。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.Rotation">
+            <summary>获取或设置整个符号的顺时针旋转角度。</summary>
+        </member>
+        <member name="P:Bing.EasyPrint.Elements.BpGs1CompositeElement.QuietZone">
+            <summary>获取或设置随完整符号旋转的静区，单位为打印点。</summary>
+        </member>
         <member name="T:Bing.EasyPrint.Elements.BpIconElement">
             <summary>
             定义使用线段绘制的内置单色图标元素。
@@ -1970,6 +1997,9 @@
         <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsExplicitQuietZone">
             <summary>获取是否支持显式码图静区；空静区仍可用于保留原生命令原点。</summary>
         </member>
+        <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.SupportsGs1Composite">
+            <summary>获取是否支持 GS1 Composite 模板元素。</summary>
+        </member>
         <member name="P:Bing.EasyPrint.Templates.TemplateProtocolCapabilities.ElementTypes">
             <summary>获取支持的模板元素类型，包括逻辑组合类型 6。</summary>
         </member>
@@ -2500,16 +2530,18 @@
             <param name="sourcePath">模板元素的节点路径。</param>
             <returns>包含实际尺寸与绘制操作的布局块。</returns>
         </member>
-        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.MatrixCode(Bing.EasyPrint.Elements.BpMatrixCodeElement,System.String,System.Int32,System.String,Bing.EasyPrint.Templates.Binding)">
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Composite(Bing.EasyPrint.Elements.BpGs1CompositeElement,System.Int32,System.String,Bing.EasyPrint.Templates.Binding)">
             <summary>
-            生成二维点阵码的黑白图片布局。
+            生成不可拆分的复合码布局块。
             </summary>
             <param name="element">点阵码元素及预留尺寸。</param>
-            <param name="text">待编码的内容。</param>
             <param name="available">元素可用的打印点宽度。</param>
             <param name="sourcePath">模板元素的节点路径。</param>
             <param name="binding">当前重复数据的绑定上下文。</param>
             <returns>包含点阵码位图的布局块。</returns>
+        </member>
+        <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.MatrixCode(Bing.EasyPrint.Elements.BpMatrixCodeElement,System.String,System.Int32,System.String,Bing.EasyPrint.Templates.Binding)">
+            <summary>生成二维点阵码的黑白图片布局。</summary>
         </member>
         <member name="M:Bing.EasyPrint.Templates.TemplateRenderer.Session.Group(Bing.EasyPrint.Elements.BpGroupElement,System.Int32,Bing.EasyPrint.Templates.Binding,System.String)">
             <summary>

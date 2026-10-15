@@ -132,6 +132,10 @@ public abstract class PrintElement
             case PrintBarcodeElement barcode:
                 bytes = checked(bytes + PrintStorageBudget.TextBytes(barcode.Data));
                 break;
+            case PrintGs1CompositeElement composite:
+                bytes = checked(bytes + PrintStorageBudget.TextBytes(composite.PrimaryData));
+                bytes = checked(bytes + PrintStorageBudget.TextBytes(composite.SecondaryData));
+                break;
             case PrintQrCodeElement qrCode:
                 bytes = checked(bytes + PrintStorageBudget.TextBytes(qrCode.Data));
                 break;

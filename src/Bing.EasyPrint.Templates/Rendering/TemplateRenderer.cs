@@ -917,6 +917,7 @@ public sealed class TemplateRenderer
             if (element is BpRectangleElement rectangle) return Shape(rectangle.Width, rectangle.Height, rectangle.LineWidth, false, width, sourcePath, binding, rectangle.Filled);
             if (element is BpEllipseElement ellipse) return Shape(ellipse.Width, ellipse.Height, ellipse.LineWidth, true, width, sourcePath, binding);
             if (element is BpIconElement icon) return Icon(icon, width, sourcePath, binding);
+            if (element is BpGs1CompositeElement composite) return Composite(composite, width, sourcePath, binding);
             var text = binding.Text(element.Field);
             payloadBytes = checked(payloadBytes + encoding.GetByteCount(text));
             if (payloadBytes > options.MaxOutputBytes) throw new ArgumentException("字段数据超过输出预算。");
@@ -1045,14 +1046,50 @@ public sealed class TemplateRenderer
         }
 
         /// <summary>
-        /// 生成二维点阵码的黑白图片布局。
+        /// 生成不可拆分的复合码布局块。
         /// </summary>
         /// <param name="element">点阵码元素及预留尺寸。</param>
-        /// <param name="text">待编码的内容。</param>
         /// <param name="available">元素可用的打印点宽度。</param>
         /// <param name="sourcePath">模板元素的节点路径。</param>
         /// <param name="binding">当前重复数据的绑定上下文。</param>
         /// <returns>包含点阵码位图的布局块。</returns>
+        private Block Composite(BpGs1CompositeElement element, int available, string sourcePath, Binding binding)
+        {
+            var primary = binding.Text(element.Field);
+            var secondary = binding.Text(element.SecondaryField);
+            payloadBytes = checked(payloadBytes + encoding.GetByteCount(primary) + encoding.GetByteCount(secondary));
+            if (payloadBytes > options.MaxOutputBytes) throw new ArgumentException("字段数据超过输出预算。");
+            var model = new PrintGs1CompositeElement(0, 0, element.LinearType, primary, secondary,
+                element.LinearBarHeight, element.ModuleWidth, element.Mode, element.Rotation, element.QuietZone);
+            int occupiedWidth, occupiedHeight;
+            using (var measurement = PrintResourceScope.BeginTemporary())
+            {
+                try
+                {
+                    var size = Gs1CompositeEncoder.Measure(model, cancellation);
+                    var quarterTurn = model.Rotation == RotationAngle.Rotate90 || model.Rotation == RotationAngle.Rotate270;
+                    occupiedWidth = quarterTurn ? size.Height : size.Width;
+                    occupiedHeight = quarterTurn ? size.Width : size.Height;
+                    if ((long)size.Width * size.Height > options.MaxImagePixels)
+                        throw new ArgumentException("Composite 点阵超过图片像素上限。");
+                }
+                catch (ArgumentException error)
+                {
+                    var secondaryError = error.ParamName == "secondaryData";
+                    TemplateBindingDiagnostic.Attach(error, secondaryError
+                        ? element.SecondaryField?.Name ?? "SecondaryField.Value" : element.Field?.Name ?? "Field.Value");
+                    throw new TemplateRenderException(sourcePath, error.Message, error);
+                }
+            }
+            if (occupiedWidth > available) throw new ArgumentException("Composite 旋转后的完整符号超出单元格。");
+            var result = new Block(storage) { Height = occupiedHeight };
+            result.Atoms.Add(new Atom { Width = occupiedWidth, Height = occupiedHeight, Type = element.Type,
+                Rotation = element.Rotation, SourcePath = sourcePath, Text = primary,
+                InstanceIndices = binding.InstanceIndices, Draw = (command, x, y) => command.DrawGs1Composite(x, y, model) });
+            return result;
+        }
+
+        /// <summary>生成二维点阵码的黑白图片布局。</summary>
         private Block MatrixCode(BpMatrixCodeElement element, string text, int available, string sourcePath, Binding binding)
         {
             if (string.IsNullOrEmpty(text)) throw new ArgumentException("二维点阵码内容不能为空。");

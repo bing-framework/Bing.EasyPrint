@@ -155,7 +155,7 @@ public sealed class TemplateLoader
         }
     }
 
-    private const string QuietZoneError = "QuietZone 仅用于二维码或条码，且只能包含非负整数打印点 Left、Top、Right、Bottom。";
+    private const string QuietZoneError = "QuietZone 仅用于二维码、条码或 Composite，且只能包含非负整数打印点 Left、Top、Right、Bottom。";
 
     // 只检查实际元素，组件参数中的同名业务字段不属于打印设置。
     private static string InvalidQuietZonePath(JObject token)
@@ -163,7 +163,7 @@ public sealed class TemplateLoader
         var quietZone = token["QuietZone"];
         if (quietZone == null || quietZone.Type == JTokenType.Null) return null;
         var type = token["Type"];
-        if (type?.Type != JTokenType.Integer || type.ToString() != "3" && type.ToString() != "4" ||
+        if (type?.Type != JTokenType.Integer || type.ToString() != "3" && type.ToString() != "4" && type.ToString() != "11" ||
             !(quietZone is JObject zone)) return quietZone.Path;
         foreach (var property in zone.Properties())
             if (property.Name != "Left" && property.Name != "Top" && property.Name != "Right" && property.Name != "Bottom" ||
@@ -226,8 +226,9 @@ public sealed class TemplateLoader
             if (token["Rotation"] is JToken rotation && token.Value<int>("Type") != 1 &&
                 token.Value<int>("Type") != 4 && token.Value<int>("Type") != 2 &&
                 token.Value<int>("Type") != 3 &&
+                token.Value<int>("Type") != 11 &&
                 (rotation.Type != JTokenType.Integer || rotation.Value<long>() != 0))
-                throw new JsonSerializationException("此元素类型不支持 Rotation；旋转仅用于文字、图片、二维码和一维条码。");
+                throw new JsonSerializationException("此元素类型不支持 Rotation；旋转仅用于文字、图片、二维码、一维条码和 Composite。");
             BpElement element;
             switch (token.Value<int>("Type"))
             {
@@ -241,6 +242,7 @@ public sealed class TemplateLoader
                 case 8: element = new BpEllipseElement(); break;
                 case 9: element = new BpIconElement(); break;
                 case 10: element = new BpMatrixCodeElement(); break;
+                case 11: element = new BpGs1CompositeElement(); break;
                 default: throw new JsonSerializationException("不支持的元素 Type。");
             }
             // Populate 会从局部 token 创建读取器，嵌套组的路径须加上当前元素的外层路径。

@@ -122,7 +122,8 @@ internal static class TemplateGraph
                 throw new TemplateRenderException(path, "协议 Zpl 的填充矩形宽高不能超过 32000 打印点。",
                     new ArgumentOutOfRangeException(nameof(zplFill), "填充矩形宽高超出原生命令范围。"));
             var quietZone = element is BpQrCodeElement quietQr ? quietQr.QuietZone :
-                element is BpBarcodeElement quietBarcode ? quietBarcode.QuietZone : null;
+                element is BpBarcodeElement quietBarcode ? quietBarcode.QuietZone :
+                element is BpGs1CompositeElement quietComposite ? quietComposite.QuietZone : null;
             if (quietZone != null && !quietZone.IsEmpty() && !capabilities.SupportsExplicitQuietZone)
                 Capability(path, "Native 模式的非零静区；请使用 Raster 模式。");
             if (native && !capabilities.SupportsElementType(element.Type) && element.Type != 3 && element.Type != 4)
@@ -331,11 +332,25 @@ internal static class TemplateGraph
                 var expected = element is BpFontElement ? 1 : element is BpImageElement ? 2 : element is BpQrCodeElement ? 3 :
                     element is BpBarcodeElement ? 4 : element is BpLineElement ? 5 : element is BpGroupElement ? 6 :
                     element is BpRectangleElement ? 7 : element is BpEllipseElement ? 8 : element is BpIconElement ? 9 :
-                    element is BpMatrixCodeElement ? 10 : 0;
+                    element is BpMatrixCodeElement ? 10 : element is BpGs1CompositeElement ? 11 : 0;
+                if (template.Version == 1 && expected == 11)
+                    throw new ArgumentException("Composite 需要升级为 V2 或 V3 模板。");
                 if (expected == 0 || element.Type != expected || (template.Version == 1 && expected > 5))
                     throw new ArgumentException("元素类型与 Type 或模板版本不匹配。");
                 ValidateProtocolElement(element, elementPath);
                 if (saving && element.Field?.ValueFunc != null) throw new ArgumentException("含 ValueFunc 的模板不能保存为 JSON。");
+                if (element is BpGs1CompositeElement composite)
+                {
+                    if (composite.SecondaryField == null)
+                        throw new ArgumentException("Composite 必须指定 SecondaryField。");
+                    if (saving && composite.SecondaryField.ValueFunc != null)
+                        throw new ArgumentException("含 SecondaryField.ValueFunc 的模板不能保存为 JSON。");
+                    if (composite.LinearType != BarcodeType.Gs1DataBarOmnidirectional &&
+                        composite.LinearType != BarcodeType.Gs1DataBarLimited || composite.ModuleWidth <= 0 ||
+                        composite.LinearBarHeight <= 0 || !Enum.IsDefined(typeof(Printing.Gs1CompositeMode), composite.Mode) ||
+                        !Enum.IsDefined(typeof(RotationAngle), composite.Rotation))
+                        throw new ArgumentException("Composite 制式、模式、模块宽度、条高或旋转参数无效。");
+                }
                 if (element.StartCoordinate?.X < 0 || element.StartCoordinate?.Y < 0) throw new ArgumentException("元素坐标不能为负数。");
                 if (element is BpFontElement font && !Enum.IsDefined(typeof(BpTextAlignment), font.TextAlignment))
                     throw new ArgumentException("文字对齐方式无效。");
