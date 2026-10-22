@@ -41,6 +41,7 @@ internal static class Program
             VerifyZplDelayedOutput();
             VerifyImageRotationOutputs();
             VerifyCcCOutputs();
+            VerifyExpandedOutputs();
 
             Console.WriteLine("Package consumer verification PASS");
             return 0;
@@ -67,6 +68,23 @@ internal static class Program
             var output = Single(provider.Render(explicitMode), "CC-C");
             Require(output.Length > 0, $"CC-C 输出: {protocol}");
             RequireBytesEqual(output, Single(provider.Render(auto), "CC-C Auto"), $"CC-C Auto 字节: {protocol}");
+        }
+    }
+
+    private static void VerifyExpandedOutputs()
+    {
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpanded,
+                "(01)09506000134352(10)LOT-A", "(10)LOT123", 40, mode: Gs1CompositeMode.CcA));
+            var auto = new PrintDocument();
+            auto.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpanded,
+                "(01)09506000134352(10)LOT-A", "(10)LOT123", 40));
+            var output = Single(provider.Render(explicitMode), "Expanded");
+            Require(output.Length > 0, $"Expanded 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(auto), "Expanded Auto"), $"Expanded Auto 字节: {protocol}");
         }
     }
 
