@@ -156,6 +156,7 @@ internal class ImageComponent : ComponentMetadata
             }
 
             var sourcePosition = source.CanSeek ? source.Position : 0;
+            TiffStructureValidator.Validate(source);
             var imageInfo = Image.Identify(Configuration.Default, source, out var format);
             if (imageInfo == null)
                 throw new InvalidDataException("无法识别图片格式。");

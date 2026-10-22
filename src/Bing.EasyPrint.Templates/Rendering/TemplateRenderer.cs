@@ -1985,6 +1985,7 @@ public sealed class TemplateRenderer
             using (var stream = new MemoryStream(bytes, false))
             {
                 cancellation.ThrowIfCancellationRequested();
+                Bing.EasyPrint.Core.TiffStructureValidator.Validate(stream, cancellation);
                 var info = Image.Identify(stream) ?? throw new ArgumentException("图片格式无效。");
                 cancellation.ThrowIfCancellationRequested();
                 if ((long)info.Width * info.Height > options.MaxImagePixels)
