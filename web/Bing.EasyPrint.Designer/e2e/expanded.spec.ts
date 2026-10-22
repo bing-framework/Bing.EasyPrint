@@ -69,11 +69,15 @@ test('缺少 Expanded 协商特性时禁用选项并明确显示降级原因', a
     const response = await route.fetch()
     const headers = response.headers()
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-composite-expanded').join(',')
+      .filter(feature => feature.trim() !== 'gs1-composite-expanded' && feature.trim() !== 'gs1-composite-stacked' &&
+        feature.trim() !== 'gs1-composite-expanded-stacked' && feature.trim() !== 'gs1-composite-ean-upc' &&
+        feature.trim() !== 'gs1-composite-truncated' && feature.trim() !== 'gs1-composite-stacked-omnidirectional').join(',')
     if (route.request().url().includes('/capabilities')) {
       const json = await response.json()
       if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
-        .filter((type: string) => type !== 'Gs1DataBarExpanded')
+        .filter((type: string) => type !== 'Gs1DataBarExpanded' && type !== 'Gs1DataBarStacked' &&
+          type !== 'Gs1DataBarExpandedStacked' && !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated',
+            'Gs1DataBarStackedOmnidirectional'].includes(type))
       await route.fulfill({ response, headers, json })
     } else await route.fulfill({ response, headers })
   })

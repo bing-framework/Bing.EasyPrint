@@ -6,6 +6,8 @@ export const barcodeOptions = [
   ['TELEPEN', 22], ['TELEPENN', 23], ['CODE49', 24],
   ['GS1 DataBar Omnidirectional', 25], ['GS1 DataBar Truncated', 26],
   ['GS1 DataBar Limited', 27], ['GS1 DataBar Expanded', 28], ['CODE128 auto', 29],
+  ['GS1 DataBar Stacked', 30], ['GS1 DataBar Expanded Stacked', 31],
+  ['GS1 DataBar Stacked Omnidirectional', 32],
 ] as const
 
 export type TsplVariableBarcodeType = 22 | 23 | 24

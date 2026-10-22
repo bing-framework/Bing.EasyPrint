@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -35,15 +35,24 @@ public sealed class Gs1CompositeHostTests
 
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
         AssertContractFeature(context);
+        Assert.Contains("gs1-composite-ean-upc", context.Response.Headers[FeaturesHeader].ToString());
+        Assert.Contains("gs1-composite-gs1-128-ab", context.Response.Headers[FeaturesHeader].ToString());
+        Assert.Contains("gs1-composite-expanded-stacked", context.Response.Headers[FeaturesHeader].ToString());
         using var response = ReadJson(context);
         var root = response.RootElement;
         Assert.True(root.GetProperty("supportsGs1Composite").GetBoolean());
         Assert.Contains(11, root.GetProperty("elementTypes").EnumerateArray()
             .Select(value => value.GetInt32()));
+        var ordinaryBarcodeTypes = root.GetProperty("barcodeTypes").EnumerateArray()
+            .Select(value => value.GetInt32()).ToArray();
+        if (protocol == "EscPos" && escPosLayout == "Raster")
+            { Assert.Contains(31, ordinaryBarcodeTypes); Assert.Contains(32, ordinaryBarcodeTypes); }
+        else
+            { Assert.DoesNotContain(31, ordinaryBarcodeTypes); Assert.DoesNotContain(32, ordinaryBarcodeTypes); }
 
         var composite = root.GetProperty("gs1Composite");
         Assert.Equal(11, composite.GetProperty("elementType").GetInt32());
-        Assert.Equal(new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128", "Gs1DataBarExpanded" },
+        Assert.Equal(new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128", "Gs1DataBarExpanded", "Gs1DataBarStacked", "Gs1DataBarExpandedStacked", "Ean8", "Ean13", "UpcA", "UpcE", "Gs1DataBarTruncated", "Gs1DataBarStackedOmnidirectional" },
             composite.GetProperty("linearTypes").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(new[] { "Auto", "CcA", "CcB", "CcC" },
             composite.GetProperty("modes").EnumerateArray().Select(value => value.GetString()));
@@ -53,6 +62,96 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal("bracketed-gs1-ai", composite.GetProperty("secondaryFormat").GetString());
         Assert.False(composite.GetProperty("includesHumanReadable").GetBoolean());
         Assert.True(composite.GetProperty("dimensionsFromEncoding").GetBoolean());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Remaining_databar_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
+    {
+        foreach (var pair in new[] { (26, "12345678901231"), (32, "12345678901231") })
+        foreach (var mode in new[] { 0, 1, 2 })
+        {
+            var feature = pair.Item1 == 26 ? "gs1-composite-truncated" : "gs1-composite-stacked-omnidirectional";
+            var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", $"\"LinearType\":{pair.Item1},\"Mode\":{mode}").Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":68");
+            var data = ValidData.Replace("1234567890123", pair.Item2);
+            using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+            var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
+            await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+            Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+            Assert.Contains(feature, preview.Response.Headers[FeaturesHeader].ToString());
+            using var json = ReadJson(preview);
+            var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
+                .Where(value => value.GetProperty("type").GetInt32() == 11));
+            Assert.True(element.GetProperty("width").GetInt32() > 0);
+            Assert.True(element.GetProperty("height").GetInt32() > 0);
+            var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
+            await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+            Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+            using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+            Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
+            Assert.Equal(0, parent.CurrentBytes);
+        }
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Ean_upc_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
+    {
+        foreach (var pair in new[] { (4, "12345670"), (5, "1234567890128"), (6, "012345678905"), (7, "01234565") })
+        foreach (var mode in new[] { 0, 1, 2 })
+        {
+            var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", $"\"LinearType\":{pair.Item1},\"Mode\":{mode}").Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":31");
+            var data = ValidData.Replace("1234567890123", pair.Item2);
+            using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+            var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc");
+            await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+            Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+            Assert.Contains("gs1-composite-ean-upc", preview.Response.Headers[FeaturesHeader].ToString());
+            using var json = ReadJson(preview);
+            var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
+                .Where(value => value.GetProperty("type").GetInt32() == 11));
+            Assert.True(element.GetProperty("width").GetInt32() > 0);
+            Assert.True(element.GetProperty("height").GetInt32() > 0);
+            var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc");
+            await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+            Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+            using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+            Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
+            Assert.Equal(0, parent.CurrentBytes);
+        }
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Stacked_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":30,\"Mode\":2").Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":31");
+        var data = ValidData.Replace("1234567890123", "(01)12345678901231");
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-stacked");
+        await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+        Assert.Contains("gs1-composite-stacked", preview.Response.Headers[FeaturesHeader].ToString());
+        using var json = ReadJson(preview);
+        var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
+            .Where(value => value.GetProperty("type").GetInt32() == 11));
+        Assert.True(element.GetProperty("width").GetInt32() > 0);
+        Assert.True(element.GetProperty("height").GetInt32() > 0);
+        var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-stacked");
+        await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+        Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+        using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+        Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
         Assert.Equal(0, parent.CurrentBytes);
     }
 
@@ -88,21 +187,23 @@ public sealed class Gs1CompositeHostTests
     [InlineData("Tspl", "")]
     [InlineData("Zpl", "")]
     [InlineData("EscPos", "Raster")]
-    public async Task Cc_c_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
+    public async Task Expanded_stacked_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
     {
-        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":11,\"Mode\":3");
-        var data = ValidData.Replace("1234567890123", "(01)12345678901231");
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":31,\"Mode\":1")
+            .Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":34");
+        var data = ValidData.Replace("1234567890123", "(01)09506000134352(10)LOT-A");
         using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
-        var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-cc-c");
+        const string feature = "gs1-composite-expanded-stacked";
+        var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
         await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
         Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
-        Assert.Contains("gs1-composite-cc-c", preview.Response.Headers[FeaturesHeader].ToString());
+        Assert.Contains(feature, preview.Response.Headers[FeaturesHeader].ToString());
         using var json = ReadJson(preview);
         var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
             .Where(value => value.GetProperty("type").GetInt32() == 11));
         Assert.True(element.GetProperty("width").GetInt32() > 0);
-        Assert.True(element.GetProperty("height").GetInt32() > 0);
-        var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-cc-c");
+        Assert.True(element.GetProperty("height").GetInt32() >= 34);
+        var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
         await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
         Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
         using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
@@ -111,10 +212,52 @@ public sealed class Gs1CompositeHostTests
     }
 
     [Theory]
-    [InlineData(11, 1)]
-    [InlineData(11, 2)]
+    [InlineData("Cpcl", "", 1)]
+    [InlineData("Cpcl", "", 2)]
+    [InlineData("Cpcl", "", 3)]
+    [InlineData("Tspl", "", 1)]
+    [InlineData("Tspl", "", 2)]
+    [InlineData("Tspl", "", 3)]
+    [InlineData("Zpl", "", 1)]
+    [InlineData("Zpl", "", 2)]
+    [InlineData("Zpl", "", 3)]
+    [InlineData("EscPos", "Raster", 1)]
+    [InlineData("EscPos", "Raster", 2)]
+    [InlineData("EscPos", "Raster", 3)]
+    public async Task Gs1_128_negotiates_previews_and_exports_across_protocols(string protocol, string layout, int mode)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", $"\"LinearType\":11,\"Mode\":{mode}");
+        var feature = mode == 3 ? "gs1-composite-cc-c" : "gs1-composite-gs1-128-ab";
+        var data = ValidData.Replace("1234567890123", "(01)12345678901231");
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
+        await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+        Assert.Contains(feature, preview.Response.Headers[FeaturesHeader].ToString());
+        using var json = ReadJson(preview);
+        var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
+            .Where(value => value.GetProperty("type").GetInt32() == 11));
+        Assert.True(element.GetProperty("width").GetInt32() > 0);
+        Assert.True(element.GetProperty("height").GetInt32() > 0);
+        var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite," + feature);
+        await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+        Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+        using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+        Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData(27, 3)]
+    [InlineData(30, 3)]
     [InlineData(25, 3)]
     [InlineData(28, 3)]
+    [InlineData(4, 3)]
+    [InlineData(5, 3)]
+    [InlineData(6, 3)]
+    [InlineData(7, 3)]
+    [InlineData(26, 3)]
+    [InlineData(32, 3)]
     public async Task Invalid_cc_c_pair_returns_structured_error(int linearType, int mode)
     {
         var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1",
@@ -124,6 +267,55 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
         using var json = ReadJson(context);
         Assert.Contains("Composite", json.RootElement.GetProperty("errors")[0].GetProperty("message").GetString());
+    }
+
+    [Theory]
+    [InlineData(26, 25)]
+    [InlineData(32, 65)]
+    public async Task Remaining_databar_invalid_height_returns_source_diagnostic(int type, int height)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25", $"\"LinearType\":{type}")
+            .Replace("\"LinearBarHeight\":20", $"\"LinearBarHeight\":{height}");
+        var context = CreateContext(BuildRequest("Cpcl", "", template));
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var error = response.RootElement.GetProperty("errors")[0];
+        Assert.Contains(type == 26 ? "13X" : "33X", error.GetProperty("message").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+    }
+
+    [Theory]
+    [InlineData(26)]
+    [InlineData(32)]
+    public async Task Remaining_databar_primary_error_keeps_field_diagnostic(int type)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25", $"\"LinearType\":{type}")
+            .Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":68");
+        var context = CreateContext(BuildRequest("Cpcl", "", template,
+            JsonSerializer.Serialize(new { Primary = "12345678901230", Secondary = "(91)123" })));
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var error = response.RootElement.GetProperty("errors")[0];
+        Assert.Equal("Primary", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+    }
+
+    [Theory]
+    [InlineData("12345671")]
+    [InlineData("1234567+12")]
+    public async Task Ean_upc_primary_errors_keep_bound_field_path(string primary)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":4,\"Mode\":0");
+        var data = JsonSerializer.Serialize(new { Primary = primary, Secondary = "(91)123" });
+        var context = CreateContext(BuildRequest("Cpcl", "", template, data));
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var error = response.RootElement.GetProperty("errors")[0];
+        Assert.Equal("Primary", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
     }
 
     [Theory]
@@ -155,6 +347,26 @@ public sealed class Gs1CompositeHostTests
         var error = json.RootElement.GetProperty("errors")[0];
         Assert.Contains("CcC 容量", error.GetProperty("message").GetString());
         Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+    }
+
+    [Theory]
+    [InlineData(1, "CcA")]
+    [InlineData(2, "CcB")]
+    public async Task Gs1_explicit_capacity_error_keeps_mode_and_secondary_binding(int mode, string modeName)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", $"\"LinearType\":11,\"Mode\":{mode}");
+        var secondary = string.Concat(Enumerable.Range(91, 3).Select(ai => $"({ai})" + new string('A', 90)));
+        var data = JsonSerializer.Serialize(new { Primary = "(01)12345678901231", Secondary = secondary });
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var context = CreateContext(BuildRequest("Cpcl", "", template, data), "gs1-composite,gs1-composite-gs1-128-ab");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var json = ReadJson(context);
+        var error = json.RootElement.GetProperty("errors")[0];
+        Assert.Contains(modeName + " 容量", error.GetProperty("message").GetString());
+        Assert.Equal("Secondary", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+        Assert.Equal(0, parent.CurrentBytes);
     }
 
     [Theory]

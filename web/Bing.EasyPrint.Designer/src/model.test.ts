@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { assertTemplate, cloneTemplate, type BpTemplate, type TemplateElement } from './model'
+import { parseDesignerProject } from './designerProject'
 
 function baseTemplate(): BpTemplate {
   return { Version: 1, Width: 100, Height: 100, Rows: [] }
@@ -43,6 +44,39 @@ describe('template validation', () => {
     expect(() => assertTemplate(template)).toThrow('Width')
     ;(template.Rows[0].Cells![0].Elements![0] as Extract<TemplateElement, { Type: 1 }>).Width = 12.5
     expect(() => assertTemplate(template)).toThrow('Width')
+  })
+
+  it('validates Expanded Stacked ordinary barcode height against its narrow module width', () => {
+    const template: BpTemplate = { Version: 2, Width: 100, Height: 100, Rows: [{ Cells: [{ Elements: [
+      { Type: 4, BarcodeType: 31, LineWidth: 3, Height: 4, Field: { Value: '(01)09506000134352(10)LOT-A' } },
+    ] }] }] }
+    expect(() => assertTemplate(template)).not.toThrow()
+
+    expect(parseDesignerProject(JSON.parse(JSON.stringify(template))).template).toEqual(template)
+
+    ;(template.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 4 }>).Height = 3
+    expect(() => assertTemplate(template)).toThrow('Height 对 Expanded Stacked 必须至少为一个模块宽度')
+  })
+
+  it('validates Stacked Omnidirectional Composite and ordinary per-row heights', () => {
+    const composite: BpTemplate = { Version: 3, Width: 200, Height: 200, Rows: [{ Cells: [{ Elements: [
+      { Type: 11, LinearType: 32, Mode: 2, ModuleWidth: 2, LinearBarHeight: 66,
+        Field: { Value: '(01)09506000134352' }, SecondaryField: { Value: '(10)LOT' } },
+    ] }] }] }
+    expect(() => assertTemplate(composite)).not.toThrow()
+    ;(composite.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 11 }>).LinearBarHeight = 65
+    expect(() => assertTemplate(composite)).toThrow('Stacked Omnidirectional 每行必须至少为模块宽度的 33 倍')
+    ;(composite.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 11 }>).LinearBarHeight = 66
+    ;(composite.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 11 }>).Mode = 3
+    expect(() => assertTemplate(composite)).toThrow('LinearType 与 Mode 组合无效')
+
+    const ordinary: BpTemplate = { Version: 2, Width: 200, Height: 200, Rows: [{ Cells: [{ Elements: [
+      { Type: 4, BarcodeType: 32, NarrowModuleWidth: 2, Height: 66, HumanReadable: true,
+        Field: { Value: '09506000134352' } },
+    ] }] }] }
+    expect(() => assertTemplate(ordinary)).not.toThrow()
+    ;(ordinary.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 4 }>).Height = 65
+    expect(() => assertTemplate(ordinary)).toThrow('Height 对 Stacked Omnidirectional 每行必须至少为模块宽度的 33 倍')
   })
 
   it('accepts explicit QR/barcode quiet zones and preserves null default compatibility', () => {

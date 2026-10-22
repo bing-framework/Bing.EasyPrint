@@ -1,7 +1,15 @@
 import type { BpTemplate, DesignerDiagnostic, Gs1CompositeElement, PreviewResponse, TemplateResource } from './model'
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
-import { isGs1CompositeCcCCombination, isGs1CompositeExpandedCombination, isValidGs1CompositeCombination } from './gs1Composite'
+import {
+  GS1_COMPOSITE_GS1_128_CC_AB_FEATURE, isGs1CompositeCcCCombination,
+  isGs1CompositeExpandedCombination, isGs1CompositeExpandedStackedCombination, isGs1CompositeGs1128CcAbCombination,
+  isGs1CompositeEanUpcCombination, isGs1CompositeRetailLinearType, isGs1CompositeStackedCombination,
+  DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE,
+  GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE, GS1_COMPOSITE_TRUNCATED_FEATURE,
+  isGs1CompositeStackedOmnidirectionalCombination, isGs1CompositeTruncatedCombination,
+  isValidGs1CompositeCombination, gs1CompositeRetailPrimaryError,
+} from './gs1Composite'
 import { walkTemplateNodes } from './templateTraversal'
 
 export type DesignerSample = { id: string; name: string; template: BpTemplate; data: unknown }
@@ -30,7 +38,8 @@ export const BARCODE_TYPE_NAMES = [
   'I2OF5', 'I2OF5C', 'I2OF5G', 'UccEan128', 'Msi', 'Postnet', 'Fim', 'Planet',
   'IntelligentMail', 'Plessey', 'Itf14', 'Ean14', 'Code11', 'ChinaPost', 'Telepen',
   'Telepenn', 'Code49', 'Gs1DataBarOmnidirectional', 'Gs1DataBarTruncated',
-  'Gs1DataBarLimited', 'Gs1DataBarExpanded', 'Code128Auto',
+  'Gs1DataBarLimited', 'Gs1DataBarExpanded', 'Code128Auto', 'Gs1DataBarStacked', 'Gs1DataBarExpandedStacked',
+  'Gs1DataBarStackedOmnidirectional',
 ] as const
 export type BarcodeTypeName = typeof BARCODE_TYPE_NAMES[number]
 export type EscPosCharacterRange = { first: number; last: number }
@@ -289,7 +298,13 @@ const DESIGNER_CONTRACT_VERSION_HEADER = 'X-EasyPrint-Contract-Version'
 const DESIGNER_FEATURES_HEADER = 'X-EasyPrint-Features'
 const DESIGNER_REQUIRED_FEATURES_HEADER = 'X-EasyPrint-Required-Features'
 const GS1_COMPOSITE_CC_C_FEATURE = 'gs1-composite-cc-c'
+const GS1_COMPOSITE_GS1_128_AB_FEATURE = GS1_COMPOSITE_GS1_128_CC_AB_FEATURE
 const GS1_COMPOSITE_EXPANDED_FEATURE = 'gs1-composite-expanded'
+const GS1_COMPOSITE_STACKED_FEATURE = 'gs1-composite-stacked'
+const GS1_COMPOSITE_EXPANDED_STACKED_FEATURE = 'gs1-composite-expanded-stacked'
+const GS1_COMPOSITE_EAN_UPC_FEATURE = 'gs1-composite-ean-upc'
+const GS1_COMPOSITE_TRUNCATED_FEATURE_NAME = GS1_COMPOSITE_TRUNCATED_FEATURE
+const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME = GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
 
 function clientValidationError(message: string, code: string, phase: string): DesignerValidationError {
@@ -321,8 +336,32 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
       const message = '打印服务缺少 GS1-128 + CC-C Composite 功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
+    if (missingFeatures.includes(GS1_COMPOSITE_GS1_128_AB_FEATURE)) {
+      const message = '打印服务缺少 GS1-128 + CC-A/CC-B Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
     if (missingFeatures.includes(GS1_COMPOSITE_EXPANDED_FEATURE)) {
       const message = '打印服务缺少 GS1 DataBar Expanded Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_COMPOSITE_STACKED_FEATURE)) {
+      const message = '打印服务缺少 GS1 DataBar Stacked Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_COMPOSITE_EXPANDED_STACKED_FEATURE)) {
+      const message = '打印服务缺少 GS1 DataBar Expanded Stacked Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_COMPOSITE_EAN_UPC_FEATURE)) {
+      const message = '打印服务缺少 EAN/UPC Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)) {
+      const message = '打印服务缺少 GS1 DataBar Truncated Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)) {
+      const message = '打印服务缺少 GS1 DataBar Stacked Omnidirectional Composite 功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
@@ -334,20 +373,56 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   const requiredFeatures: string[] = [...DESIGNER_REQUIRED_FEATURES]
   const template = (body as { template?: BpTemplate }).template
   if (template) walkTemplateNodes(template, (node, context) => {
-    if (context.kind !== 'element' || !('Type' in node) || node.Type !== 11) return
+    if (context.kind !== 'element' || !('Type' in node)) return
+    const requestContract = body as { protocol?: PrintProtocol; escPosLayoutMode?: EscPosLayoutMode }
+    if (node.Type === 4 && (node as { BarcodeType?: number }).BarcodeType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE &&
+      (requestContract.protocol !== 'EscPos' || requestContract.escPosLayoutMode !== 'Raster')) {
+      const message = 'GS1 DataBar Stacked Omnidirectional 普通条码仅支持 ESC/POS Raster。'
+      throw clientValidationError(message, 'UnsupportedBarcodeType', 'Validation')
+    }
+    if (node.Type !== 11) return
     const composite = node as Gs1CompositeElement
     if (!isValidGs1CompositeCombination(composite.LinearType, composite.Mode)) {
-      const message = `${context.path}.LinearType 与 Mode 组合无效；DataBar Omnidirectional、Limited 和 Expanded 仅支持 Auto、CC-A 或 CC-B，GS1-128 仅支持 Auto 或 CC-C。`
+      const message = `${context.path}.LinearType 与 Mode 组合无效；EAN/UPC 与 DataBar 仅支持 Auto、CC-A 或 CC-B，GS1-128 支持 Auto、CC-A、CC-B 或 CC-C。`
       throw clientValidationError(message, 'InvalidGs1CompositeMode', 'Validation')
+    }
+    if (isGs1CompositeRetailLinearType(composite.LinearType) && !composite.Field?.Name && composite.Field?.Value !== undefined) {
+      const error = gs1CompositeRetailPrimaryError(composite.LinearType, composite.Field.Value)
+      if (error) throw clientValidationError(`${context.path}.Field.Value ${error}`,
+        'InvalidGs1CompositePrimaryData', 'Validation')
     }
     if (!requiredFeatures.includes('gs1-composite')) requiredFeatures.push('gs1-composite')
     if (isGs1CompositeCcCCombination(composite.LinearType, composite.Mode) &&
       !requiredFeatures.includes(GS1_COMPOSITE_CC_C_FEATURE)) {
       requiredFeatures.push(GS1_COMPOSITE_CC_C_FEATURE)
     }
+    if (isGs1CompositeGs1128CcAbCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_GS1_128_AB_FEATURE)) {
+      requiredFeatures.push(GS1_COMPOSITE_GS1_128_AB_FEATURE)
+    }
     if (isGs1CompositeExpandedCombination(composite.LinearType, composite.Mode) &&
       !requiredFeatures.includes(GS1_COMPOSITE_EXPANDED_FEATURE)) {
       requiredFeatures.push(GS1_COMPOSITE_EXPANDED_FEATURE)
+    }
+    if (isGs1CompositeStackedCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_STACKED_FEATURE)) {
+      requiredFeatures.push(GS1_COMPOSITE_STACKED_FEATURE)
+    }
+    if (isGs1CompositeExpandedStackedCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_EXPANDED_STACKED_FEATURE)) {
+      requiredFeatures.push(GS1_COMPOSITE_EXPANDED_STACKED_FEATURE)
+    }
+    if (isGs1CompositeEanUpcCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_EAN_UPC_FEATURE)) {
+      requiredFeatures.push(GS1_COMPOSITE_EAN_UPC_FEATURE)
+    }
+    if (isGs1CompositeTruncatedCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)) {
+      requiredFeatures.push(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)
+    }
+    if (isGs1CompositeStackedOmnidirectionalCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)) {
+      requiredFeatures.push(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
     }
   })
   const serializedBody = JSON.stringify(body)
@@ -443,6 +518,12 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   capabilities.gs1CompositeFeature = features.has('gs1-composite')
   capabilities.gs1CompositeCcCFeature = features.has(GS1_COMPOSITE_CC_C_FEATURE)
   capabilities.gs1CompositeExpandedFeature = features.has(GS1_COMPOSITE_EXPANDED_FEATURE)
+  capabilities.gs1CompositeStackedFeature = features.has(GS1_COMPOSITE_STACKED_FEATURE)
+  capabilities.gs1CompositeExpandedStackedFeature = features.has(GS1_COMPOSITE_EXPANDED_STACKED_FEATURE)
+  capabilities.gs1CompositeGs1128CcAbFeature = features.has(GS1_COMPOSITE_GS1_128_AB_FEATURE)
+  capabilities.gs1CompositeEanUpcFeature = features.has(GS1_COMPOSITE_EAN_UPC_FEATURE)
+  capabilities.gs1CompositeTruncatedFeature = features.has(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)
+  capabilities.gs1CompositeStackedOmnidirectionalFeature = features.has(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
   return capabilities
 }
 

@@ -83,8 +83,17 @@ test('GS1 Composite 在旧 Host 缺少协商特性时禁用并说明原因', asy
     expect(body.elementTypes).toContain(11)
     const headers = response.headers()
     headers['x-easyprint-features'] = headers['x-easyprint-features']!.split(',')
-      .filter((feature) => feature.trim() !== 'gs1-composite').join(',')
-    await route.fulfill({ response, headers })
+      .filter((feature) => !['gs1-composite', 'gs1-composite-cc-c', 'gs1-composite-expanded',
+        'gs1-composite-stacked', 'gs1-composite-expanded-stacked', 'gs1-composite-ean-upc',
+        'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
+    if (body.gs1Composite) {
+      body.gs1Composite.modes = ['Auto', 'CcA', 'CcB']
+      body.gs1Composite.linearTypes = ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited']
+    }
+    body.barcodeTypes = Array.isArray(body.barcodeTypes)
+      ? body.barcodeTypes.filter((type: number) => type !== 32)
+      : body.barcodeTypes
+    await route.fulfill({ response, headers, json: body })
   })
   await page.goto('/')
   await expect(page.locator('.capability-note')).toHaveClass(/ready/)

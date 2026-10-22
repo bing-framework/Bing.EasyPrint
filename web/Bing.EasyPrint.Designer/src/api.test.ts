@@ -55,6 +55,25 @@ function validTsplCutterCapabilitiesResponse(overrides: Record<string, unknown> 
 }
 
 describe('designer preview errors', () => {
+  it.each([
+    ['Cpcl', 'Native'],
+    ['EscPos', 'Native'],
+  ] as const)('rejects Stacked Omnidirectional ordinary barcodes for %s/%s before sending the request',
+    async (protocol, layoutMode) => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const template = createBlankSample()
+      template.Rows[0]!.Cells![0]!.Elements!.push({ Type: 4, BarcodeType: 32, NarrowModuleWidth: 2,
+        Height: 66, HumanReadable: true, Field: { Value: '0950600013435' } })
+
+      await expect(previewTemplate(template, {}, [], undefined, protocol, layoutMode))
+        .rejects.toMatchObject({
+          message: 'GS1 DataBar Stacked Omnidirectional 普通条码仅支持 ESC/POS Raster。',
+          diagnostics: [expect.objectContaining({ code: 'UnsupportedBarcodeType' })],
+        })
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
   it('sends only output configuration to the capabilities endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       protocol: 'EscPos', escPosLayoutMode: 'Native', nativeFlow: 'Rows', jobFeedUnits: ['Lines', 'MotionUnits'], dpi: 203,

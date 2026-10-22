@@ -93,6 +93,18 @@ export type DesignerCapabilities = {
   gs1CompositeCcCFeature?: boolean
   /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Expanded Composite。 */
   gs1CompositeExpandedFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Stacked Composite。 */
+  gs1CompositeStackedFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Expanded Stacked Composite。 */
+  gs1CompositeExpandedStackedFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1-128 CC-A/CC-B Composite。 */
+  gs1CompositeGs1128CcAbFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 EAN/UPC Composite。 */
+  gs1CompositeEanUpcFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Truncated Composite。 */
+  gs1CompositeTruncatedFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Stacked Omnidirectional Composite。 */
+  gs1CompositeStackedOmnidirectionalFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -604,9 +616,18 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128'
     const expandedComposite = modes === 'Auto,CcA,CcB,CcC' &&
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded'
+    const stackedComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked'
+    const expandedStackedComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked,Gs1DataBarExpandedStacked'
+    const eanUpcComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked,Gs1DataBarExpandedStacked,Ean8,Ean13,UpcA,UpcE'
+    const truncatedStackedOmnidirectionalComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked,Gs1DataBarExpandedStacked,Ean8,Ean13,UpcA,UpcE,Gs1DataBarTruncated,Gs1DataBarStackedOmnidirectional'
     if (typeof composite !== 'object' || Array.isArray(composite) || composite.elementType !== 11 ||
       composite.dimensionsFromEncoding !== true || composite.includesHumanReadable !== false ||
-      (!legacyComposite && !ccCComposite && !expandedComposite))
+      (!legacyComposite && !ccCComposite && !expandedComposite && !stackedComposite && !expandedStackedComposite &&
+        !eanUpcComposite && !truncatedStackedOmnidirectionalComposite))
       throw new Error('能力响应的 gs1Composite 无效。')
     gs1Composite = { rotations: parseRotationArray(composite.rotations, 'gs1Composite.rotations'),
       modes: composite.modes as string[], linearTypes: composite.linearTypes as string[] }
@@ -660,6 +681,12 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
     gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
     gs1CompositeExpandedFeature: input.gs1CompositeExpandedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedFeature, 'gs1CompositeExpandedFeature'),
+    gs1CompositeStackedFeature: input.gs1CompositeStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedFeature, 'gs1CompositeStackedFeature'),
+    gs1CompositeExpandedStackedFeature: input.gs1CompositeExpandedStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedStackedFeature, 'gs1CompositeExpandedStackedFeature'),
+    gs1CompositeGs1128CcAbFeature: input.gs1CompositeGs1128CcAbFeature === undefined ? false : parseBoolean(input.gs1CompositeGs1128CcAbFeature, 'gs1CompositeGs1128CcAbFeature'),
+    gs1CompositeEanUpcFeature: input.gs1CompositeEanUpcFeature === undefined ? false : parseBoolean(input.gs1CompositeEanUpcFeature, 'gs1CompositeEanUpcFeature'),
+    gs1CompositeTruncatedFeature: input.gs1CompositeTruncatedFeature === undefined ? false : parseBoolean(input.gs1CompositeTruncatedFeature, 'gs1CompositeTruncatedFeature'),
+    gs1CompositeStackedOmnidirectionalFeature: input.gs1CompositeStackedOmnidirectionalFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedOmnidirectionalFeature, 'gs1CompositeStackedOmnidirectionalFeature'),
     gs1Composite,
   }
   const hasEscPosCutFields = Object.prototype.hasOwnProperty.call(input, 'cutModes') &&
@@ -729,6 +756,7 @@ export function rotationSupported(caps: DesignerCapabilities | undefined, type: 
 }
 
 export function barcodeTypeSupported(caps: DesignerCapabilities | undefined, value: number | undefined): boolean {
+  if (value === 32 && (caps?.protocol !== 'EscPos' || caps.escPosLayoutMode !== 'Raster')) return false
   return Boolean(caps && value !== undefined && caps.barcodeTypes.includes(value))
 }
 

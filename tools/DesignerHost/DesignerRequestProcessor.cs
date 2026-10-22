@@ -81,10 +81,10 @@ internal static class DesignerRequestProcessor
                 gs1Composite = capabilities.SupportsGs1Composite ? new
                 {
                     elementType = 11,
-                    linearTypes = new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128", "Gs1DataBarExpanded" },
+                    linearTypes = new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128", "Gs1DataBarExpanded", "Gs1DataBarStacked", "Gs1DataBarExpandedStacked", "Ean8", "Ean13", "UpcA", "UpcE", "Gs1DataBarTruncated", "Gs1DataBarStackedOmnidirectional" },
                     modes = new[] { "Auto", "CcA", "CcB", "CcC" },
                     rotations = new[] { 0, 90, 180, 270 },
-                    primaryFormats = new[] { "GTIN-13-data", "GTIN-14", "GS1-AI-01", "bracketed-gs1-ai" },
+                    primaryFormats = new[] { "GTIN-13-data", "GTIN-14", "GS1-AI-01", "bracketed-gs1-ai", "ean-upc-digits" },
                     secondaryFormat = "bracketed-gs1-ai",
                     includesHumanReadable = false,
                     dimensionsFromEncoding = true

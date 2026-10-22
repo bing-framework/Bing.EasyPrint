@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import {
-  canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, filledRectangleSupported, legacyDeviceFontSupported, normalizeDesignerCapabilities,
+  barcodeTypeSupported, canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, filledRectangleSupported, legacyDeviceFontSupported, normalizeDesignerCapabilities,
   rotationSupported, textSizeSupported, valueInRange, type DesignerCapabilities,
 } from './capabilities'
 import type { FontElement } from './model'
@@ -62,6 +62,21 @@ describe('designer capabilities rules', () => {
     expect(valueInRange(6, range)).toBe(true)
     expect(valueInRange(6.5, range)).toBe(false)
     expect(valueInRange(7, range)).toBe(false)
+  })
+
+  it('offers Expanded Stacked ordinary barcode only when the selected protocol capability includes it', () => {
+    const raster = capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31] })
+    expect(barcodeTypeSupported(raster, 31)).toBe(true)
+    expect(barcodeTypeSupported({ ...raster, barcodeTypes: [] }, 31)).toBe(false)
+    expect(barcodeTypeSupported(capabilities({ protocol: 'Cpcl', barcodeTypes: [] }), 31)).toBe(false)
+  })
+
+  it('offers Stacked Omnidirectional ordinary barcode only in ESC/POS Raster', () => {
+    const raster = capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [32] })
+    expect(barcodeTypeSupported(raster, 32)).toBe(true)
+    expect(barcodeTypeSupported({ ...raster, barcodeTypes: [] }, 32)).toBe(false)
+    expect(barcodeTypeSupported(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Native', barcodeTypes: [32] }), 32)).toBe(false)
+    expect(barcodeTypeSupported(capabilities({ protocol: 'Cpcl', barcodeTypes: [32] }), 32)).toBe(false)
   })
 
   it('keeps image rotation conservative when an old Host omits the field', () => {
