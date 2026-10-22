@@ -41,7 +41,7 @@ const elements = computed(() => {
       other.instanceIndices?.join(',') === element.instanceIndices?.join(',')))
     .map((element) => ({ ...element, type: 6 }))
   return [...groups, ...all.filter((element) => element.kind !== 'row' && element.kind !== 'cell' &&
-    element.type >= 1 && element.type <= 10)]
+    element.type >= 1 && element.type <= 11)]
 })
 const frames = computed(() => (props.page?.elements ?? []).filter((element) => element.kind === 'row' || element.kind === 'cell'))
 const borderSides = ['Top', 'Right', 'Bottom', 'Left'] as const

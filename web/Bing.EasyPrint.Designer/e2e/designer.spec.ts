@@ -2257,16 +2257,16 @@ test('TSPL 和 ZPL 介质设置按协议传递并省略不适用字段', async (
     const body = request.postDataJSON() as Record<string, unknown> | null
     const media = body?.zplMedia as Record<string, unknown> | undefined
     return body?.protocol === 'Zpl' && media?.dpi === 300 && media?.printSpeed === 6 &&
-      media?.orientation === 'Right' && media?.mediaTracking === 'M' && media?.darkness === -4 &&
+      media?.orientation === 'Down' && media?.mediaTracking === 'M' && media?.darkness === -4 &&
       !('tsplMedia' in (body ?? {}))
   })
   await page.getByLabel('ZPL DPI').fill('300')
   await page.getByLabel('ZPL 打印速度').fill('6')
-  await page.getByLabel('ZPL 方向').selectOption('Right')
+  await page.getByLabel('ZPL 方向').selectOption('Down')
   await page.getByLabel('ZPL 介质跟踪').selectOption('M')
   await page.getByLabel('ZPL 打印浓度').fill('-4')
   expect((await zplRequest).postDataJSON().zplMedia).toEqual({
-    dpi: 300, printSpeed: 6, orientation: 'Right', mediaTracking: 'M', darkness: -4,
+    dpi: 300, printSpeed: 6, orientation: 'Down', mediaTracking: 'M', darkness: -4,
   })
 })
 
@@ -2351,12 +2351,23 @@ test('TSPL 和 ZPL 介质设置写入最终协议字节', async ({ page }) => {
 
   const zpl = await render({
     protocol: 'Zpl',
-    zplMedia: { dpi: 300, printSpeed: 6, orientation: 'Right', mediaTracking: 'M', darkness: -4 },
+    zplMedia: { dpi: 300, printSpeed: 6, orientation: 'Down', mediaTracking: 'M', darkness: -4 },
   }, 'zpl')
   expect(zpl).toContain('^PR6\r\n')
-  expect(zpl).toContain('^POR\r\n')
+  expect(zpl).toContain('^POI\r\n')
   expect(zpl).toContain('^MNM\r\n')
   expect(zpl).toContain('^MD-4\r\n')
+  const normal = await render({ protocol: 'Zpl', zplMedia: { orientation: 'None' } }, 'zpl')
+  expect(normal).toContain('^PON\r\n')
+  const defaultOrientation = await render({ protocol: 'Zpl' }, 'zpl')
+  expect(defaultOrientation).not.toContain('^PO')
+  for (const orientation of ['Left', 'Right']) {
+    const invalid = await page.request.post(`${apiUrl}/api/designer/render`, {
+      data: { template, data: {}, protocol: 'Zpl', zplMedia: { orientation } },
+    })
+    expect(invalid.status()).toBe(400)
+    expect(await invalid.json()).toMatchObject({ errors: [{ code: 'InvalidOptions' }] })
+  }
 })
 
 test('TSPL 和 ZPL 文字样式位图开关恢复预览并写入位图字节', async ({ page }) => {
@@ -4562,7 +4573,7 @@ test('ESC/POS Native 能力过滤工具并保留不支持值直到用户修正',
   await entries.nth(3).click()
   const barcodeType = page.getByLabel('制式')
   await expect(barcodeType).toHaveValue('1')
-  await expect(barcodeType.locator('option[value="1"]')).toHaveAttribute('disabled', '')
+  await expect(barcodeType.locator('option[value="1"]')).toBeEnabled()
 
   const retained = JSON.parse((await exportTemplateJson(page)).toString('utf8'))
   expect(retained.Rows[0].Cells[0].Elements[0]).toMatchObject({ Rotation: 90, Font: { Kind: 2, Name: 'Microsoft YaHei' } })
@@ -4586,7 +4597,7 @@ test('ESC/POS Native 机型关闭原生命令后切 Raster 恢复码图工具', 
   await page.locator('.output-settings-button').click()
   await page.getByRole('button', { name: '新建设备配置' }).click()
 
-  const nativeBarcode = page.getByLabel('ESC/POS 支持原生条码')
+  const nativeBarcode = page.getByLabel('ESC/POS 支持原生条码', { exact: true })
   const nativeQr = page.getByLabel('ESC/POS 支持原生二维码')
   await expect(nativeBarcode).toBeChecked()
   await expect(nativeQr).toBeChecked()
