@@ -1,10 +1,22 @@
 # 待实现与待确认
 
-2026-10-22 单行 Expanded Composite 后续阶段见[实施计划](../ai_docs/plans/gs1-composite-expanded-2026-10-22.md)和[验证报告](gs1-composite-expanded-verification-2026-10-22.md)。本地验收已通过：两运行时各 3478、Host 155、Vitest 294、Chromium 158；当前软件范围新增 Expanded + A/B；Stacked Composite 仍为后续阶段，实机验收状态保持独立。
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。该阶段验证见[EAN/UPC 阶段报告](ean-upc-composite-verification-2026-10-22.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)，该阶段验证见[ExpandedStacked 阶段报告](expanded-stacked-verification-2026-10-22.md)。
+
+当前 GS1-128 Composite 支持显式 CC-A/CC-B，Auto 仍选择 CC-C；旧 Host 缺少 `gs1-composite-gs1-128-ab` 时仍可使用已声明的 Auto/CC-C。接口和协商细节见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。下文各历史阶段的计数保留原日期与范围。
+
+2026-10-22 单行 Expanded Composite 的[实施计划](../ai_docs/plans/gs1-composite-expanded-2026-10-22.md)和[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)保留其当时范围；本轮还修正 Expanded 历史编码问题并接入 DataBar Stacked + CC-A/CC-B Composite，当前软件能力和验证范围分别见[Expanded 使用说明](gs1-composite-expanded.md)、[Stacked 使用说明](gs1-composite-stacked.md)及[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。此前的自动化计数仅属于 Expanded 阶段，不代表本轮 Stacked 或目标设备扫描验收。ExpandedStacked 已接入普通 Raster 与 Composite，见[使用说明](gs1-composite-expanded-stacked.md)；EAN/UPC Composite 已接入，见[使用说明](gs1-composite-ean-upc.md)。
 
 本页只记录代码和现有验证资料尚不能证明完成的事项。历史轮次中的 TODO 以当前代码重新核对为准。
 
 ## 待实现
+
+### 后续软件能力
+
+EAN/UPC 的四种基本 Composite 组合及剩余两种 DataBar Composite 已完成。后续独立阶段包括 EAN/UPC 的 2/5 位附加码、ExpandedStacked 自定义列数、设计器真实条码位图预览、完整 GS1 AI 字典和复杂字体排版。各项为 `DEFERRED`，不作为当前阶段未修复缺陷。实机验收按本轮用户指令为 `NOT_APPLICABLE`。
 
 ### 打印传输与设备管理
 
@@ -40,7 +52,9 @@ Profile 会收窄能力并参与预检，但库不会自动发现设备，也不
 
 处理方向：为正式支持的型号维护可追溯到厂商手册或实测样张的配置；未知设备保持严格默认。
 
-### 当前分支的完整回归状态
+### 已有阶段自动化验收记录
+
+GS1-128 显式 CC-A/CC-B 的最新完整验收见[A/B 阶段报告](gs1-128-ab-verification-2026-10-22.md)。以下 CC-C 和较早修复阶段记录保留原范围，不代表 A/B 阶段验收结果。
 
 2026-10-22 后续 CC-C 阶段已完成本地验收：Core 两运行时各 3435 项、Host 148 项、Vitest 288 项、Chromium 156 项通过；五框架严格 XML 构建、四协议案例及候选包消费通过。新增能力与证据见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)。下段保留同日较早的修复阶段记录。
 

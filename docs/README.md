@@ -1,5 +1,11 @@
 # Bing.EasyPrint 文档索引
 
+- [Truncated / Stacked Omnidirectional 使用说明](gs1-composite-databar-completion.md)
+- [DataBar 补齐阶段验收](databar-completion-verification-2026-10-22.md)
+
+- [EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)
+- [EAN/UPC Composite 阶段验收](ean-upc-composite-verification-2026-10-22.md)
+
 本目录是项目当前功能的开发者入口。代码是最终依据；带 `Rxx` 标题的文档记录历史迭代与验证证据，不应替代当前模块说明。
 
 ## 盘点结果
@@ -35,11 +41,16 @@
 
 - [协议详细说明](protocols.md)：协议选项、Profile、条码、裁切、Raw 校验和设备边界的详细记录。
 - [模板详细说明](templates.md)：模板版本、元素、布局、字体校准和历史兼容细节。
+- [ExpandedStacked 普通条码与 Composite](gs1-composite-expanded-stacked.md)：固定两列布局、每行高度、A/B 及旧 Host 协商。
+- [ExpandedStacked 阶段验收](expanded-stacked-verification-2026-10-22.md)：功能矩阵、运行时及浏览器验证记录。
+- [GS1-128 CC-A/CC-B Composite](gs1-composite-gs1-128-ab.md)：显式 A/B、兼容 Auto/CC-C 与旧 Host 协商。
 - [单行 Expanded Composite](gs1-composite-expanded.md)：Expanded + CC-A/CC-B 的输入、尺寸、模板与能力协商。
+- [Stacked Composite](gs1-composite-stacked.md)：DataBar Stacked + CC-A/CC-B 的输入、尺寸、模板与 Host 能力协商。
 - [设计器详细说明](designer.md)：设计器交互、项目文件、模板包与 Host 契约细节。
 
-## 历史证据
+## 验证记录
 
+- [GS1-128 A/B 阶段验收](gs1-128-ab-verification-2026-10-22.md)：本阶段最新自动化验收记录。
 - [多协议验证记录](multi-protocol-verification.md)：按迭代轮次保存的测试范围和已知环境问题。
 - [实现报告](implementation-report.md)：早期实现阶段的总结，不代表当前完整能力清单。
 - [组件校验基准](component-validation-benchmark.md)：特定提交与测试集的冻结基准。

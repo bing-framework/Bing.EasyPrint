@@ -100,7 +100,7 @@ public sealed class TemplateRenderOptions
     /// 获取或设置打印输出编码。
     /// </summary>
     /// <remarks>
-    /// 未指定时使用 GBK，调用方须注册 CodePagesEncodingProvider。
+    /// 未指定时 ZPL 使用 UTF-8，其他协议使用 GBK；使用 GBK 时调用方须注册 CodePagesEncodingProvider。
     /// </remarks>
     public Encoding Encoding { get; set; }
 

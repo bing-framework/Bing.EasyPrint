@@ -1,6 +1,12 @@
 # 多协议模板渲染
 
-2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
+2026-10-22 新增单行 DataBar Expanded 与 DataBar Stacked + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)；两阶段结果分别见[Expanded 阶段报告](gs1-composite-expanded-verification-2026-10-22.md)与[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
 
 > 文档定位：本文件是模板版本、元素和兼容规则的详细参考。快速接入请先阅读[模板渲染指南](templates-guide.md)；当前模块关系见[架构与模块](architecture.md)。带 `Rxx` 的段落保留历史实现脉络。
 
@@ -582,9 +588,9 @@ ESC/POS Raster 显式开启条码可读文字时必须声明正的 `HumanReadabl
 
 ## GS1 Composite
 
-`BpGs1CompositeElement` 使用 `Type: 11`，仅用于 V2/V3；V1 模板必须先升级。继承的 `Field` 提供主数据，必需的 `SecondaryField` 提供次数据。DataBar `Gs1DataBarOmnidirectional`/`Gs1DataBarLimited` 支持 `Auto`、`CcA`、`CcB`；GS1-128 `UccEan128` 支持 `Auto`、`CcC`，Auto 直接选择 CC-C。DataBar+CC-C 与 GS1-128+CC-A/CC-B 均为非法组合，导入校验和渲染预检会拒绝。`ModuleWidth` 与 `LinearBarHeight` 均为正的打印点数。DataBar 主数据接受 GTIN-13 数据、GTIN-14 或 AI `(01)` 的 GTIN-14；GS1-128 主数据使用括号式 AI 元素串，经共享解析器规范化后最多 48 个字符。解析器不保证业务关系或 GTIN 校验位正确。次数据采用当前支持的括号式 GS1 AI 子集，不是完整 GS1 AI 字典。属性、C# 模型和模板 JSON 示例见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
+`BpGs1CompositeElement` 使用 `Type: 11`，仅用于 V2/V3；V1 模板必须先升级。继承的 `Field` 提供主数据，必需的 `SecondaryField` 提供次数据。DataBar `Gs1DataBarOmnidirectional`、`Gs1DataBarLimited`、单行 `Gs1DataBarExpanded`、`Gs1DataBarTruncated`、`Gs1DataBarStacked`、`Gs1DataBarStackedOmnidirectional` 和 `Gs1DataBarExpandedStacked` 支持 `Auto`、`CcA`、`CcB`；GS1-128 `UccEan128` 支持 `Auto`、`CcA`、`CcB`、`CcC`，Auto 直接选择 CC-C。DataBar+CC-C 仍为非法组合，导入校验和渲染预检会拒绝。`ModuleWidth` 与 `LinearBarHeight` 均以打印点计。Omnidirectional/Limited/Stacked 主数据接受 GTIN-13、GTIN-14 或 AI `(01)` 的 GTIN-14；Expanded 主数据使用括号式 AI，并校验格式和容量；GS1-128 主数据使用括号式 AI 元素串，经共享解析器规范化后最多 48 个字符。Stacked 线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；其 `LinearBarHeight` 是上下数据行总高且至少为 `12 × ModuleWidth`。解析器不验证所有 AI 之间的业务关系；开头 `(01)` 的 GTIN 校验位会校验。次数据采用当前支持的括号式 GS1 AI 子集，不是完整 GS1 AI 字典。完整输入、尺寸和模式见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
 
-复合符号不可拆分。CC-C 行高为 `3 × ModuleWidth`，分隔行为 `1 × ModuleWidth`；编码尺寸、旋转、四边静区、单元格占位和整页边界共同作用。Composite 不内置 HRI；需要可读文字时使用独立文字元素。发生编码或空间错误时不会返回部分页，并尽可能保留元素路径。能力受目标 Provider 限制，ESC/POS Native 不支持；设计器还要求 Host 协商基础 `gs1-composite` 特性并返回支持能力，GS1-128+CC-C 另要求 `gs1-composite-cc-c`。2026-10-22 的既有 DataBar 浏览器验收及 154/154 完整 Chromium E2E 发生在 CC-C 集成前，不作为 GS1-128/CC-C 验收证据；画布显示布局占位，不绘制可扫描的编码位图。详见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md) 和[本轮修复验收报告](review-fixes-2026-10-22.md)。
+复合符号不可拆分。CC-C 行高为 `3 × ModuleWidth`，分隔行为 `1 × ModuleWidth`；编码尺寸、旋转、四边静区、单元格占位和整页边界共同作用。Composite 不内置 HRI；需要可读文字时使用独立文字元素。发生编码或空间错误时不会返回部分页，并尽可能保留元素路径。能力受目标 Provider 限制，ESC/POS Native 不支持；设计器还要求 Host 协商基础 `gs1-composite` 特性并返回支持能力。GS1-128 Auto/CC-C 还要求 `gs1-composite-cc-c`，显式 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab` 以及 `UccEan128`、`CcA`、`CcB` 能力；EAN/UPC 还要求 `gs1-composite-ean-upc`，ExpandedStacked 还要求 `gs1-composite-expanded-stacked`；Expanded 和 Stacked 分别还要求 `gs1-composite-expanded`、`gs1-composite-stacked`。旧 Host 缺少相应特性或线性类型时不会开放对应选项。2026-10-22 的既有 DataBar 浏览器验收及 154/154 完整 Chromium E2E 发生在 CC-C 集成前，不作为 GS1-128/CC-C 验收证据；画布显示布局占位，不绘制可扫描的编码位图。详见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
 
 ## 资源与失败语义
 

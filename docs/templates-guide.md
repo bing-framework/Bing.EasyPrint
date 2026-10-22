@@ -1,8 +1,14 @@
 # 模板渲染指南
 
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
 ## 功能说明
 
-`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。当前 DataBar 支持 CC-A/CC-B，GS1-128 支持 CC-C；完整组合和数据限制见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)及[单行 Expanded 使用说明](gs1-composite-expanded.md)。
+`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。当前 DataBar Omnidirectional/Truncated/Limited、单行 Expanded、Stacked、StackedOmnidirectional 和 ExpandedStacked 支持 CC-A/CC-B，GS1-128 支持 CC-A/CC-B/CC-C；输入、尺寸和能力协商限制见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
 
 ## 基本用法
 
@@ -52,7 +58,7 @@ CPCL 与模板图片入口在 `Image.Identify` 前预检 TIFF 目录结构；截
 
 字段绑定支持常量值和对象路径；重复区从集合来源生成实例。绑定和资源异常会携带模板路径，Host 还会将其转换为结构化诊断。
 
-Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`。DataBar Omnidirectional/Limited/单行 Expanded 只接受 Auto/CC-A/CC-B；GS1-128 (`UccEan128`) 只接受 Auto/CC-C，Auto 直接选择 CC-C；不支持的组合在导入验证和渲染预检时拒绝。模块宽度和线性条高均为正的打印点数，整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 仅具备 `gs1-composite` 时保留既有 DataBar 入口；GS1-128/CC-C 选项需要新增 `gs1-composite-cc-c` 特性，旧 Host 对该组合的预览/渲染请求会明确拒绝。
+Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`。EAN-8/EAN-13/UPC-A/UPC-E 与 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 只接受 Auto/CC-A/CC-B；GS1-128 (`UccEan128`) 接受 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C；DataBar+CC-C 及其他未声明配对在导入验证和渲染预检时拒绝。Stacked 的 `LinearBarHeight` 是上下两条数据行的总高，不含内部一模块分隔行，且不得小于 `12 × ModuleWidth`。模块宽度和线性条高均为打印点数，整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 仅具备 `gs1-composite` 时保留其已声明组合；GS1-128 Auto/CC-C 需要 `gs1-composite-cc-c`，显式 CC-A/CC-B 还需 `gs1-composite-gs1-128-ab` 及 `UccEan128`、`CcA`、`CcB` 能力，EAN/UPC 需要 `gs1-composite-ean-upc`，ExpandedStacked 需要 `gs1-composite-expanded-stacked`；Expanded 和 Stacked 分别需要对应协商特性和线性制式能力。缺失时设计器禁用并提示，服务端对强制请求明确拒绝。详细协议与模板示例见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
 
 ## 配置
 
@@ -72,7 +78,7 @@ Composite 的主数据使用继承的 `Field`，次数据必须提供 `Secondary
 
 ## 价签与示例
 
-`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出、TSPL/ZPL 切刀和 GS1-128/CC-C、Expanded/CC-A/B Composite 案例；对应的 [C# 案例](../samples/Templates/Gs1CompositeSamples.cs) 会与 [模板 JSON](../samples/Templates/gs1-composite-cc-c.json) 及 Save/Load 往返输出逐协议比较。
+`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出、TSPL/ZPL 切刀和 GS1-128/CC-A/CC-B/CC-C、Expanded/Stacked CC-A/B Composite 案例；见 [C# 案例](../samples/Templates/Gs1CompositeSamples.cs)、[GS1-128 CC-A 模板 JSON](../samples/Templates/gs1-composite-gs1-128-cc-a.json)、[GS1-128 CC-B 模板 JSON](../samples/Templates/gs1-composite-gs1-128-cc-b.json)、[CC-C 模板 JSON](../samples/Templates/gs1-composite-cc-c.json)、[Expanded 模板 JSON](../samples/Templates/gs1-composite-expanded.json)和[Stacked 模板 JSON](../samples/Templates/gs1-composite-stacked.json)。
 
 ```powershell
 dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples

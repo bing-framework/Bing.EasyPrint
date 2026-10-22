@@ -1,6 +1,14 @@
 # 打印指令集
 
-2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
+当前 GS1 Composite 的模式和能力协商见 [GS1-128 CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)与[Stacked 使用说明](gs1-composite-stacked.md)。
+
+2026-10-22 新增单行 DataBar Expanded 和 DataBar Stacked + CC-A/CC-B Composite，分别见[Expanded 使用说明](gs1-composite-expanded.md)与[Stacked 使用说明](gs1-composite-stacked.md)；两阶段的验证范围分别见[Expanded 阶段报告](gs1-composite-expanded-verification-2026-10-22.md)和[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
 
 > 文档定位：本文件保存协议能力、设备 Profile 和各轮兼容细节。首次接入请先阅读[核心打印与协议](core-printing.md)；未完成和设备验收项见[待实现与待确认](status.md)。带 `Rxx` 的段落是对应迭代的记录，不等同于当前分支验证结论。
 
@@ -32,11 +40,11 @@
 
 - **制式矩阵**：零售码、Code39/93、I2OF5 校验变体、MSI、GS1-128、邮政码等按协议能力映射；Raster 有 PLANET、FIM A–E、IMb、Code11、Plessey、ITF14、China Post、Telepen/Telepenn、Code49、DataBar Omnidirectional/Truncated/Limited/Expanded/Stacked 主机编码。能力矩阵是支持范围依据，不能外推到任意协议/制式组合。
 - **共享 AI/FNC1**：严格括号解析统一长度、字符集、校验位、日期和变量字段 FNC1，未知 AI 拒绝；已接入常用压缩 AI、Scan4Transport、内部 AI 和 253/254/255 限定子集。GDTI/GCN 键校验、AI 254 与 414 配对、跨 Provider 输出和 HRI 共用该规则；不是完整字典、全部业务关系或扫描器返回值契约。
-- **Composite 编码**：独立 `PrintGs1CompositeElement` 与 `Gs1CompositeMode` 不改变普通条码枚举。DataBar Omnidirectional/Limited 支持 Auto/CC-A/CC-B，Auto 在 CC-A 容量不足时选择 CC-B；GS1-128 (`UccEan128`) 只支持 Auto/CC-C，Auto 直接选择 CC-C。DataBar+CC-C 和 GS1-128+CC-A/CC-B 明确拒绝。DataBar 主数据接受既有 GTIN 形式；GS1-128 主数据使用括号 AI 元素串，共享解析器规范化后最多 48 字符，但不保证业务关系和 GTIN 校验位。次数据复用严格 AI 解析器的已声明子集。
-- **公共位图输出**：托管编码处理压缩、纠错、码字、行指示、DataBar/GS1-128 连接标志、分隔与对齐；CPCL/TSPL/ZPL/ESC/POS Raster 共用位图和图片输出路径，Native 与禁图 Profile 在解析/编码前拒绝。CC-C 行高为 `3X`、分隔行为 `X`；无内置 Composite HRI，静区与旋转沿用完整符号行为。目标固件、打印品质和扫描结果仍需设备验收。
-- **独立向量与许可**：CC-A、CC-B、CC-C 向量固定来源于 Zint 2.15.0（commit `4896136bdbebb1a0908a5cc419513efa5bf4bf70`），保留原 A/B 的 6 组完整矩阵，新增 CC-C 的 8 组完整矩阵，覆盖容量及列扩展；不依赖外部编码进程。Expanded/Stacked Composite 和其他线性组件仍延期，不能由各自独立制式的支持推导 Composite 支持。当前实现和输入示例见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
+- **Composite 编码**：独立 `PrintGs1CompositeElement` 与 `Gs1CompositeMode` 不改变普通条码枚举。EAN-8/EAN-13/UPC-A/UPC-E 与 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 支持 Auto/CC-A/CC-B，Auto 在 CC-A 容量不足时选择 CC-B；GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C。DataBar+CC-C 仍明确拒绝。Host 对 GS1-128 Auto/CC-C 和显式 CC-A/CC-B 分别协商 `gs1-composite-cc-c` 与 `gs1-composite-gs1-128-ab`；A/B 还需 `UccEan128`、`CcA`、`CcB` 能力。Stacked 使用两列 CC-A/CC-B；线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度。其 `LinearBarHeight` 表示上下数据行总高且至少为 `12 × ModuleWidth`，尺寸细节见 [Stacked 使用说明](gs1-composite-stacked.md)。DataBar 主数据按制式接受 GTIN 或括号式 AI；GS1-128 主数据使用括号 AI 元素串，共享解析器规范化后最多 48 字符，但不保证业务关系和 GTIN 校验位。次数据复用严格 AI 解析器的已声明子集。
+- **公共位图输出**：托管编码处理压缩、纠错、码字、行指示、DataBar/GS1-128 连接标志、分隔与对齐；CPCL/TSPL/ZPL/ESC/POS Raster 共用位图和图片输出路径，ESC/POS Native 与禁图 Profile 在解析/编码前拒绝。CC-C 行高为 `3X`、分隔行为 `X`；Composite 不内置 HRI，静区与旋转沿用完整符号行为。目标固件、打印品质和扫描结果仍需设备验收。
+- **独立向量与许可**：CC-A、CC-B、CC-C 向量固定来源于 Zint 2.15.0（commit `4896136bdbebb1a0908a5cc419513efa5bf4bf70`），保留原 A/B 的 6 组完整矩阵，新增 CC-C 的 8 组完整矩阵，覆盖容量及列扩展；不依赖外部编码进程。当前 Composite 支持固定两列 ExpandedStacked，已涵盖不带附加码的 EAN/UPC Composite；GS1-128 + CC-A/CC-B 的入口和协商限制见[使用说明](gs1-composite-gs1-128-ab.md)，普通 Expanded 与 Stacked Composite 的输入限制分别见[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。各自独立线性制式的支持不能推导为其 Composite 支持。
 
-实现入口：[共享 AI 解析器](../src/Bing.EasyPrint/Protocols/Gs1ApplicationIdentifierParser.cs)、[Composite 编码器](../src/Bing.EasyPrint/Protocols/Gs1CompositeEncoder.cs)、[固定编码表](../src/Bing.EasyPrint/Protocols/Gs1CompositeTables.cs)、[CC-C 编码实现](../src/Bing.EasyPrint/Protocols/Gs1CompositeEncoder.CcC.cs)。回归入口：[制式矩阵](../tests/Bing.EasyPrint.Tests/ProtocolBarcodeModuleTests.cs)、[Scan4Transport](../tests/Bing.EasyPrint.Tests/Gs1Scan4TransportTests.cs)、[Composite 向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeVectors.cs)、[CC-C 固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeCcCVectors.cs)、[编码测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeEncoderTests.cs)、[Provider 输出](../tests/Bing.EasyPrint.Tests/Gs1CompositeProviderTests.cs)。
+实现入口：[共享 AI 解析器](../src/Bing.EasyPrint/Protocols/Gs1ApplicationIdentifierParser.cs)、[Composite 编码器](../src/Bing.EasyPrint/Protocols/Gs1CompositeEncoder.cs)、[固定编码表](../src/Bing.EasyPrint/Protocols/Gs1CompositeTables.cs)、[CC-C 编码实现](../src/Bing.EasyPrint/Protocols/Gs1CompositeEncoder.CcC.cs)。回归入口：[制式矩阵](../tests/Bing.EasyPrint.Tests/ProtocolBarcodeModuleTests.cs)、[Scan4Transport](../tests/Bing.EasyPrint.Tests/Gs1Scan4TransportTests.cs)、[Composite 向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeVectors.cs)、[Stacked 固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeStackedVectors.cs)、[CC-C 固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeCcCVectors.cs)、[编码测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeEncoderTests.cs)、[Provider 输出](../tests/Bing.EasyPrint.Tests/Gs1CompositeProviderTests.cs)。
 
 以下 `Rxx` 章节继续保留历史兼容细节，不重复作为待办入口。
 

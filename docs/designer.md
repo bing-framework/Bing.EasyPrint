@@ -1,5 +1,11 @@
 # Vue 多协议模板设计器
 
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
 ## 2026-10-22 CC-C 集成前修复验收记录
 
 真实 Host 的五种输出模式能力加载后均可编辑；能力中的 Native HRI 位置字段可缺省或为 `null`，若提供数组则仅允许用于 ESC/POS Native。GS1 Composite 浏览器用例覆盖 Host 创建、属性编辑、编码尺寸、CPCL CG 二进制导出、项目保存重载，以及模拟旧 Host 缺少 `gs1-composite` 时禁用入口。Composite 画布节点、ZPL 方向、Code39 支持状态和复选框可访问名称的定向 E2E 为 3/3 通过；生产构建和 Vitest 277 项通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`；完整验收见[本轮修复验收报告](review-fixes-2026-10-22.md)。这组日期结果来自 CC-C 集成前，不覆盖 GS1-128/CC-C 路径。画布显示布局占位，不绘制可扫描的编码位图；旋转验收不由上述定向结果推断。
@@ -251,7 +257,9 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 ### GS1 Composite
 
-“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。DataBar Omnidirectional/Limited 支持 Auto、CC-A、CC-B；单行 GS1 DataBar Expanded 支持 Auto、CC-A、CC-B；GS1-128 (`UccEan128`) 只支持 Auto/CC-C，Auto 直接选择 CC-C。Expanded 主数据和次数据均使用括号式 GS1 AI。切换线性制式会保留已有主数据绑定和值；主字段为空时，Expanded 填入默认 `(01)09506000134352(10)LOT-A`，GS1-128 填入 `(01)12345678901231`。已有非空裸 GTIN 不会自动转换，使用 Expanded 时需手动输入括号式 AI 主数据。非法组合在导入校验和 Host 预览/渲染预检时被明确拒绝。GS1-128 主数据使用括号式 AI，共享解析器规范化后最多 48 个字符；Expanded 的 AI 格式和编码容量由编码器校验；这些检查不替业务层校验 AI 关系；Expanded 开头 `(01)` 的 GTIN 校验位会校验，GS1-128 不额外保证 GTIN 校验位。次数据使用共享解析器当前支持的 AI 子集。模块宽度、线性条高、旋转和静区沿用既有属性；CC-C 行高为 `3X`，分隔行为 `X`，不内置 HRI。Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。能力响应声明基础 `gs1-composite` 并提供对应线性制式和模式后，才开放基础组合；GS1-128/CC-C 还要求 `gs1-composite-cc-c`，Expanded 还要求 `gs1-composite-expanded`。旧 Host 保留其已支持的 DataBar/CC-C 组合，未协商 Expanded 特性时 Expanded 选项禁用，含 Expanded 的预览/渲染请求会明确提示需升级 Host。完整配置例见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)及[Expanded 使用说明](gs1-composite-expanded.md)。CPCL 导出使用 CG 二进制图形数据，不能按文本 `EG` 十六进制行读取。ZPL 整页方向仅支持默认、`None` 和 `Down`；导入旧项目中的 `Left`/`Right` 时会明确报错，不会改写成其他方向。
+“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。DataBar Omnidirectional/Limited、单行 GS1 DataBar Expanded、GS1 DataBar Stacked 和 GS1 DataBar ExpandedStacked 支持 Auto、CC-A、CC-B；GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C。Expanded 主数据和次数据均使用括号式 GS1 AI；Stacked 主数据使用 GTIN，次数据使用共享解析器当前支持的括号式 AI 子集。切换线性制式会保留已有主数据绑定和值；主字段为空时，Expanded 填入默认 `(01)09506000134352(10)LOT-A`，GS1-128 填入 `(01)12345678901231`。已有非空裸 GTIN 不会自动转换，使用 Expanded 时需手动输入括号式 AI 主数据。非法组合在导入校验和 Host 预览/渲染预检时被明确拒绝。GS1-128 主数据使用括号式 AI，共享解析器规范化后最多 48 个字符；Expanded 的 AI 格式和编码容量由编码器校验；这些检查不替业务层校验 AI 关系；Expanded 开头 `(01)` 的 GTIN 校验位会校验，GS1-128 不额外保证 GTIN 校验位。Stacked 的线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；`LinearBarHeight` 是上下数据行总高，必须至少为模块宽的 12 倍。默认模块宽 2、条高 40 可用。模块宽度、线性条高、旋转和静区沿用既有属性；Composite 不内置 HRI。Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。
+
+能力响应须声明基础 `gs1-composite` 并提供对应线性制式和模式，才开放基础组合；GS1-128 Auto/CC-C 还要求 `gs1-composite-cc-c`，显式 GS1-128 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab`，以及 `UccEan128`、`CcA`、`CcB` 能力；Expanded、Stacked 分别还要求 `gs1-composite-expanded`、`gs1-composite-stacked`。新 Host 在原能力数组末尾追加 `Gs1DataBarExpandedStacked`，`modes` 不变；旧 Host 缺少相应特性或类型能力时，设计器禁用选项并提示，强制提交的请求由 Host 拒绝。完整配置见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。这里的 Stacked 指 `Gs1DataBarStacked` 线性组件；`ExpandedStacked` 现由[独立使用说明](gs1-composite-expanded-stacked.md)描述，条高为每条数据行高度。CPCL 导出使用 CG 二进制图形数据，不能按文本 `EG` 十六进制行读取。ZPL 整页方向仅支持默认、`None` 和 `Down`；导入旧项目中的 `Left`/`Right` 时会明确报错，不会改写成其他方向。
 
 - 纸张尺寸保存在打印点，毫米按目标 DPI 换算。CPCL 保留 200 DPI；其他协议使用显式设备 DPI 或默认 203，ESC/POS 未指定 DPI 时优先使用 Profile 的横向 DPI。修改 DPI 不重写页面或元素点数。
 - 支持通用单色元素、行/单元格边框与字段条件；不提供彩色背景或任意角度自由旋转，元素旋转仍受目标 Provider 能力约束。

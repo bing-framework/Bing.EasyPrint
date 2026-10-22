@@ -1,5 +1,11 @@
 # 核心打印与协议
 
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
 ## 功能说明
 
 核心库支持 CPCL、ESC/POS、TSPL 和 ZPL。它提供三层入口：原有 CPCL API、各协议独立命令 API，以及协议无关的 `PrintDocument` + Provider API。
@@ -66,7 +72,7 @@ byte[] firstPage = pages[0];
 
 能力查询使用 `PrintCapabilities`。统一模型与直接命令的能力并不完全相同，例如 ESC/POS Raster 可由主机绘制码图，但不等于设备支持原生 `GS k`。
 
-`PrintGs1CompositeElement` 将 GS1 线性组件和 CC-A、CC-B 或 CC-C 次码作为一个不可拆分符号处理，尺寸由编码结果确定。组合受限：DataBar Omnidirectional/Limited/单行 Expanded 支持 Auto、CC-A、CC-B；GS1-128 (`BarcodeType.UccEan128`) 支持 Auto 和 CC-C，且 Auto 直接选择 CC-C。其他配对会被拒绝。该功能只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。完整输入、模式和 Host 协商说明见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)及[单行 Expanded 使用说明](gs1-composite-expanded.md)。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
+`PrintGs1CompositeElement` 将 GS1 线性组件和 CC-A、CC-B 或 CC-C 次码作为一个不可拆分符号处理，尺寸由编码结果确定。组合受限：DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 支持 Auto、CC-A、CC-B；GS1-128 (`BarcodeType.UccEan128`) 支持 Auto、CC-A、CC-B 和 CC-C，且 Auto 直接选择 CC-C。其他配对会被拒绝。Stacked 的线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；条高是上下数据行总高且至少为模块宽的 12 倍。该功能只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。完整输入、模式和 Host 协商说明见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
 
 应用可以直接向统一模型提供自定义 `IPrintProtocolProvider`；静态 `PrintProtocolProviderFactory` 只创建内置四协议 Provider。`TemplateRenderer` 目前固定使用该内置工厂，`TemplateRenderOptions` 没有 Provider/工厂注入点。自定义 Provider 也不能直接复用内置任务收尾与部分切纸编码；请求这些功能时会按不支持处理。实现接口本身不会自动把新协议接入模板或 Host。
 

@@ -1,5 +1,7 @@
 # 多协议打印与旋转剩余任务
 
+2026-10-22：继续补齐 Truncated 与 Stacked Omnidirectional，新增普通 Raster 类型 32；范围与结果见[本轮计划](databar-completion-2026-10-22.md)和[验收报告](../../docs/databar-completion-verification-2026-10-22.md)。
+
 整理日期：2026-10-15。已按确认的清理方案迁出重复完成记录，保留本文件作为打印计划的唯一任务入口。状态基于候选 `1f590cb` 的[逐项核对报告](../../docs/plan-audit-2026-10-15.md)，代码实现不等于发布或设备验收；本轮仅整理文档。
 
 ## 已完成能力的维护位置
@@ -32,7 +34,7 @@
 6. [ ] 跨平台运行时/字库验证。`BLOCKED_EXTERNAL / OUT_OF_SCOPE`；依赖对应 OS、运行时、字体环境；尚无环境执行证据，环境建设不在本次范围。（核对编号 U05）
 7. [ ] 具体机型 HRI 四边、字形墨迹和旋转实测。`BLOCKED_EXTERNAL / DEFERRED_DEVICE`；依赖 R138 角度边界配置与设备样本；本轮暂缓。（核对编号 U06）
 
-2026-10-22 用户已单独选择 CC-C 为后续实施阶段，范围与证据由[CC-C 实施计划](gs1-composite-cc-c-2026-10-22.md)维护。单行 Expanded Composite 已进入[本阶段计划](gs1-composite-expanded-2026-10-22.md)；Stacked Composite、其他线性组件仍保留为后续范围。设备相关第 2 项继续等待设备/样本；不得由 CC-C 本地实现推断实机验收完成。
+2026-10-22 用户已单独选择 CC-C 为后续实施阶段，范围与证据由[CC-C 实施计划](gs1-composite-cc-c-2026-10-22.md)维护。单行 Expanded Composite 已完成，见[验证报告](../../docs/gs1-composite-expanded-verification-2026-10-22.md)；Stacked Composite 已完成，见[本阶段验收](../../docs/gs1-stacked-verification-2026-10-22.md)；GS1-128 A/B 已完成，见[阶段报告](../../docs/gs1-128-ab-verification-2026-10-22.md)；ExpandedStacked 已补齐固定两列普通 Raster 与 Composite 链路，见[本轮计划](expanded-stacked-2026-10-22.md)；不带附加码的 EAN/UPC Composite 本轮接入，见[实施计划](ean-upc-composite-2026-10-22.md)。本轮按用户要求不执行实机验收。设备相关第 2 项继续等待设备/样本；不得由本地实现推断实机验收完成。
 
 ## 保留的范围与验收边界
 
@@ -77,3 +79,5 @@
 ### 尚未确认的注释验收
 
 注释计划已按[逐项核对报告](../../docs/plan-audit-2026-10-15.md)更新为当前状态，C1–C7 未整体验收；RawMetadata、MetadataType、默认编码文案与实施前 token 证据缺口继续由[中文注释计划](chinese-comments-plan.md)跟踪。
+
+2026-10-22 本轮用户要求忽略实机验收，因此硬件验证不纳入本阶段完成条件；历史设备事项不改写成已验收。

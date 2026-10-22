@@ -1,6 +1,14 @@
 # 开发与验证
 
-2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
+
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。该阶段验证见[EAN/UPC 阶段报告](ean-upc-composite-verification-2026-10-22.md)。
+
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)，该阶段验证见[ExpandedStacked 阶段报告](expanded-stacked-verification-2026-10-22.md)。
+
+当前 GS1-128 Composite 支持显式 CC-A/CC-B，Auto 仍选择 CC-C；A/B 的 Host 门控特性为 `gs1-composite-gs1-128-ab`。详细契约见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)，本阶段结果见[A/B 阶段验收报告](gs1-128-ab-verification-2026-10-22.md)。下文各历史阶段的计数保留原日期与范围。
+
+2026-10-22 新增单行 DataBar Expanded 与 DataBar Stacked + CC-A/CC-B Composite。使用和输入限制见[Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)，阶段验证分别记录在[Expanded 报告](gs1-composite-expanded-verification-2026-10-22.md)和[Stacked 报告](gs1-stacked-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
 
 ## 项目与依赖
 
@@ -90,8 +98,8 @@ try {
 
 - Host 通过版本/特性协商和严格 DTO 校验请求，返回稳定错误、字段路径与绑定诊断。能力响应与前端过滤共用协议准入规则，标签 QR rotation allowlist 的 JSON 请求已有集成回归。
 - 设计器支持角度与属性编辑、旋转占位/结束坐标回写及 JSON/项目 ZIP 往返；离线结束坐标框不重复旋转。在线预览使用 Host 实际度量，模型测试和归档测试不替代浏览器交互验收。
-- GS1 Composite 基础入口要求 `gs1-composite` 特性和能力确认；GS1-128/CC-C 另要求 `gs1-composite-cc-c`。旧 Host 只有基础特性时仍可使用既有 DataBar 模式，GS1-128/CC-C 选项禁用；preview/render 对该组合要求两个特性并在缺失时明确拒绝。组合为 DataBar Omnidirectional/Limited × Auto/CC-A/CC-B、GS1-128 × Auto/CC-C；非法组合导入或服务端预检会拒绝。画布当前显示不可扫描的布局占位，不绘制实际编码位图。详细契约见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
-- 2026-10-22 的五模式能力、DataBar Composite 交互和原完整 Chromium E2E 结果仍按[本轮修复验收报告](review-fixes-2026-10-22.md)留作历史记录；这些结果发生在 CC-C 集成前，不代表新 GS1-128/CC-C 路径验收完成。CC-C 定向入口：[核心向量测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeCcCTests.cs)、[固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeCcCVectors.cs)、[Host 测试](../tests/DesignerHost.Tests/Gs1CompositeHostTests.cs)；运行 [C#/JSON/往返样例](../samples/Templates/Gs1CompositeSamples.cs) 的命令见 `dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples`。新路径的最终验证结果应在集成验收后单独记录。
+- GS1 Composite 基础入口要求 `gs1-composite` 特性和能力确认；GS1-128 Auto/CC-C 要求 `gs1-composite-cc-c`，显式 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab` 以及 `UccEan128`、`CcA`、`CcB` 能力；EAN/UPC 组合还要求 `gs1-composite-ean-upc` 与四种零售线性类型及 Auto/CcA/CcB 能力；Expanded 和 Stacked 分别要求 `gs1-composite-expanded` 和 `gs1-composite-stacked`。新 Host 在 `linearTypes` 的既有 Expanded、Stacked 项之后追加 `Gs1DataBarExpandedStacked`，再追加 `Ean8`、`Ean13`、`UpcA`、`UpcE`，本阶段末尾追加 `Gs1DataBarTruncated`、`Gs1DataBarStackedOmnidirectional`，`modes` 保持原值；旧 Host 缺少对应特性或线性/模式能力时禁用相关组合，保留其已声明的既有组合。当前组合为 EAN-8/EAN-13/UPC-A/UPC-E、DataBar Omnidirectional/Limited/Expanded/Stacked/ExpandedStacked × Auto/CC-A/CC-B、GS1-128 × Auto/CC-A/CC-B/CC-C；非法组合导入或服务端预检会拒绝。A/B 模式不会在导入时静默改写，preview/render 会要求新特性并检查响应，防止旧 Host 降级处理。画布显示不可扫描的布局占位，不绘制实际编码位图。详细契约见 [GS1-128 CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。
+- 2026-10-22 早期五模式能力、DataBar Composite 交互和完整 Chromium E2E 结果仍按[修复验收报告](review-fixes-2026-10-22.md)留作历史记录；这些结果发生在 CC-C 集成前，不代表新路径验收。CC-C 定向入口：[核心向量测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeCcCTests.cs)、[固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeCcCVectors.cs)、[Host 测试](../tests/DesignerHost.Tests/Gs1CompositeHostTests.cs)；Stacked 阶段完整验收范围见[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。运行 [C#/JSON/往返样例](../samples/Templates/Gs1CompositeSamples.cs) 的命令见 `dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples`。
 
 实现/测试入口：[Host 契约](../tools/DesignerHost/DesignerContract.cs)、[请求处理器](../tools/DesignerHost/DesignerRequestProcessor.cs)、[Host 契约测试](../tests/DesignerHost.Tests/HostContractTests.cs)、[Composite Host 测试](../tests/DesignerHost.Tests/Gs1CompositeHostTests.cs)、[前端能力](../web/Bing.EasyPrint.Designer/src/capabilities.ts)、[属性编辑](../web/Bing.EasyPrint.Designer/src/components/PropertyInspector.vue)、[Composite 单元测试](../web/Bing.EasyPrint.Designer/src/gs1Composite.test.ts)、[旋转 E2E 用例](../web/Bing.EasyPrint.Designer/e2e/imageRotation.spec.ts)。
 
