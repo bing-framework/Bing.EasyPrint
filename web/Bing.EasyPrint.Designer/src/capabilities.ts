@@ -89,6 +89,8 @@ export type DesignerCapabilities = {
   gs1Composite?: { rotations: number[]; modes: string[]; linearTypes: string[] } | null
   /** 来自协商响应头；旧 Host 或未查询时不视为支持。 */
   gs1CompositeFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 可继续提供基础 DataBar Composite。 */
+  gs1CompositeCcCFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -590,10 +592,17 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
   let gs1Composite: DesignerCapabilities['gs1Composite'] = null
   if (input.gs1Composite !== undefined && input.gs1Composite !== null) {
     const composite = input.gs1Composite as Record<string, unknown>
+    const validModes = Array.isArray(composite.modes) && composite.modes.every((mode) => typeof mode === 'string')
+    const validLinearTypes = Array.isArray(composite.linearTypes) && composite.linearTypes.every((type) => typeof type === 'string')
+    const modes = validModes ? (composite.modes as string[]).join(',') : ''
+    const linearTypes = validLinearTypes ? (composite.linearTypes as string[]).join(',') : ''
+    const legacyComposite = modes === 'Auto,CcA,CcB' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited'
+    const ccCComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128'
     if (typeof composite !== 'object' || Array.isArray(composite) || composite.elementType !== 11 ||
       composite.dimensionsFromEncoding !== true || composite.includesHumanReadable !== false ||
-      !Array.isArray(composite.modes) || composite.modes.join(',') !== 'Auto,CcA,CcB' ||
-      !Array.isArray(composite.linearTypes) || composite.linearTypes.join(',') !== 'Gs1DataBarOmnidirectional,Gs1DataBarLimited')
+      (!legacyComposite && !ccCComposite))
       throw new Error('能力响应的 gs1Composite 无效。')
     gs1Composite = { rotations: parseRotationArray(composite.rotations, 'gs1Composite.rotations'),
       modes: composite.modes as string[], linearTypes: composite.linearTypes as string[] }
@@ -645,6 +654,7 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsCoordinates: parseBoolean(input.supportsCoordinates, 'supportsCoordinates'),
     supportsExplicitQuietZone: parseBoolean(input.supportsExplicitQuietZone, 'supportsExplicitQuietZone'),
     supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
+    gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
     gs1Composite,
   }
   const hasEscPosCutFields = Object.prototype.hasOwnProperty.call(input, 'cutModes') &&

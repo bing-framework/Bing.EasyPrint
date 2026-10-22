@@ -16,6 +16,10 @@ import {
   type CapabilitiesState, type DesignerCapabilities,
 } from '../capabilities'
 import {
+  GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE, gs1CompositeModeChoices, setGs1CompositeLinearType,
+  setGs1CompositeMode, supportsGs1CompositeCcC, type Gs1CompositeLinearType, type Gs1CompositeMode,
+} from '../gs1Composite'
+import {
   barcodeOptions, fixedBarcodeWideWidth, isTsplVariableBarcodeType, legacyRatioForTsplBarcodeRatio,
   tsplBarcodeModulePairForRatio, tsplBarcodeRatioForModules, tsplBarcodeRatioFromLegacyRatio,
   tsplVariableBarcodeRatios, type TsplBarcodeRatioKey,
@@ -46,6 +50,8 @@ const isPage = computed(() => !props.selectedPath)
 const isTopLevelRow = computed(() => /^Rows\[\d+\]$/.test(props.selectedPath))
 const title = computed(() => isPage.value ? '页面属性' : props.definition ? `组件 · ${props.definition.Id}` : props.element ? `${typeName[props.element.Type]}属性` : props.row ? '行属性' : props.cell ? '列属性' : '属性')
 const capabilitiesReady = computed(() => props.capabilitiesState === 'ready' && Boolean(props.capabilities))
+const gs1CompositeModeOptions = computed(() => gs1CompositeModeChoices(
+  props.element?.Type === 11 ? props.element.LinearType : undefined, props.capabilities))
 const capabilityNotice = computed(() => props.capabilitiesState === 'error'
   ? '当前协议能力不可用，保留现有值，待能力恢复后再调整。'
   : props.capabilitiesState === 'loading' ? '正在读取当前协议能力，暂不能确认支持情况。' : '')
@@ -821,6 +827,25 @@ function setCompositeSize(element: Gs1CompositeElement, key: 'ModuleWidth' | 'Li
   if (Number.isInteger(value) && value > 0 && value <= 2147483647) element[key] = value
 }
 
+function setCompositeLinearType(element: Gs1CompositeElement, event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value)
+  if (value === GS1_128_LINEAR_TYPE || value === 25 || value === 27)
+    setGs1CompositeLinearType(element, value as Gs1CompositeLinearType, props.capabilities)
+}
+
+function setCompositeMode(element: Gs1CompositeElement, event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value)
+  if (value === 0 || value === 1 || value === 2 || value === GS1_COMPOSITE_CC_C_MODE)
+    setGs1CompositeMode(element, value as Gs1CompositeMode, props.capabilities)
+}
+
+function compositeLinearTypeDisabled(value: Gs1CompositeLinearType): boolean {
+  if (value === GS1_128_LINEAR_TYPE) return !supportsGs1CompositeCcC(props.capabilities)
+  const name = value === 25 ? 'Gs1DataBarOmnidirectional' : 'Gs1DataBarLimited'
+  const supported = props.capabilities?.gs1Composite?.linearTypes
+  return supported !== undefined && !supported.includes(name)
+}
+
 const conditionTarget = computed(() => props.element ?? props.row)
 const conditionValue = computed(() => conditionTarget.value?.Condition)
 const selectedImageMissing = computed(() => props.element?.Type === 2 && !props.element.Field?.Name && Boolean(props.element.Field?.Value) && !props.resources.some((resource) => resource.key === props.element?.Field?.Value))
@@ -1171,15 +1196,16 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
 
         <section v-if="element.Type === 11" class="inspector-section">
           <div class="section-title"><span>GS1 Composite</span></div>
-          <label class="field-label">线性组件<select class="field-input" :value="element.LinearType ?? 25" @change="element.LinearType = Number(($event.target as HTMLSelectElement).value) as 25 | 27"><option :value="25">Omnidirectional</option><option :value="27">Limited</option></select></label>
-          <label class="field-label">二维模式<select class="field-input" :value="element.Mode ?? 0" @change="element.Mode = Number(($event.target as HTMLSelectElement).value) as 0 | 1 | 2"><option :value="0">Auto</option><option :value="1">CC-A</option><option :value="2">CC-B</option></select></label>
+          <label class="field-label">线性组件<select aria-label="Composite 线性组件" class="field-input" :value="element.LinearType ?? 25" @change="setCompositeLinearType(element, $event)"><option :value="25" :disabled="compositeLinearTypeDisabled(25)">Omnidirectional</option><option :value="27" :disabled="compositeLinearTypeDisabled(27)">Limited</option><option :value="GS1_128_LINEAR_TYPE" :disabled="compositeLinearTypeDisabled(GS1_128_LINEAR_TYPE)">GS1-128</option></select></label>
+          <label class="field-label">二维模式<select aria-label="Composite 二维模式" class="field-input" :value="element.Mode ?? 0" @change="setCompositeMode(element, $event)"><option v-for="mode in gs1CompositeModeOptions" :key="mode.value" :value="mode.value" :disabled="mode.disabled">{{ mode.label }}</option></select></label>
           <label class="field-label">模块宽度（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 模块宽度" :value="element.ModuleWidth ?? 2" @input="setCompositeSize(element, 'ModuleWidth', $event)" /></label>
           <label class="field-label">线性条高（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 线性条高" :value="element.LinearBarHeight ?? 40" @input="setCompositeSize(element, 'LinearBarHeight', $event)" /></label>
           <div class="section-title"><span>次数据绑定</span><span class="section-kicker">SecondaryField</span></div>
           <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
           <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
           <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
-          <p class="field-note">上方内容绑定为主 GTIN，次数据使用括号式 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
+          <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
+          <p v-if="element.LinearType === GS1_128_LINEAR_TYPE && !supportsGs1CompositeCcC(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1-128 + CC-C；此组合的预览与输出不可用。</p>
           <p v-if="!capabilitiesReady || !elementTypeSupported(capabilities, 11)" class="field-note capability-warning">当前 Host 尚未确认 Composite 能力，请更新或连接 Host 后验证。</p>
         </section>
 

@@ -1,4 +1,5 @@
 import { walkTemplateNodes } from './templateTraversal'
+import { isValidGs1CompositeCombination } from './gs1Composite'
 
 export type Point = { X: number; Y: number }
 
@@ -121,8 +122,8 @@ export type MatrixElement = BaseElement & { Type: 10; Format: 'DataMatrix' | 'PD
 export type Gs1CompositeElement = BaseElement & {
   Type: 11
   SecondaryField: Field
-  LinearType?: 25 | 27
-  Mode?: 0 | 1 | 2
+  LinearType?: 11 | 25 | 27
+  Mode?: 0 | 1 | 2 | 3
   ModuleWidth?: number
   LinearBarHeight?: number
   Rotation?: RotationAngle
@@ -384,8 +385,8 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
     if (element.Type === 11) {
       if (!element.SecondaryField || typeof element.SecondaryField !== 'object' || Array.isArray(element.SecondaryField))
         throw new Error(`${context.path}.SecondaryField 必须为字段对象。`)
-      if (![25, 27].includes(element.LinearType ?? 25)) throw new Error(`${context.path}.LinearType 仅支持 Omnidirectional 或 Limited。`)
-      if (![0, 1, 2].includes(element.Mode ?? 0)) throw new Error(`${context.path}.Mode 必须为 Auto、CC-A 或 CC-B。`)
+      if (!isValidGs1CompositeCombination(element.LinearType, element.Mode))
+        throw new Error(`${context.path}.LinearType 与 Mode 组合无效；DataBar 仅支持 Auto、CC-A 或 CC-B，GS1-128 仅支持 Auto 或 CC-C。`)
       for (const [key, value] of [['ModuleWidth', element.ModuleWidth ?? 2], ['LinearBarHeight', element.LinearBarHeight ?? 40]] as const) {
         if (!Number.isInteger(value) || value < 1 || value > 2147483647) throw new Error(`${context.path}.${key} 必须为正整数打印点。`)
       }

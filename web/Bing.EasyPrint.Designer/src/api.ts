@@ -1,6 +1,7 @@
-import type { BpTemplate, DesignerDiagnostic, PreviewResponse, TemplateResource } from './model'
+import type { BpTemplate, DesignerDiagnostic, Gs1CompositeElement, PreviewResponse, TemplateResource } from './model'
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
+import { isGs1CompositeCcCCombination, isValidGs1CompositeCombination } from './gs1Composite'
 import { walkTemplateNodes } from './templateTraversal'
 
 export type DesignerSample = { id: string; name: string; template: BpTemplate; data: unknown }
@@ -287,6 +288,7 @@ const DESIGNER_CONTRACT_VERSION = '1'
 const DESIGNER_CONTRACT_VERSION_HEADER = 'X-EasyPrint-Contract-Version'
 const DESIGNER_FEATURES_HEADER = 'X-EasyPrint-Features'
 const DESIGNER_REQUIRED_FEATURES_HEADER = 'X-EasyPrint-Required-Features'
+const GS1_COMPOSITE_CC_C_FEATURE = 'gs1-composite-cc-c'
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
 
 function clientValidationError(message: string, code: string, phase: string): DesignerValidationError {
@@ -314,6 +316,10 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
     .split(',').map((feature) => feature.trim()).filter((feature) => feature.length > 0))
   const missingFeatures = requiredFeatures.filter((feature) => !availableFeatures.has(feature))
   if (missingFeatures.length > 0) {
+    if (missingFeatures.includes(GS1_COMPOSITE_CC_C_FEATURE)) {
+      const message = '打印服务缺少 GS1-128 + CC-C Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
       'ContractFeatureUnavailable', 'Contract')
   }
@@ -323,8 +329,17 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   const requiredFeatures: string[] = [...DESIGNER_REQUIRED_FEATURES]
   const template = (body as { template?: BpTemplate }).template
   if (template) walkTemplateNodes(template, (node, context) => {
-    if (context.kind === 'element' && 'Type' in node && node.Type === 11 && !requiredFeatures.includes('gs1-composite'))
-      requiredFeatures.push('gs1-composite')
+    if (context.kind !== 'element' || !('Type' in node) || node.Type !== 11) return
+    const composite = node as Gs1CompositeElement
+    if (!isValidGs1CompositeCombination(composite.LinearType, composite.Mode)) {
+      const message = `${context.path}.LinearType 与 Mode 组合无效；DataBar 仅支持 Auto、CC-A 或 CC-B，GS1-128 仅支持 Auto 或 CC-C。`
+      throw clientValidationError(message, 'InvalidGs1CompositeMode', 'Validation')
+    }
+    if (!requiredFeatures.includes('gs1-composite')) requiredFeatures.push('gs1-composite')
+    if (isGs1CompositeCcCCombination(composite.LinearType, composite.Mode) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_CC_C_FEATURE)) {
+      requiredFeatures.push(GS1_COMPOSITE_CC_C_FEATURE)
+    }
   })
   const serializedBody = JSON.stringify(body)
   let response: Response
@@ -414,8 +429,10 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   if (labelProfileRequested && capabilities.labelProfile == null) {
     throw new Error('能力服务未返回标签机型配置，请更新 Host。')
   }
-  capabilities.gs1CompositeFeature = (response.headers.get(DESIGNER_FEATURES_HEADER) ?? '').split(',')
-    .some((feature) => feature.trim() === 'gs1-composite')
+  const features = new Set((response.headers.get(DESIGNER_FEATURES_HEADER) ?? '').split(',')
+    .map((feature) => feature.trim()).filter((feature) => feature.length > 0))
+  capabilities.gs1CompositeFeature = features.has('gs1-composite')
+  capabilities.gs1CompositeCcCFeature = features.has(GS1_COMPOSITE_CC_C_FEATURE)
   return capabilities
 }
 
