@@ -2,7 +2,7 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://mit-license.org/)
 
-Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打印指令生成库。当前代码支持 CPCL、ESC/POS、TSPL 和 ZPL，并提供协议命令、统一打印模型、版本化模板渲染以及浏览器模板设计器。
+Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打印指令生成库。当前代码支持 CPCL、ESC/POS、TSPL 和 ZPL，并提供协议命令、统一打印模型、版本化模板渲染以及浏览器模板设计器。统一打印模型与模板现支持受限的 GS1 Composite：DataBar + CC-A/CC-B，以及 GS1-128 + CC-C。
 
 项目只生成协议字节，不负责打印机连接、驱动、设备发现、打印队列或状态查询。
 
@@ -11,6 +11,7 @@ Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打�
 - [项目文档索引](docs/README.md)
 - [核心打印与协议](docs/core-printing.md)
 - [模板渲染指南](docs/templates-guide.md)
+- [GS1-128 + CC-C Composite 使用说明](docs/gs1-composite-cc-c.md)
 - [设计器与 Host](docs/designer-host.md)
 - [开发与验证](docs/development.md)
 - [2026-10-22 工程修复与验收](docs/review-fixes-2026-10-22.md)

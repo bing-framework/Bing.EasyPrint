@@ -11,6 +11,8 @@
 
 测试项目位于 `tests/Bing.EasyPrint.Tests`、`tests/DesignerHost.Tests` 和 `tests/PackageConsumer`；性能/资源探针位于 `tools/PerformanceProbe`。
 
+2026-10-22 的 CC-C 后续阶段已完成本地验收，当前命令、覆盖矩阵及结果见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)。本页较早的 3397/140/277/154 计数属于同日修复阶段的历史记录。
+
 ## 常用命令
 
 ```powershell
@@ -20,7 +22,7 @@ dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0
 ./tools/Verify-DesignerHost.ps1
 ./tools/Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1
 ./tools/Verify-XmlDocumentation.ps1
-dotnet run --project samples/Templates -- artifacts/template-samples
+dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples
 ```
 
 ```powershell
@@ -50,7 +52,7 @@ $targets = Join-Path $candidate 'Documentation.targets'
 @'
 <Project>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Bing.EasyPrint' Or '$(MSBuildProjectName)' == 'Bing.EasyPrint.Templates'">
-    <DocumentationFile>$(MSBuildThisFileDirectory)$(MSBuildProjectName)-$(TargetFramework).xml</DocumentationFile>
+    <DocumentationFile>$(MSBuildThisFileDirectory)xml/$(TargetFramework)/$(MSBuildProjectName).xml</DocumentationFile>
   </PropertyGroup>
 </Project>
 '@ | Set-Content -Encoding utf8 $targets
@@ -86,8 +88,8 @@ try {
 
 - Host 通过版本/特性协商和严格 DTO 校验请求，返回稳定错误、字段路径与绑定诊断。能力响应与前端过滤共用协议准入规则，标签 QR rotation allowlist 的 JSON 请求已有集成回归。
 - 设计器支持角度与属性编辑、旋转占位/结束坐标回写及 JSON/项目 ZIP 往返；离线结束坐标框不重复旋转。在线预览使用 Host 实际度量，模型测试和归档测试不替代浏览器交互验收。
-- Composite 的 `gs1-composite` 特性与能力确认共同控制新增入口：旧 Host 或查询未完成时禁用。可编辑主/次字段、线性制式、模式、模块宽度、条高、旋转及静区；离线显示占位与待验证，在线 Host 预览返回编码尺寸。`e2e/reviewFixes.spec.ts` 的真实 Host 交互断言已验证创建、编辑模块宽度和条高、次数据、预览尺寸、CPCL CG 二进制输出及项目保存重载一致；旧 Host 缺少特性时入口禁用并说明原因。画布当前显示不可扫描的布局占位，不绘制实际编码位图。
-- 新增五模式能力及 Composite 定向 E2E 为 3/3 通过；ZPL 方向、Code39 能力和复选框可访问名称案例在完整回归中通过。生产构建和 Vitest 277 项通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`；结果文件为 `artifacts/review-fixes-20261022/web-e2e-canvas-final.json`，汇总见[本轮修复验收报告](review-fixes-2026-10-22.md)。画布节点表示布局占位，不是可扫描的编码位图。Host 进程隔离和监听批准也继续保留。
+- GS1 Composite 基础入口要求 `gs1-composite` 特性和能力确认；GS1-128/CC-C 另要求 `gs1-composite-cc-c`。旧 Host 只有基础特性时仍可使用既有 DataBar 模式，GS1-128/CC-C 选项禁用；preview/render 对该组合要求两个特性并在缺失时明确拒绝。组合为 DataBar Omnidirectional/Limited × Auto/CC-A/CC-B、GS1-128 × Auto/CC-C；非法组合导入或服务端预检会拒绝。画布当前显示不可扫描的布局占位，不绘制实际编码位图。详细契约见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
+- 2026-10-22 的五模式能力、DataBar Composite 交互和原完整 Chromium E2E 结果仍按[本轮修复验收报告](review-fixes-2026-10-22.md)留作历史记录；这些结果发生在 CC-C 集成前，不代表新 GS1-128/CC-C 路径验收完成。CC-C 定向入口：[核心向量测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeCcCTests.cs)、[固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeCcCVectors.cs)、[Host 测试](../tests/DesignerHost.Tests/Gs1CompositeHostTests.cs)；运行 [C#/JSON/往返样例](../samples/Templates/Gs1CompositeSamples.cs) 的命令见 `dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples`。新路径的最终验证结果应在集成验收后单独记录。
 
 实现/测试入口：[Host 契约](../tools/DesignerHost/DesignerContract.cs)、[请求处理器](../tools/DesignerHost/DesignerRequestProcessor.cs)、[Host 契约测试](../tests/DesignerHost.Tests/HostContractTests.cs)、[Composite Host 测试](../tests/DesignerHost.Tests/Gs1CompositeHostTests.cs)、[前端能力](../web/Bing.EasyPrint.Designer/src/capabilities.ts)、[属性编辑](../web/Bing.EasyPrint.Designer/src/components/PropertyInspector.vue)、[Composite 单元测试](../web/Bing.EasyPrint.Designer/src/gs1Composite.test.ts)、[旋转 E2E 用例](../web/Bing.EasyPrint.Designer/e2e/imageRotation.spec.ts)。
 

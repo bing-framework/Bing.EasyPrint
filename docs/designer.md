@@ -1,8 +1,8 @@
 # Vue 多协议模板设计器
 
-## 2026-10-22 当前修复验收
+## 2026-10-22 CC-C 集成前修复验收记录
 
-真实 Host 的五种输出模式能力加载后均可编辑；能力中的 Native HRI 位置字段可缺省或为 `null`，若提供数组则仅允许用于 ESC/POS Native。GS1 Composite 浏览器用例覆盖 Host 创建、属性编辑、编码尺寸、CPCL CG 二进制导出、项目保存重载，以及模拟旧 Host 缺少 `gs1-composite` 时禁用入口。Composite 画布节点、ZPL 方向、Code39 支持状态和复选框可访问名称的定向 E2E 为 3/3 通过；生产构建和 Vitest 277 项通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`；完整验收见[本轮修复验收报告](review-fixes-2026-10-22.md)。画布显示布局占位，不绘制可扫描的编码位图；旋转验收不由上述定向结果推断。
+真实 Host 的五种输出模式能力加载后均可编辑；能力中的 Native HRI 位置字段可缺省或为 `null`，若提供数组则仅允许用于 ESC/POS Native。GS1 Composite 浏览器用例覆盖 Host 创建、属性编辑、编码尺寸、CPCL CG 二进制导出、项目保存重载，以及模拟旧 Host 缺少 `gs1-composite` 时禁用入口。Composite 画布节点、ZPL 方向、Code39 支持状态和复选框可访问名称的定向 E2E 为 3/3 通过；生产构建和 Vitest 277 项通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`；完整验收见[本轮修复验收报告](review-fixes-2026-10-22.md)。这组日期结果来自 CC-C 集成前，不覆盖 GS1-128/CC-C 路径。画布显示布局占位，不绘制可扫描的编码位图；旋转验收不由上述定向结果推断。
 
 > 文档定位：本文件记录设计器交互、模板包和 Host 契约的详细行为。启动、接口和环境变量请先阅读[设计器与 Host](designer-host.md)；验证命令见[开发与验证](development.md)。
 
@@ -251,7 +251,7 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 ### GS1 Composite
 
-“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。属性面板分别编辑主数据、次数据、线性制式、CC-A/CC-B 模式、模块宽度、线性条高、旋转和静区；Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。能力接口必须同时声明 `gs1-composite` 特性并确认当前模式支持 Composite；旧 Host 会禁用工具并提示原因。CPCL 导出使用 CG 二进制图形数据，不能按文本 `EG` 十六进制行读取。ZPL 整页方向仅支持默认、`None` 和 `Down`；导入旧项目中的 `Left`/`Right` 时会明确报错，不会改写成其他方向。
+“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。DataBar Omnidirectional/Limited 支持 Auto、CC-A、CC-B；GS1-128 (`UccEan128`) 只支持 Auto/CC-C，Auto 直接选择 CC-C。属性面板按线性制式提供模式选项；切换到 GS1-128 时保留已有绑定和值；主字段为空时填入默认 `(01)12345678901231`，已有裸 GTIN 需手动改为括号 AI。非法组合在导入校验和 Host 预览/渲染预检时被明确拒绝。GS1-128 主数据使用括号式 AI，共享解析器规范化后最多 48 个字符；这不替业务层校验 AI 关系或 GTIN 校验位。次数据使用共享解析器当前支持的 AI 子集。模块宽度、线性条高、旋转和静区沿用既有属性；CC-C 行高为 `3X`，分隔行为 `X`，不内置 HRI。Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。能力响应同时声明 `gs1-composite`、`gs1-composite-cc-c` 并返回 GS1-128/CC-C 能力后，才开放该组合；旧 Host 只有基础特性时，既有 DataBar Composite 仍可用，GS1-128/CC-C 选项禁用，含该组合的预览/渲染请求会明确提示需升级 Host。完整配置例见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。CPCL 导出使用 CG 二进制图形数据，不能按文本 `EG` 十六进制行读取。ZPL 整页方向仅支持默认、`None` 和 `Down`；导入旧项目中的 `Left`/`Right` 时会明确报错，不会改写成其他方向。
 
 - 纸张尺寸保存在打印点，毫米按目标 DPI 换算。CPCL 保留 200 DPI；其他协议使用显式设备 DPI 或默认 203，ESC/POS 未指定 DPI 时优先使用 Profile 的横向 DPI。修改 DPI 不重写页面或元素点数。
 - 支持通用单色元素、行/单元格边框与字段条件；不提供彩色背景或任意角度自由旋转，元素旋转仍受目标 Provider 能力约束。

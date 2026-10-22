@@ -40,6 +40,8 @@ Profile 会收窄能力并参与预检，但库不会自动发现设备，也不
 
 ### 当前分支的完整回归状态
 
+2026-10-22 后续 CC-C 阶段已完成本地验收：Core 两运行时各 3435 项、Host 148 项、Vitest 288 项、Chromium 156 项通过；五框架严格 XML 构建、四协议案例及候选包消费通过。新增能力与证据见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)。下段保留同日较早的修复阶段记录。
+
 截至 2026-10-22，本轮自动化验收已完成。Core 的 `net6.0` 与 `netcoreapp3.1` 完整测试各为 3397/3397 通过；Core 与 Templates 的严格 XML 门禁为 10/10 通过。Host 的 140 项测试、五模式能力加载、旧 Host Composite 降级及 Composite Host 预览/导出/项目往返断言已通过。前端生产构建与 Vitest 277 项通过；新增五模式能力及 Composite 定向 E2E 为 3/3 通过；ZPL、Code39 与复选框案例在完整回归中通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`。命令和结果见[本轮修复验收报告](review-fixes-2026-10-22.md)。旧分轮证据见 `multi-protocol-verification.md`，不替代本轮结果。
 
 处理方向：发布前按[开发与验证](development.md)重新运行当前分支门禁，并单独记录网络、SDK、浏览器或设备造成的阻塞。

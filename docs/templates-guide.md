@@ -2,7 +2,7 @@
 
 ## 功能说明
 
-`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。
+`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。当前 DataBar 支持 CC-A/CC-B，GS1-128 支持 CC-C；完整组合和数据限制见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
 
 ## 基本用法
 
@@ -52,7 +52,7 @@ CPCL 与模板图片入口在 `Image.Identify` 前预检 TIFF 目录结构；截
 
 字段绑定支持常量值和对象路径；重复区从集合来源生成实例。绑定和资源异常会携带模板路径，Host 还会将其转换为结构化诊断。
 
-Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`；仅接受 GS1 DataBar Omnidirectional 或 Limited 线性部分、Auto/CC-A/CC-B 模式及正的模块宽度和条高。整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 缺少 `gs1-composite` 协商特性时，设计器禁用新增入口。
+Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`。DataBar Omnidirectional/Limited 只接受 Auto/CC-A/CC-B；GS1-128 (`UccEan128`) 只接受 Auto/CC-C，Auto 直接选择 CC-C；不支持的组合在导入验证和渲染预检时拒绝。模块宽度和线性条高均为正的打印点数，整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 仅具备 `gs1-composite` 时保留既有 DataBar 入口；GS1-128/CC-C 选项需要新增 `gs1-composite-cc-c` 特性，旧 Host 对该组合的预览/渲染请求会明确拒绝。
 
 ## 配置
 
@@ -72,10 +72,10 @@ Composite 的主数据使用继承的 `Field`，次数据必须提供 `Secondary
 
 ## 价签与示例
 
-`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出和 TSPL/ZPL 切刀示例。
+`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出、TSPL/ZPL 切刀和 GS1-128/CC-C Composite 案例；对应的 [C# 案例](../samples/Templates/Gs1CompositeSamples.cs) 会与 [模板 JSON](../samples/Templates/gs1-composite-cc-c.json) 及 Save/Load 往返输出逐协议比较。
 
 ```powershell
-dotnet run --project samples/Templates -- artifacts/template-samples
+dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples
 ```
 
 该命令只生成文件，不连接打印机。

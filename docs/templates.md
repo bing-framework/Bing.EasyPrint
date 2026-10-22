@@ -398,7 +398,7 @@ var renderOptions = new TemplateRenderOptions
 
 `EightDotImpact(360)` 只是通用的 8 点针式设备配置示例，不代表任何品牌或型号已经通过验收。只支持 ESC/P 或厂商私有指令的针式设备不能用 ESC/POS 结果替代；必须依据对应手册实现或选择相应 Provider。Epson 的 [ESC `*` 点阵图参考](https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/esc_asterisk.html) 和 [ESC `3` 行距参考](https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/esc_3.html) 仅用于核对命令字段。
 
-运行 `dotnet run --project samples/Templates -- artifacts/template-samples` 可生成固定标签、分页小票和价签的默认 CPCL 文件。PM0025、PM0034 的可编辑新版模板也分别保存在 `samples/Templates/price-label-pm0025.json` 和 `samples/Templates/price-label-pm0034.json`；示例程序会直接加载这两份文件，并核对与 C# 构造的逐页 CPCL 字节一致。两者按新模型独立重制，参考 ERP 样例的纸张尺寸、字段和二维码位置（PM0025 旧样例不含二维码），不会自动导入 ERP 旧 JSON。程序会检查 PM0025 的常规/促销分支，以及 PM0034 的常规、促销、会员和促销+会员分支。示例不会连接或打印到设备。
+运行 `dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples` 可生成固定标签、分页小票、价签及 GS1-128/CC-C Composite 的默认输出。Composite 案例位于 [C# 模型与往返比较](../samples/Templates/Gs1CompositeSamples.cs) 和 [模板 JSON](../samples/Templates/gs1-composite-cc-c.json)，会逐协议比较 C#、JSON 和 Save/Load 往返的输出。PM0025、PM0034 的可编辑新版模板也分别保存在 `samples/Templates/price-label-pm0025.json` 和 `samples/Templates/price-label-pm0034.json`；示例程序会直接加载这两份文件，并核对与 C# 构造的逐页 CPCL 字节一致。两者按新模型独立重制，参考 ERP 样例的纸张尺寸、字段和二维码位置（PM0025 旧样例不含二维码），不会自动导入 ERP 旧 JSON。程序会检查 PM0025 的常规/促销分支，以及 PM0034 的常规、促销、会员和促销+会员分支。示例不会连接或打印到设备。
 
 ## 价签组合
 
@@ -580,9 +580,9 @@ ESC/POS Raster 显式开启条码可读文字时必须声明正的 `HumanReadabl
 
 ## GS1 Composite
 
-`BpGs1CompositeElement` 使用 `Type: 11`，仅用于 V2/V3；V1 模板必须先升级。继承的 `Field` 提供主数据，必需的 `SecondaryField` 提供次数据。线性部分仅支持 `Gs1DataBarOmnidirectional` 和 `Gs1DataBarLimited`；模式为 `Auto`、`CcA` 或 `CcB`，`ModuleWidth` 与 `LinearBarHeight` 均为正的打印点数。主数据接受 GTIN-13 数据、GTIN-14 或 AI `(01)` 的 GTIN-14；次数据采用当前支持的括号式 GS1 AI 子集，不是完整 GS1 AI 字典。
+`BpGs1CompositeElement` 使用 `Type: 11`，仅用于 V2/V3；V1 模板必须先升级。继承的 `Field` 提供主数据，必需的 `SecondaryField` 提供次数据。DataBar `Gs1DataBarOmnidirectional`/`Gs1DataBarLimited` 支持 `Auto`、`CcA`、`CcB`；GS1-128 `UccEan128` 支持 `Auto`、`CcC`，Auto 直接选择 CC-C。DataBar+CC-C 与 GS1-128+CC-A/CC-B 均为非法组合，导入校验和渲染预检会拒绝。`ModuleWidth` 与 `LinearBarHeight` 均为正的打印点数。DataBar 主数据接受 GTIN-13 数据、GTIN-14 或 AI `(01)` 的 GTIN-14；GS1-128 主数据使用括号式 AI 元素串，经共享解析器规范化后最多 48 个字符。解析器不保证业务关系或 GTIN 校验位正确。次数据采用当前支持的括号式 GS1 AI 子集，不是完整 GS1 AI 字典。属性、C# 模型和模板 JSON 示例见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。
 
-复合符号不可拆分。预览与布局按真实编码结果计算宽高，旋转、四边静区、单元格占位和整页边界共同作用；发生编码或空间错误时不会返回部分页，并尽可能保留元素路径。能力受目标 Provider 限制，ESC/POS Native 不支持；设计器还要求 Host 协商 `gs1-composite` 特性并返回支持能力。浏览器验收见 [`reviewFixes.spec.ts`](../web/Bing.EasyPrint.Designer/e2e/reviewFixes.spec.ts)：真实 Host 的创建、属性编辑、预览尺寸、CPCL CG 二进制导出、项目保存/重载及模拟旧 Host 缺少特性时禁用入口的断言已通过；完整 Chromium E2E 为 154/154 通过。画布显示布局占位，不绘制可扫描的编码位图，详细结果见[本轮修复验收报告](review-fixes-2026-10-22.md)。
+复合符号不可拆分。CC-C 行高为 `3 × ModuleWidth`，分隔行为 `1 × ModuleWidth`；编码尺寸、旋转、四边静区、单元格占位和整页边界共同作用。Composite 不内置 HRI；需要可读文字时使用独立文字元素。发生编码或空间错误时不会返回部分页，并尽可能保留元素路径。能力受目标 Provider 限制，ESC/POS Native 不支持；设计器还要求 Host 协商基础 `gs1-composite` 特性并返回支持能力，GS1-128+CC-C 另要求 `gs1-composite-cc-c`。2026-10-22 的既有 DataBar 浏览器验收及 154/154 完整 Chromium E2E 发生在 CC-C 集成前，不作为 GS1-128/CC-C 验收证据；画布显示布局占位，不绘制可扫描的编码位图。详见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md) 和[本轮修复验收报告](review-fixes-2026-10-22.md)。
 
 ## 资源与失败语义
 

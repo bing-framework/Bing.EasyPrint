@@ -36,7 +36,7 @@ Host 通过 `X-EasyPrint-Contract-Version`、`X-EasyPrint-Features` 和 `X-EasyP
 
 能力响应中的 `supportedNativeBarcodeHumanReadablePositions` 只描述 ESC/POS Native 的设备可读文字位置。字段可缺省或为 `null`；提供数组时（包括空数组）只允许出现在 ESC/POS Native 能力中，数组成员仍须是已知位置且不能重复。Host 的现有响应结构不变；设计器兼容字段缺省和 `null`，其他协议不得携带该数组。
 
-GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。新增入口要求能力响应声明 `gs1-composite` 特性且确认能力；缺少该特性的旧 Host 响应会使工具禁用并显示原因。真实 Host 浏览器用例已覆盖创建、编辑、编码预览尺寸、CPCL CG 二进制导出和项目保存重载；完整 Chromium E2E 为 154/154 通过。画布显示选择/布局占位，不绘制可扫描的编码位图；命令及结果见[开发与验证](development.md)和[本轮修复验收报告](review-fixes-2026-10-22.md)。
+GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。能力响应的 `gs1Composite.linearTypes` 可包含 `UccEan128`，`modes` 可包含 `CcC`；组合规则仍是 DataBar Omnidirectional/Limited × Auto/CC-A/CC-B，GS1-128 × Auto/CC-C。基础功能要求 `gs1-composite`；GS1-128/CC-C 另要求并协商 `gs1-composite-cc-c`。旧 Host 只有基础特性时，既有 DataBar Composite 可继续使用，GS1-128/CC-C 选项禁用；preview/render 对包含新组合的请求要求两个特性，缺少时返回明确的功能缺失错误。非法配对在导入验证和服务端预检时拒绝。2026-10-22 的既有 DataBar 浏览器验收和完整 Chromium E2E 154/154 发生在 CC-C 集成前，后续 CC-C 的完整 Chromium 回归为 156/156，见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)。画布显示选择/布局占位，不绘制可扫描的编码位图；命令及验收结论见[开发与验证](development.md)和[本轮修复验收报告](review-fixes-2026-10-22.md)。
 
 ## 关键文件
 
