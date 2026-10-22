@@ -228,7 +228,7 @@ public sealed class Gs1CompositeEncoderTests
     {
         Assert.Throws<NotSupportedException>(() => Element(BarcodeType.Gs1DataBarExpanded));
         Assert.Throws<ArgumentOutOfRangeException>(() => Element((BarcodeType)(-1)));
-        Assert.Throws<ArgumentOutOfRangeException>(() => Element(mode: (Gs1CompositeMode)3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Element(mode: (Gs1CompositeMode)4));
         Assert.Throws<ArgumentNullException>(() => Element(primary: null));
         Assert.Throws<ArgumentNullException>(() => Element(secondary: null));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PrintGs1CompositeElement(0, 0,

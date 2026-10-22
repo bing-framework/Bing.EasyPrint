@@ -11,6 +11,22 @@ namespace Bing.EasyPrint.Tests;
 public sealed class Gs1CompositeProviderTests
 {
     [Theory]
+    [InlineData(PrintProtocol.Cpcl)]
+    [InlineData(PrintProtocol.Tspl)]
+    [InlineData(PrintProtocol.Zpl)]
+    [InlineData(PrintProtocol.EscPos)]
+    public void Cc_c_outputs_match_explicit_raster_with_bounds_and_failure_recovery(PrintProtocol protocol)
+    {
+        var element = Gs1CompositeCcCTests.Element();
+        var provider = Provider(protocol);
+        var image = Gs1CompositeEncoder.Rasterize(element);
+        var expected = Assert.Single(provider.Render(Document(image, "Raster")));
+        Assert.Equal(expected, Assert.Single(provider.Render(Document(element, "Composite"))));
+        Assert.Throws<PrintElementValidationException>(() => provider.Render(Document(element, "Composite", width: 10)));
+        Assert.Equal(expected, Assert.Single(provider.Render(Document(element, "Composite"))));
+    }
+
+    [Theory]
     [InlineData(PrintProtocol.Cpcl, RotationAngle.None)]
     [InlineData(PrintProtocol.Cpcl, RotationAngle.Rotate90)]
     [InlineData(PrintProtocol.Cpcl, RotationAngle.Rotate180)]

@@ -1,0 +1,42 @@
+GS1 Composite encoding and PDF417/Code128 tables
+Sources: https://github.com/zint/zint/tree/2.15.0/backend
+
+Managed port of Zint 2.15.0 backend/composite.c (CC-A/CC-B/CC-C).
+Commit: 4896136bdbebb1a0908a5cc419513efa5bf4bf70.
+Copyright (C) 2008-2025 Robin Stuart <rstuart114@gmail.com>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the project nor the names of its contributors may be used
+   to endorse or promote products derived from this software without specific
+   prior written permission.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The upstream functions getBit, init928 and encode928 are copyright BSI:
+"Copyright subsists in all BSI publications. BSI also holds the copyright, in the
+UK, of the international standardisation bodies. Except as permitted under the
+Copyright, Designs and Patents Act 1988 no extract may be reproduced, stored in a
+retrieval system or transmitted in any form or by any means - electronic,
+photocopying, recording or otherwise - without prior written permission from BSI.
+This does not preclude the free use, in the course of implementing the standard,
+of necessary details such as symbols, and size, type or grade designations. If
+these details are to be used for any other purpose than implementation then the
+prior written permission of BSI must be obtained." Published 31 May 2006.
+Base-928 conversion below uses iterative multiplication instead of these functions.
+The date-only FNC1 detail follows Zint/BWIPP, Copyright (c) 2004-2019 Terry Burton.
+
+PDF417 tables include portions Copyright (C) 2004 Grandzebu, under the BSD-3-Clause terms above.

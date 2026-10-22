@@ -6,6 +6,10 @@
 	</PropertyGroup>
 
   <Import Project="..\..\common.props" />
+  <ItemGroup>
+    <None Remove="ThirdPartyNotices.txt" />
+    <None Include="ThirdPartyNotices.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
   
 	<!--用于解决单元测试internal测试-->
   <ItemGroup>

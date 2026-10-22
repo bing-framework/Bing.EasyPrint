@@ -345,8 +345,7 @@ internal static class TemplateGraph
                         throw new ArgumentException("Composite 必须指定 SecondaryField。");
                     if (saving && composite.SecondaryField.ValueFunc != null)
                         throw new ArgumentException("含 SecondaryField.ValueFunc 的模板不能保存为 JSON。");
-                    if (composite.LinearType != BarcodeType.Gs1DataBarOmnidirectional &&
-                        composite.LinearType != BarcodeType.Gs1DataBarLimited || composite.ModuleWidth <= 0 ||
+                    if (!Printing.PrintGs1CompositeElement.IsSupportedCombination(composite.LinearType, composite.Mode) || composite.ModuleWidth <= 0 ||
                         composite.LinearBarHeight <= 0 || !Enum.IsDefined(typeof(Printing.Gs1CompositeMode), composite.Mode) ||
                         !Enum.IsDefined(typeof(RotationAngle), composite.Rotation))
                         throw new ArgumentException("Composite 制式、模式、模块宽度、条高或旋转参数无效。");
