@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Bing.EasyPrint.Core;
@@ -351,7 +351,7 @@ public sealed class PrintBarcodeElement : PrintElement
     public BarcodeType Type { get; }
     /// <summary>条码内容。</summary>
     public string Data { get; }
-    /// <summary>条码高度。</summary>
+    /// <summary>条码高度（dot）；ExpandedStacked/StackedOmnidirectional 表示每条数据行高度，行间另加三个 1X 分隔行。</summary>
     public int BarHeight { get; }
     /// <summary>条码窄条宽度。</summary>
     public int NarrowWidth { get; }
@@ -371,7 +371,7 @@ public sealed class PrintBarcodeElement : PrintElement
     /// <param name="y">条码编码区左上角 Y 坐标，单位为逻辑打印点。</param>
     /// <param name="type">条码制式。</param>
     /// <param name="data">条码编码数据；不能为 <see langword="null" />，具体内容规则由目标协议决定。</param>
-    /// <param name="barHeight">条高，单位为打印点，必须为正数。</param>
+    /// <param name="barHeight">条高，单位为打印点，必须为正数；ExpandedStacked/StackedOmnidirectional 表示每条数据行高度；ExpandedStacked 至少 1X，建议 34X，StackedOmnidirectional 至少 33X。</param>
     /// <param name="narrowWidth">窄模块宽度，单位为打印点，默认 2。</param>
     /// <param name="wideWidth">宽模块宽度，单位为打印点，默认 2。</param>
     /// <param name="rotation">顺时针旋转角度，默认为不旋转。</param>

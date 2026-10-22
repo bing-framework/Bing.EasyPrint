@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,16 +15,102 @@ namespace Bing.EasyPrint.Tests;
 public sealed class Gs1CompositeTemplateTests
 {
     [Theory]
+    [InlineData(2, BarcodeType.Gs1DataBarTruncated, "12345678901231")]
+    [InlineData(2, BarcodeType.Gs1DataBarStackedOmnidirectional, "12345678901231")]
+    [InlineData(3, BarcodeType.Gs1DataBarTruncated, "12345678901231")]
+    [InlineData(3, BarcodeType.Gs1DataBarStackedOmnidirectional, "12345678901231")]
+    public void Remaining_databar_roundtrip_keeps_actual_dimensions_and_output(int version, BarcodeType type, string primary)
+    {
+        foreach (var mode in new[] { Gs1CompositeMode.Auto, Gs1CompositeMode.CcA, Gs1CompositeMode.CcB })
+        {
+            var template = SingleComposite(version, Composite(type, mode), width: 600, height: 300);
+            ((BpGs1CompositeElement)template.Rows[0].Cells[0].Elements[0]).LinearBarHeight = 68;
+            var options = Options();
+            var loader = new TemplateLoader();
+            var restored = loader.LoadJson(loader.SaveJson(template, options), options);
+            var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
+            Assert.Equal(type, element.LinearType);
+            Assert.Equal(mode, element.Mode);
+            var data = new { Primary = primary, Secondary = "(91)123456" };
+            var renderer = new TemplateRenderer();
+            var expected = renderer.RenderWithLayout(template, data, options: options);
+            var actual = renderer.RenderWithLayout(restored, data, options: options);
+            Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
+            var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
+            var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, type,
+                data.Primary, data.Secondary, 68, mode: mode));
+            Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
+        }
+    }
+
+    [Theory]
+    [InlineData(2, BarcodeType.Ean8, "12345670")]
+    [InlineData(3, BarcodeType.Ean8, "12345670")]
+    [InlineData(2, BarcodeType.Ean13, "1234567890128")]
+    [InlineData(3, BarcodeType.Ean13, "1234567890128")]
+    [InlineData(2, BarcodeType.UpcA, "012345678905")]
+    [InlineData(3, BarcodeType.UpcA, "012345678905")]
+    [InlineData(2, BarcodeType.UpcE, "01234565")]
+    [InlineData(3, BarcodeType.UpcE, "01234565")]
+    public void Ean_upc_roundtrip_keeps_actual_dimensions_and_output(int version, BarcodeType type, string primary)
+    {
+        foreach (var mode in new[] { Gs1CompositeMode.Auto, Gs1CompositeMode.CcA, Gs1CompositeMode.CcB })
+        {
+            var template = SingleComposite(version, Composite(type, mode), width: 600);
+            var options = Options();
+            var loader = new TemplateLoader();
+            var restored = loader.LoadJson(loader.SaveJson(template, options), options);
+            var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
+            Assert.Equal(type, element.LinearType);
+            Assert.Equal(mode, element.Mode);
+            var data = new { Primary = primary, Secondary = "(91)123456" };
+            var renderer = new TemplateRenderer();
+            var expected = renderer.RenderWithLayout(template, data, options: options);
+            var actual = renderer.RenderWithLayout(restored, data, options: options);
+            Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
+            var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
+            var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, type,
+                data.Primary, data.Secondary, 20, mode: mode));
+            Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
+        }
+    }
+
+    [Theory]
     [InlineData(2)]
     [InlineData(3)]
-    public void Expanded_roundtrip_keeps_fields_mode_and_exact_output(int version)
+    public void Stacked_roundtrip_keeps_fields_mode_and_exact_output(int version)
     {
-        var template = SingleComposite(version, Composite(BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.CcB), width: 600);
+        var template = SingleComposite(version, Composite(BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.CcB), width: 600);
+        ((BpGs1CompositeElement)template.Rows[0].Cells[0].Elements[0]).LinearBarHeight = 31;
         var options = Options();
         var loader = new TemplateLoader();
         var restored = loader.LoadJson(loader.SaveJson(template, options), options);
         var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
-        Assert.Equal(BarcodeType.Gs1DataBarExpanded, element.LinearType);
+        Assert.Equal(BarcodeType.Gs1DataBarStacked, element.LinearType);
+        Assert.Equal(Gs1CompositeMode.CcB, element.Mode);
+        var data = new { Primary = "(01)12345678901231", Secondary = "(91)123456" };
+        var renderer = new TemplateRenderer();
+        var expected = renderer.RenderWithLayout(template, data, options: options);
+        var actual = renderer.RenderWithLayout(restored, data, options: options);
+        Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
+        var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
+        var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarStacked, data.Primary, data.Secondary, 31, mode: Gs1CompositeMode.CcB));
+        Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
+    }
+
+    [Theory]
+    [InlineData(2, BarcodeType.Gs1DataBarExpanded)]
+    [InlineData(3, BarcodeType.Gs1DataBarExpanded)]
+    [InlineData(2, BarcodeType.Gs1DataBarExpandedStacked)]
+    [InlineData(3, BarcodeType.Gs1DataBarExpandedStacked)]
+    public void Expanded_roundtrip_keeps_fields_mode_and_exact_output(int version, BarcodeType type)
+    {
+        var template = SingleComposite(version, Composite(type, Gs1CompositeMode.CcB), width: 600);
+        var options = Options();
+        var loader = new TemplateLoader();
+        var restored = loader.LoadJson(loader.SaveJson(template, options), options);
+        var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
+        Assert.Equal(type, element.LinearType);
         Assert.Equal(Gs1CompositeMode.CcB, element.Mode);
         var data = new { Primary = "(01)09506000134352(10)LOT-A", Secondary = "(91)123456" };
         var renderer = new TemplateRenderer();
@@ -32,37 +118,46 @@ public sealed class Gs1CompositeTemplateTests
         var actual = renderer.RenderWithLayout(restored, data, options: options);
         Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
         var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
-        var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpanded, data.Primary, data.Secondary, 20, mode: Gs1CompositeMode.CcB));
+        var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, type, data.Primary, data.Secondary, 20, mode: Gs1CompositeMode.CcB));
         Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
     }
 
     [Theory]
-    [InlineData(2)]
-    [InlineData(3)]
-    public void Cc_c_roundtrip_keeps_fields_mode_and_exact_output(int version)
+    [InlineData(2, Gs1CompositeMode.CcA)]
+    [InlineData(2, Gs1CompositeMode.CcB)]
+    [InlineData(2, Gs1CompositeMode.CcC)]
+    [InlineData(3, Gs1CompositeMode.CcA)]
+    [InlineData(3, Gs1CompositeMode.CcB)]
+    [InlineData(3, Gs1CompositeMode.CcC)]
+    public void Gs1_128_roundtrip_keeps_fields_mode_and_exact_output(int version, Gs1CompositeMode mode)
     {
-        var template = SingleComposite(version, Composite(BarcodeType.UccEan128, Gs1CompositeMode.CcC));
+        var template = SingleComposite(version, Composite(BarcodeType.UccEan128, mode));
         var options = Options();
         var loader = new TemplateLoader();
         var restored = loader.LoadJson(loader.SaveJson(template, options), options);
         var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
         Assert.Equal(BarcodeType.UccEan128, element.LinearType);
-        Assert.Equal(Gs1CompositeMode.CcC, element.Mode);
+        Assert.Equal(mode, element.Mode);
         var data = new { Primary = "(01)12345678901231", Secondary = "(91)123456" };
         var renderer = new TemplateRenderer();
         var expected = renderer.RenderWithLayout(template, data, options: options);
         var actual = renderer.RenderWithLayout(restored, data, options: options);
         Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
         var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
-        var size = Gs1CompositeEncoder.Measure(Gs1CompositeCcCTests.Element());
+        var size = Gs1CompositeEncoder.Measure(Gs1CompositeGs1128AbTests.Element(mode));
         Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
     }
 
     [Theory]
-    [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcA)]
-    [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcB)]
+    [InlineData(BarcodeType.Gs1DataBarOmnidirectional, Gs1CompositeMode.CcC)]
     [InlineData(BarcodeType.Gs1DataBarLimited, Gs1CompositeMode.CcC)]
     [InlineData(BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Ean8, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Ean13, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.UpcA, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.UpcE, Gs1CompositeMode.CcC)]
     public void Cc_c_invalid_pair_is_rejected_before_binding(BarcodeType type, Gs1CompositeMode mode)
         => Assert.Throws<ArgumentException>(() => new TemplateRenderer().Render(
             SingleComposite(3, Composite(type, mode)), new { }, options: Options()));

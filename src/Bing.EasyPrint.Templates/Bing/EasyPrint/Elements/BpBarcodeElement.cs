@@ -40,7 +40,7 @@
         public int Width { get; set; }
 
         /// <summary>
-        /// 获取或设置条码高度，单位为打印点。
+        /// 获取或设置条码高度，单位为打印点；ExpandedStacked/StackedOmnidirectional 表示每条数据行高度；ExpandedStacked 至少 1X，建议 34X，StackedOmnidirectional 至少 33X；行间另加三个 1X 分隔行。
         /// </summary>
         public int Height { get; set; }
         /// <summary>获取或设置顺时针旋转角度；宽高表示旋转前占位，坐标表示旋转后左上角。</summary>

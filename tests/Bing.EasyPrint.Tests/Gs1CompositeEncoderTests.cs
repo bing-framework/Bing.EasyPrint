@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -226,7 +226,7 @@ public sealed class Gs1CompositeEncoderTests
     [Fact]
     public void Constructor_rejects_unsupported_or_invalid_contract_values()
     {
-        Assert.Throws<NotSupportedException>(() => Element(BarcodeType.Gs1DataBarStacked));
+        Assert.Throws<NotSupportedException>(() => Element(BarcodeType.Code39));
         Assert.Throws<ArgumentOutOfRangeException>(() => Element((BarcodeType)(-1)));
         Assert.Throws<ArgumentOutOfRangeException>(() => Element(mode: (Gs1CompositeMode)4));
         Assert.Throws<ArgumentNullException>(() => Element(primary: null));

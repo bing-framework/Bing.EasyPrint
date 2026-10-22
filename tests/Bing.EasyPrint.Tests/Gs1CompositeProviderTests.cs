@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using System.Threading;
 using Bing.EasyPrint.Printing;
@@ -17,7 +17,12 @@ public sealed class Gs1CompositeProviderTests
     [InlineData(PrintProtocol.EscPos)]
     public void Extended_composites_match_explicit_raster_with_bounds_and_failure_recovery(PrintProtocol protocol)
     {
-        foreach (var element in new[] { Gs1CompositeCcCTests.Element(), Gs1CompositeExpandedTests.Element() })
+        foreach (var element in new[] { Gs1CompositeCcCTests.Element(), Gs1CompositeExpandedTests.Element(), Gs1CompositeStackedTests.Element(),
+            Gs1CompositeGs1128AbTests.Element(Gs1CompositeMode.CcA), Gs1CompositeGs1128AbTests.Element(Gs1CompositeMode.CcB),
+            ExpandedStackedTests.Element(Gs1CompositeMode.CcA), ExpandedStackedTests.Element(Gs1CompositeMode.CcB), DataBarCompletionTests.Element(),
+            DataBarCompletionTests.Element(Gs1CompositeMode.CcB),
+            new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarTruncated, "12345678901231", "(91)123", 26),
+            new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarTruncated, "12345678901231", "(91)123", 26, mode: Gs1CompositeMode.CcB) })
         {
             var provider = Provider(protocol);
             var image = Gs1CompositeEncoder.Rasterize(element);

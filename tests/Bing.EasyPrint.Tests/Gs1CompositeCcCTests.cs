@@ -46,12 +46,12 @@ public sealed class Gs1CompositeCcCTests
     }
 
     [Theory]
-    [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcA)]
-    [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcB)]
+    [InlineData(BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.CcC)]
     [InlineData(BarcodeType.Gs1DataBarLimited, Gs1CompositeMode.CcC)]
     [InlineData(BarcodeType.Gs1DataBarOmnidirectional, Gs1CompositeMode.CcC)]
     public void Unsupported_pairs_fail_at_construction(BarcodeType type, Gs1CompositeMode mode)
-        => Assert.Throws<NotSupportedException>(() => new PrintGs1CompositeElement(0, 0, type, "", "", 20, mode: mode));
+        => Assert.Throws<NotSupportedException>(() => new PrintGs1CompositeElement(0, 0, type, "", "", 40, mode: mode));
 
     [Theory]
     [InlineData("12345678901231")]

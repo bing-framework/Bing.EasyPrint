@@ -588,7 +588,8 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         if (protocol == PrintProtocol.EscPos && barcode.Type == BarcodeType.Gs1DataBarStacked)
             return EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
                 barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None);
-        if (protocol == PrintProtocol.EscPos && barcode.Type == BarcodeType.Code49)
+        if (protocol == PrintProtocol.EscPos && (barcode.Type == BarcodeType.Code49 ||
+            barcode.Type == BarcodeType.Gs1DataBarExpandedStacked || barcode.Type == BarcodeType.Gs1DataBarStackedOmnidirectional))
         {
             var symbolHeight = EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
                 barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None);

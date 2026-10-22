@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -61,7 +61,7 @@ public readonly struct EscPosRasterTextBounds
 }
 
 /// <summary>用于 ESC/POS Raster 输出的单色位图画布。</summary>
-public sealed class EscPosRasterCanvas
+public sealed partial class EscPosRasterCanvas
 {
     internal const int DefaultHumanReadableFontSize = 12;
     private const int Code49LeadingQuietZoneModules = 10;
@@ -252,6 +252,7 @@ public sealed class EscPosRasterCanvas
            type == BarcodeType.ChinaPost ||
            type == BarcodeType.Gs1DataBarOmnidirectional || type == BarcodeType.Gs1DataBarTruncated ||
            type == BarcodeType.Gs1DataBarLimited || type == BarcodeType.Gs1DataBarExpanded ||
+           type == BarcodeType.Gs1DataBarStackedOmnidirectional || type == BarcodeType.Gs1DataBarExpandedStacked ||
            type == BarcodeType.Gs1DataBarStacked ||
            type == BarcodeType.Code49;
 
@@ -325,7 +326,8 @@ public sealed class EscPosRasterCanvas
             throw new ArgumentOutOfRangeException(nameof(humanReadableFontSize),
                 "条码可读文字字号必须在 1–255 点范围内。");
         var readableData = humanReadable ? HumanReadableBarcodeData(type, data) : data;
-        if (humanReadable && (type == BarcodeType.UccEan128 || type == BarcodeType.Gs1DataBarExpanded))
+        if (humanReadable && (type == BarcodeType.UccEan128 || type == BarcodeType.Gs1DataBarExpanded ||
+            type == BarcodeType.Gs1DataBarExpandedStacked))
             readableData = readableData.Replace("\u001D", string.Empty);
         using var operation = PrintResourceScope.BeginTemporary();
         var encoded = PrepareBarcode(type, x, y, data, height, moduleWidth, rotation == 0);
@@ -391,6 +393,10 @@ public sealed class EscPosRasterCanvas
                 : 0), moduleWidth, nameof(moduleWidth));
         var symbolHeight = type == BarcodeType.Code49
             ? checked(matrix.Height * height + (matrix.Height + 1) * moduleWidth)
+            : type == BarcodeType.Gs1DataBarStackedOmnidirectional
+                ? StackedOmnidirectionalHeight(height, moduleWidth)
+            : type == BarcodeType.Gs1DataBarExpandedStacked
+                ? ExpandedStackedHeight(matrix.Height, height, moduleWidth)
             : type == BarcodeType.Gs1DataBarStacked
                 ? MeasureBarcodeHeight(type, data, height, moduleWidth, _cancellationToken)
                 : height;
@@ -405,6 +411,11 @@ public sealed class EscPosRasterCanvas
         if (type == BarcodeType.Code49)
         {
             DrawCode49Core(x, y, height, encoded);
+            return;
+        }
+        if (type == BarcodeType.Gs1DataBarExpandedStacked || type == BarcodeType.Gs1DataBarStackedOmnidirectional)
+        {
+            DrawSeparatedBarcodeRowsCore(x, y, height, encoded);
             return;
         }
         if (type == BarcodeType.Gs1DataBarStacked)
@@ -581,7 +592,7 @@ public sealed class EscPosRasterCanvas
     /// <summary>测量支持的 ESC/POS Raster 主机条码符号输出高度。</summary>
     /// <remarks>
     /// Code 49 的 <paramref name="height"/> 表示每个堆叠行的条高，结果包含顶部、行间和底部 1X 分隔条；
-    /// 其它制式沿用原有条高语义。
+    /// ExpandedStacked/StackedOmnidirectional 的 height 为每条数据行高度，行间另加三个 1X 分隔行；其它制式沿用原有条高语义。
     /// </remarks>
     internal static int MeasureBarcodeHeight(BarcodeType type, string data, int height, int moduleWidth,
         CancellationToken cancellationToken)
@@ -591,6 +602,17 @@ public sealed class EscPosRasterCanvas
         if (type == BarcodeType.Gs1DataBarStacked && (long)height < 13L * moduleWidth)
             throw new ArgumentOutOfRangeException(nameof(height),
                 "GS1 DataBar Stacked 总条高至少为模块宽度的 13 倍。顶部行、分隔行和底部行按 5:1:7 排列。");
+        if (type == BarcodeType.Gs1DataBarStackedOmnidirectional)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return StackedOmnidirectionalHeight(height, moduleWidth);
+        }
+        if (type == BarcodeType.Gs1DataBarExpandedStacked)
+        {
+            using var operation = PrintResourceScope.BeginTemporary();
+            var (matrix, _, _) = EncodeBarcode(type, data, cancellationToken);
+            return ExpandedStackedHeight(matrix.Height, height, moduleWidth);
+        }
         if (type != BarcodeType.Code49) return height;
         ValidateCode49RowHeight(height, moduleWidth);
         return MeasureCode49SymbolHeight(data, height, moduleWidth, cancellationToken);
@@ -641,10 +663,14 @@ public sealed class EscPosRasterCanvas
             return EncodeChinaPost(normalizedData, cancellationToken);
         if (type == BarcodeType.Gs1DataBarOmnidirectional || type == BarcodeType.Gs1DataBarTruncated)
             return EncodeGs1DataBar(normalizedData, cancellationToken);
+        if (type == BarcodeType.Gs1DataBarStackedOmnidirectional)
+            return EncodeGs1DataBarStackedOmnidirectional(normalizedData, cancellationToken);
         if (type == BarcodeType.Gs1DataBarStacked)
             return EncodeGs1DataBarStacked(normalizedData, cancellationToken);
         if (type == BarcodeType.Gs1DataBarLimited)
             return EncodeGs1DataBarLimited(normalizedData, cancellationToken);
+        if (type == BarcodeType.Gs1DataBarExpandedStacked)
+            return EncodeGs1DataBarExpandedStacked(normalizedData, cancellationToken);
         if (type == BarcodeType.Gs1DataBarExpanded)
             return EncodeGs1DataBarExpanded(normalizedData, cancellationToken);
         if (type == BarcodeType.Code49)
@@ -905,7 +931,13 @@ public sealed class EscPosRasterCanvas
             CancellationToken.None);
     }
 
-    private static string[] BuildGs1DataBarStackedRows(string linearPattern,
+    /// <summary>
+    /// 将完整 DataBar 模块串折成 Stacked 上行、分隔行和下行，保留输入的连接标志。
+    /// </summary>
+    /// <param name="linearPattern">含保护条的 96 模块串，调用方已完成 GTIN 校验。</param>
+    /// <param name="cancellationToken">逐模块观察的取消令牌。</param>
+    /// <returns>三个独立字符串，顺序为上行、内部分隔行、下行。</returns>
+    internal static string[] BuildGs1DataBarStackedRows(string linearPattern,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -1244,8 +1276,7 @@ public sealed class EscPosRasterCanvas
     /// 以及显式 `(3103)` 公斤重量的 Method 3、`(3202)/(3203)` 英制重量的 Method 4；
     /// `(392x)` 本地价格的 Method 5、`(393x)` 货币代码加价格的 Method 6，以及 `(310x)`/
     /// `(320x)` 重量加虚拟日期的 Method 7/8，以及带日期和可选通用尾部的 Method 9–14；日期后的
-    /// 常用括号 AI 尾部会按变长/定长规则规范化为 FNC1 或连续字段；其它 AI、
-    /// 压缩方法、组合码和堆叠形式在规范化阶段严格拒绝。
+    /// 常用括号 AI 尾部会按变长/定长规则规范化为 FNC1 或连续字段；其它 AI 仍按共享解析器边界拒绝；堆叠布局及 Composite 由独立入口处理。
     /// </remarks>
     internal static string EncodeGs1DataBarExpandedPattern(string data)
         => EncodeGs1DataBarExpandedPattern(NormalizeBarcodeData(BarcodeType.Gs1DataBarExpanded, data),
@@ -1254,9 +1285,24 @@ public sealed class EscPosRasterCanvas
     private static string EncodeGs1DataBarExpandedPattern(string normalizedData,
         CancellationToken cancellationToken, bool composite = false)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        var elements = EncodeExpandedElements(normalizedData, cancellationToken, composite, false);
+        elements[0] = elements[1] = elements[elements.Length - 2] = elements[elements.Length - 1] = 1;
+        var pattern = new StringBuilder(elements.Length);
+        var black = false;
+        foreach (var width in elements)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            pattern.Append(black ? '1' : '0', width);
+            black = !black;
+        }
+        return pattern.ToString();
+    }
 
-        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken, composite);
+    private static int[] EncodeExpandedElements(string normalizedData,
+        CancellationToken cancellationToken, bool composite, bool stacked)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken, composite, stacked);
         var dataCharacters = encoded.DataCharacters;
         var symbolCharacters = encoded.SymbolCharacters;
         var binary = encoded.Bits;
@@ -1305,10 +1351,7 @@ public sealed class EscPosRasterCanvas
         {
             cancellationToken.ThrowIfCancellationRequested();
             var finderValue = Gs1DataBarExpandedFinderSequence[finderSequence, block];
-            // Preserve the R108 GTIN-only byte stream. That historical
-            // five-character path used the legacy value-4 table slot; all
-            // variable-length symbols use the ISO/Zint table ordering.
-            var finder = !composite && symbolCharacters == 5 && finderValue == 4 ? 1 : finderValue - 1;
+            var finder = finderValue - 1;
             for (var element = 0; element < 5; element++)
                 elements[21 * block + element + 10] =
                     Gs1DataBarExpandedFinderPatterns[finder, element];
@@ -1328,19 +1371,7 @@ public sealed class EscPosRasterCanvas
                 elements[start + element] = characterWidths[character, 7 - element];
         }
 
-        elements[0] = elements[1] = elements[patternWidth - 2] = elements[patternWidth - 1] = 1;
-        var pattern = new StringBuilder(patternWidth);
-        var black = false;
-        for (var element = 0; element < patternWidth; element++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            pattern.Append(black ? '1' : '0', elements[element]);
-            black = !black;
-        }
-        var expectedWidth = checked(17 * symbolCharacters + 15 * codeBlocks + 4);
-        if (pattern.Length != expectedWidth)
-            throw new InvalidOperationException($"GS1 DataBar Expanded 编码宽度不是 {expectedWidth} 模块，实际为 {pattern.Length}。");
-        return pattern.ToString();
+        return elements;
     }
 
     private static int Gs1DataBarExpandedSymbolCharacters(string normalizedData)
@@ -1675,9 +1706,9 @@ public sealed class EscPosRasterCanvas
     }
 
     /// <summary>
-    /// 为 Composite 主数据选择标准 Expanded 压缩方法；不满足压缩条件时保留通用 AI 字段。
+    /// 为普通与 Composite 主数据选择标准 Expanded 压缩方法；不满足压缩条件时保留通用 AI 字段。
     /// </summary>
-    /// <param name="data">已经严格解析为 FNC1 分隔的 GS1 元素串。</param>
+    /// <param name="data">已规范化的 GS1 元素串或兼容原始通用字段；结构化压缩前另行确认数字格式。</param>
     /// <returns>供 Expanded 编码器使用的内部规范化数据，可能包含方法标记。</returns>
     internal static string NormalizeCompositeExpanded(string data)
     {
@@ -1687,9 +1718,12 @@ public sealed class EscPosRasterCanvas
         var ai = data.Substring(16, 4);
         char marker;
         if ((ai.StartsWith("310", StringComparison.Ordinal) || ai.StartsWith("320", StringComparison.Ordinal)) &&
-            (data.Length == 26 || data.Length == 34))
+            ai[3] >= '0' && ai[3] <= '9' && (data.Length == 26 || data.Length == 34))
         {
-            if (!int.TryParse(data.Substring(20, 6), out var weight) || weight > 99999) return data;
+            // 原始通用字段也能进入此入口；不能把符号、字母或负号当作结构化重量。
+            var weightText = data.Substring(20, 6);
+            if (weightText.Any(character => character < '0' || character > '9') ||
+                !int.TryParse(weightText, out var weight) || weight > 99999) return data;
             var metric = ai[1] == '1';
             if (data.Length == 26)
                 marker = metric
@@ -1709,16 +1743,36 @@ public sealed class EscPosRasterCanvas
         }
         else if (ai.StartsWith("392", StringComparison.Ordinal) && ai[3] >= '0' && ai[3] <= '3')
             marker = ExpandedMethod5Marker;
-        else if (ai.StartsWith("393", StringComparison.Ordinal) && ai[3] >= '0' && ai[3] <= '3')
+        else if (ai.StartsWith("393", StringComparison.Ordinal) && ai[3] >= '0' && ai[3] <= '3' &&
+                 data.Length >= 23 && data.Substring(20, 3).All(character => character >= '0' && character <= '9'))
             marker = ExpandedMethod6Marker;
         else return data;
         return data.Insert(16, marker.ToString());
     }
 
+    /// <summary>
+    /// 判断字符是否为旧输入规范化器用于保留可读字段边界的内部压缩方法标记。
+    /// </summary>
+    /// <param name="value">GTIN 后的候选字符。</param>
+    /// <returns>内部方法标记返回 true；普通数据或 FNC1 返回 false。</returns>
+    private static bool IsExpandedMethodMarker(char value)
+        => value == ExpandedMethod3Marker || value == ExpandedMethod4Marker ||
+           value == ExpandedMethod5Marker || value == ExpandedMethod6Marker ||
+           value == ExpandedMethod7Marker || value == ExpandedMethod8Marker ||
+           value == ExpandedMethod9Marker || value == ExpandedMethod10Marker ||
+           value == ExpandedMethod11Marker || value == ExpandedMethod12Marker ||
+           value == ExpandedMethod13Marker || value == ExpandedMethod14Marker;
+
     private static ExpandedBinary EncodeGs1DataBarExpandedBinary(string normalizedData,
-        CancellationToken cancellationToken, bool composite = false)
+        CancellationToken cancellationToken, bool composite = false, bool stacked = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        // 保留旧输入规范化器的标记供 HRI 使用；实际编码重新按完整载荷选择标准方法。
+        // 压缩方法要求 GTIN 前导 9，固定重量/日期方法必须消费全部数据。
+        if (normalizedData.Length > 16 && IsExpandedMethodMarker(normalizedData[16]))
+            normalizedData = normalizedData.Remove(16, 1);
+        normalizedData = NormalizeCompositeExpanded(normalizedData);
 
         var method3 = normalizedData.Length > 16 && normalizedData[16] == ExpandedMethod3Marker;
         var method4 = normalizedData.Length > 16 && normalizedData[16] == ExpandedMethod4Marker;
@@ -1773,9 +1827,8 @@ public sealed class EscPosRasterCanvas
             AppendBinary(binary, 4, 3); // 1XX; the two variable bits are patched below.
         if (!method2)
         {
-            // Composite compressed methods imply the leading GTIN digit 9.
-            // Ordinary Expanded retains its historical stream for compatibility.
-            if (!composite || !compressedMethod) AppendBinary(binary, encodedData[2] - '0', 4);
+            // 普通和 Composite 的压缩方法都隐含 GTIN 的前导数字 9。
+            if (!compressedMethod) AppendBinary(binary, encodedData[2] - '0', 4);
             for (var index = 3; index < 15; index += 3)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1836,6 +1889,7 @@ public sealed class EscPosRasterCanvas
         var remainder = 12 - bitPosition % 12;
         if (remainder == 12) remainder = 0;
         var symbolCharacters = ((bitPosition + remainder) / 12) + 1;
+        if (stacked && symbolCharacters % 4 == 1) symbolCharacters++;
         if (symbolCharacters < 4) symbolCharacters = 4;
         remainder = 12 * (symbolCharacters - 1) - bitPosition;
 
@@ -1853,6 +1907,7 @@ public sealed class EscPosRasterCanvas
             remainder = 12 - bitPosition % 12;
             if (remainder == 12) remainder = 0;
             symbolCharacters = ((bitPosition + remainder) / 12) + 1;
+            if (stacked && symbolCharacters % 4 == 1) symbolCharacters++;
             if (symbolCharacters < 4) symbolCharacters = 4;
             remainder = 12 * (symbolCharacters - 1) - bitPosition;
         }
@@ -2845,7 +2900,7 @@ public sealed class EscPosRasterCanvas
             return data;
         }
         if (type == BarcodeType.Gs1DataBarOmnidirectional || type == BarcodeType.Gs1DataBarTruncated ||
-            type == BarcodeType.Gs1DataBarStacked)
+            type == BarcodeType.Gs1DataBarStacked || type == BarcodeType.Gs1DataBarStackedOmnidirectional)
         {
             if (data.Length != 13 || data.Any(character => character < '0' || character > '9'))
                 throw new ArgumentException("GS1 DataBar Omnidirectional/Truncated/Stacked 条码需要 13 位 ASCII 数字 payload。", nameof(data));
@@ -2858,7 +2913,7 @@ public sealed class EscPosRasterCanvas
                 throw new ArgumentException("GS1 DataBar Limited 条码需要以 0 或 1 开头的 13 位 ASCII 数字 payload。", nameof(data));
             return data;
         }
-        if (type == BarcodeType.Gs1DataBarExpanded)
+        if (type == BarcodeType.Gs1DataBarExpanded || type == BarcodeType.Gs1DataBarExpandedStacked)
         {
             if (Gs1ApplicationIdentifierParser.IsBracketed(data) &&
                 !data.StartsWith("(01)", StringComparison.Ordinal) &&
@@ -2939,7 +2994,7 @@ public sealed class EscPosRasterCanvas
                         var useMethod3 = ai == "3103" && weightIsNumeric && weight <= 32767;
                         normalized = normalized.Substring(0, 16) +
                             (useMethod3 ? ExpandedMethod3Marker : ExpandedMethod7Marker) + ai +
-                            normalized.Substring(22);
+                            weightText + NormalizeExpandedDateTail(structuredSuffix.Substring(6), normalized[16], nameof(data));
                         method3 = useMethod3;
                         method7 = !useMethod3;
                     }
@@ -2967,7 +3022,7 @@ public sealed class EscPosRasterCanvas
                             (ai == "3203" && weightIsNumeric && weight <= 22767);
                         normalized = normalized.Substring(0, 16) +
                             (useMethod4 ? ExpandedMethod4Marker : ExpandedMethod8Marker) + ai +
-                            normalized.Substring(22);
+                            weightText + NormalizeExpandedDateTail(structuredSuffix.Substring(6), normalized[16], nameof(data));
                         method4 = useMethod4;
                         method8 = !useMethod4;
                     }
@@ -3053,16 +3108,16 @@ public sealed class EscPosRasterCanvas
                         nameof(data));
                 var weightText = expandedData.Substring(20, 6);
                 if (weightText.Any(character => character < '0' || character > '9') ||
-                    int.Parse(weightText, System.Globalization.CultureInfo.InvariantCulture) > 99999 ||
+                    int.Parse(weightText, System.Globalization.CultureInfo.InvariantCulture) > 999999 ||
                     !TryParseExpandedDate(expandedData.Substring(28, 6), out _))
                     throw new ArgumentException(
-                        "GS1 DataBar Expanded Method 7-14 需要 000000-099999 范围的 6 位重量和有效日期。",
+                        "GS1 DataBar Expanded Method 7-14 需要 000000-999999 范围的 6 位重量和有效日期。",
                         nameof(data));
             }
             else if (method7 || method8)
             {
                 var ai = expandedData.Length >= 20 ? expandedData.Substring(16, 4) : string.Empty;
-                if (expandedData.Length != 26 ||
+                if (expandedData.Length < 26 ||
                     (method7 && (ai.Length != 4 || !ai.StartsWith("310", StringComparison.Ordinal) ||
                                  ai[3] < '0' || ai[3] > '9')) ||
                     (method8 && (ai.Length != 4 || !ai.StartsWith("320", StringComparison.Ordinal) ||
@@ -3076,9 +3131,9 @@ public sealed class EscPosRasterCanvas
                         "GS1 DataBar Expanded Method 7/8 的重量后不接受未实现的结构化日期 AI。",
                         nameof(data));
                 if (weightText.Any(character => character < '0' || character > '9') ||
-                    int.Parse(weightText, System.Globalization.CultureInfo.InvariantCulture) > 99999)
+                    int.Parse(weightText, System.Globalization.CultureInfo.InvariantCulture) > 999999)
                     throw new ArgumentException(
-                        "GS1 DataBar Expanded Method 7/8 需要 000000-099999 范围的 6 位重量。",
+                        "GS1 DataBar Expanded Method 7/8 需要 000000-999999 范围的 6 位重量。",
                         nameof(data));
             }
             else if (method5 || method6)
@@ -3160,12 +3215,15 @@ public sealed class EscPosRasterCanvas
     internal static string HumanReadableBarcodeData(BarcodeType type, string data)
     {
         var normalized = NormalizeBarcodeData(type, data);
-        if (type == BarcodeType.Gs1DataBarExpanded)
+        if (type == BarcodeType.Gs1DataBarExpanded || type == BarcodeType.Gs1DataBarExpandedStacked)
         {
             var readableInput = Gs1ApplicationIdentifierParser.IsBracketed(data)
                 ? Gs1ApplicationIdentifierParser.DecodeDisplayEscapes(data)
                 : data;
-            if (Gs1ApplicationIdentifierParser.IsExpandedGenericGtin(data))
+            if (Gs1ApplicationIdentifierParser.IsExpandedGenericGtin(data) ||
+                Gs1ApplicationIdentifierParser.IsBracketed(data) && data.Length > 30 &&
+                IsExpandedStructuredAi(data, 18) && (data.Substring(19, 3) == "310" || data.Substring(19, 3) == "320") &&
+                (data[30] == '(' || data[30] == '['))
                 return readableInput;
             var bracketedDateTail = HasExpandedBracketedDateTail(data);
             if (Gs1ApplicationIdentifierParser.IsBracketed(data) &&
@@ -3215,7 +3273,7 @@ public sealed class EscPosRasterCanvas
             return "(01)" + normalized.Substring(2);
         }
         if (type != BarcodeType.Gs1DataBarOmnidirectional && type != BarcodeType.Gs1DataBarTruncated &&
-            type != BarcodeType.Gs1DataBarStacked &&
+            type != BarcodeType.Gs1DataBarStacked && type != BarcodeType.Gs1DataBarStackedOmnidirectional &&
             type != BarcodeType.Gs1DataBarLimited)
             return normalized;
         return "(01)" + normalized + CalculateI2of5CheckDigit(normalized, 3, 1);

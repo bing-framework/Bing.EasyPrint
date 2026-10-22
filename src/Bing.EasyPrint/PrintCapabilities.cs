@@ -62,7 +62,9 @@ public sealed class PrintCapabilities
     public bool SupportsExplicitQuietZone => SupportsCoordinates;
     /// <summary>获取是否支持图片。</summary>
     public bool SupportsImages { get; }
-    /// <summary>获取是否支持通过共享主机位图输出 DataBar Omnidirectional/Limited Composite。</summary>
+    /// <summary>
+    /// 获取是否支持通过共享主机位图输出 GS1 Composite；允许的线性制式、模式配对及输入约束见 <see cref="Printing.PrintGs1CompositeElement"/>。
+    /// </summary>
     public bool SupportsGs1Composite => SupportsImages && SupportsCoordinates;
     /// <summary>获取是否支持二维码。</summary>
     public bool SupportsQrCode { get; }
@@ -442,7 +444,7 @@ public sealed class PrintCapabilities
         {
             if (SupportsRasterLayout && (type == BarcodeType.I2OF5C || type == BarcodeType.I2OF5G ||
                                           type == BarcodeType.Msi || type == BarcodeType.ChinaPost ||
-                                          type == BarcodeType.Gs1DataBarStacked))
+                                          type == BarcodeType.Gs1DataBarStacked || type == BarcodeType.Gs1DataBarExpandedStacked || type == BarcodeType.Gs1DataBarStackedOmnidirectional))
                 return true;
             return type == BarcodeType.Code128 || type == BarcodeType.Code39 ||
                  type == BarcodeType.Code93 || type == BarcodeType.Codabar ||

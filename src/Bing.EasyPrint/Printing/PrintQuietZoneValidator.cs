@@ -215,7 +215,8 @@ internal static class PrintQuietZoneValidator
                 if ((protocol == PrintProtocol.Tspl || protocol == PrintProtocol.Zpl) &&
                     barcode.HumanReadable != false && barcode.HumanReadableReserveHeight <= 0)
                     throw new ArgumentException("含显式静区的页面要求为启用或默认启用可读文字的条码声明 HumanReadableReserveHeight，或关闭可读文字。" );
-                var height = protocol == PrintProtocol.EscPos && barcode.Type == BarcodeType.Code49
+                var height = protocol == PrintProtocol.EscPos && (barcode.Type == BarcodeType.Code49 ||
+                    barcode.Type == BarcodeType.Gs1DataBarExpandedStacked || barcode.Type == BarcodeType.Gs1DataBarStackedOmnidirectional)
                     ? checked(EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
                         barcode.BarHeight, barcode.NarrowWidth, cancellationToken) +
                         barcode.HumanReadableReserveHeight)

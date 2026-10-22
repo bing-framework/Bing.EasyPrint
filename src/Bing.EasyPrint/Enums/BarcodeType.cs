@@ -1,4 +1,4 @@
-﻿// ReSharper disable once CheckNamespace
+// ReSharper disable once CheckNamespace
 namespace Bing.EasyPrint;
 
 /// <summary>
@@ -114,7 +114,7 @@ public enum BarcodeType
     /// </summary>
     Gs1DataBarOmnidirectional = 25,
     /// <summary>
-    /// GS1 DataBar Truncated；当前由 ESC/POS Native Function B 76、ESC/POS Raster 主机编码和 ZPL ^BR 类型 2 支持。
+    /// GS1 DataBar Truncated；普通条码由 ESC/POS Native Function B 76、ESC/POS Raster 主机编码和 ZPL ^BR 类型 2 支持；Composite 支持 CC-A/B，条高至少 13X。
     /// </summary>
     Gs1DataBarTruncated = 26,
     /// <summary>
@@ -132,5 +132,17 @@ public enum BarcodeType
     /// <summary>
     /// GS1 DataBar Stacked；当前由 ESC/POS Raster 主机编码支持。
     /// </summary>
-    Gs1DataBarStacked = 30
+    Gs1DataBarStacked = 30,
+
+    /// <summary>
+    /// GS1 DataBar Expanded Stacked；固定每行两个字符对，普通条码由 ESC/POS Raster 编码。
+    /// 条高为每条数据行高度（dot），行间另加三个 1X 分隔行；Composite 支持 CC-A/B。
+    /// </summary>
+    Gs1DataBarExpandedStacked = 31,
+
+    /// <summary>
+    /// GS1 DataBar Stacked Omnidirectional；普通条码由 ESC/POS Raster 编码，Composite 支持 CC-A/B。
+    /// 条高为每条数据行高度（dot），至少 33X；两数据行之间另加三个 1X 分隔行。
+    /// </summary>
+    Gs1DataBarStackedOmnidirectional = 32
 }

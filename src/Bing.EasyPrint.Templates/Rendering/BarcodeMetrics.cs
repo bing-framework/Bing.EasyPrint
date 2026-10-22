@@ -28,7 +28,8 @@ internal static class BarcodeMetrics
         var allowGroupSeparator = element.BarcodeType == BarcodeType.UccEan128;
         var allowTelepenDel = element.BarcodeType == BarcodeType.Telepen || element.BarcodeType == BarcodeType.Code49;
         var allowEscPosControl = element.BarcodeType == BarcodeType.Code128Auto ||
-                                 element.BarcodeType == BarcodeType.Gs1DataBarExpanded;
+                                 element.BarcodeType == BarcodeType.Gs1DataBarExpanded ||
+                                 element.BarcodeType == BarcodeType.Gs1DataBarExpandedStacked;
         if (string.IsNullOrEmpty(data) || data.Any(c =>
                 c > (allowTelepenDel || allowEscPosControl ? 127 : 126) ||
                 c < 32 && !allowEscPosControl && (!allowGroupSeparator || c != '\u001D')))
@@ -171,6 +172,7 @@ internal static class BarcodeMetrics
                     if (data.Length != 13) throw new ArgumentException("GS1 DataBar Truncated 需要 13 位数字。");
                     bars = checked((13 * 14 + 34) * narrow);
                     break;
+                case BarcodeType.Gs1DataBarStackedOmnidirectional:
                 case BarcodeType.Gs1DataBarStacked:
                     Digits(data);
                     if (data.Length != 13) throw new ArgumentException("GS1 DataBar Stacked 需要 13 位数字。");
@@ -182,6 +184,7 @@ internal static class BarcodeMetrics
                         throw new ArgumentException("GS1 DataBar Limited 需要 13 位数字且首位必须为 0 或 1。");
                     bars = checked((13 * 14 + 34) * narrow);
                     break;
+                case BarcodeType.Gs1DataBarExpandedStacked:
                 case BarcodeType.Gs1DataBarExpanded:
                     Gs1DataBarExpandedAscii(data);
                     var expandedLength = checked(data.Length + data.Count(c => c == '(' || c == ')' ||

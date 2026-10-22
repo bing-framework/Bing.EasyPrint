@@ -1012,7 +1012,10 @@ public sealed class TemplateRenderer
                             barcode.BarcodeType, layout.Data, narrow ?? checked(barcode.LineWidth + 1)))
                     : layout.Width;
                 var w = barcode.Width == 0 ? requiredWidth : barcode.Width;
-                var h = checked(barcode.Height + barcode.HumanReadableReserveHeight +
+                var barHeight = (barcode.BarcodeType == BarcodeType.Gs1DataBarExpandedStacked || barcode.BarcodeType == BarcodeType.Gs1DataBarStackedOmnidirectional)
+                    ? EscPosRasterCanvas.MeasureBarcodeHeight(barcode.BarcodeType, layout.Data, barcode.Height,
+                        narrow ?? checked(barcode.LineWidth + 1), cancellation) : barcode.Height;
+                var h = checked(barHeight + barcode.HumanReadableReserveHeight +
                     (quietZone == null ? 0 : checked(quietZone.Top + quietZone.Bottom)));
                 var quarterTurn = barcode.Rotation == RotationAngle.Rotate90 || barcode.Rotation == RotationAngle.Rotate270;
                 if (w < requiredWidth || (quarterTurn ? h : w) > width)

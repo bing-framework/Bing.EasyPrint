@@ -50,12 +50,22 @@ namespace Bing.EasyPrint.Protocols;
 internal static partial class Gs1CompositeEncoder
 {
     private const char Fnc1 = '\u001D';
+    /// <summary>
+    /// 获取二列 CC-A 各尺寸的二进制容量（位）。
+    /// </summary>
+    private static readonly int[] AaTwoSizes = { 59, 78, 88, 108, 118, 138, 167 };
     private static readonly int[] AaThreeSizes = { 78, 98, 118, 138, 167 };
     private static readonly int[] AaFourSizes = { 78, 108, 138, 167, 197 };
+    /// <summary>
+    /// 获取二列 CC-B 各尺寸的二进制容量（位）。
+    /// </summary>
+    private static readonly int[] BbTwoSizes = { 56, 104, 160, 208, 256, 296, 336 };
     private static readonly int[] BbThreeSizes = { 32, 72, 112, 152, 208, 304, 416, 536, 648, 768 };
     private static readonly int[] BbFourSizes = { 56, 96, 152, 208, 264, 352, 496, 672, 840, 1016, 1184 };
 
-    /// <summary>生成真实模块矩阵；二维行、分隔行、线性行分别占用一行。</summary>
+    /// <summary>
+    /// 生成逻辑模块矩阵；Stacked 包含上下两条数据行和独立的内部分隔行。
+    /// </summary>
     internal static Gs1CompositeSymbol Encode(PrintGs1CompositeElement element,
         CancellationToken cancellationToken = default)
     {
@@ -63,7 +73,11 @@ internal static partial class Gs1CompositeEncoder
         cancellationToken.ThrowIfCancellationRequested();
         using var operation = PrintResourceScope.BeginTemporary();
         var gs1 = element.LinearType == BarcodeType.UccEan128;
-        var expanded = element.LinearType == BarcodeType.Gs1DataBarExpanded;
+        var retail = IsEanUpc(element.LinearType);
+        var stacked = element.LinearType == BarcodeType.Gs1DataBarStacked;
+        var stackedOmni = element.LinearType == BarcodeType.Gs1DataBarStackedOmnidirectional;
+        var expandedStacked = element.LinearType == BarcodeType.Gs1DataBarExpandedStacked;
+        var expanded = element.LinearType == BarcodeType.Gs1DataBarExpanded || expandedStacked;
         if (element.PrimaryData.Length > (expanded ? 2990 : gs1 ? 192 : 18))
             throw new ArgumentException("Composite 主数据超过线性组件输入长度限制。", "primaryData");
         if (element.SecondaryData.Length > 2990)
@@ -79,20 +93,26 @@ internal static partial class Gs1CompositeEncoder
         var secondary = Gs1ApplicationIdentifierParser.NormalizeForProtocol(element.SecondaryData,
             "secondaryData", 2990);
         cancellationToken.ThrowIfCancellationRequested();
-        var columns = element.LinearType == BarcodeType.Gs1DataBarLimited ? 3 : 4;
-        var mode = gs1 ? Gs1CompositeMode.CcC
+        var columns = stacked || stackedOmni || element.LinearType == BarcodeType.UpcE ? 2
+            : element.LinearType == BarcodeType.Gs1DataBarLimited || element.LinearType == BarcodeType.Ean8 ? 3 : 4;
+        // Preserve the original GS1-128 Auto contract; A/B are explicit opt-ins.
+        var mode = gs1 ? (element.Mode == Gs1CompositeMode.Auto ? Gs1CompositeMode.CcC : element.Mode)
             : element.Mode == Gs1CompositeMode.CcB ? Gs1CompositeMode.CcB : Gs1CompositeMode.CcA;
         string linear;
+        string[] expandedRows = null;
         try
         {
-            linear = gs1 ? EncodeGs1Linear(primary, cancellationToken)
+            if (expandedStacked)
+                expandedRows = EscPosRasterCanvas.EncodeGs1DataBarExpandedStackedPattern(primary, cancellationToken, true);
+            linear = retail ? EncodeEanUpcLinear(element.LinearType, primary, cancellationToken)
+                : expandedStacked ? expandedRows[0] : gs1 ? EncodeGs1Linear(primary, mode, cancellationToken)
                 : EscPosRasterCanvas.EncodeGs1CompositeLinearPattern(element.LinearType, primary, cancellationToken);
         }
         catch (ArgumentException error) when (expanded)
         {
             throw new ArgumentException(error.Message, "primaryData", error);
         }
-        var ccC = gs1 ? new CcCLayout(linear.Length) : null;
+        var ccC = mode == Gs1CompositeMode.CcC ? new CcCLayout(linear.Length) : null;
         var bits = BuildBinary(secondary, columns, mode, cancellationToken, ccC);
         if (bits == null && !gs1 && element.Mode == Gs1CompositeMode.Auto)
         {
@@ -101,20 +121,36 @@ internal static partial class Gs1CompositeEncoder
         }
         if (bits == null)
             throw new ArgumentException($"Composite 次数据超过 {mode} 容量。", "secondaryData");
-        var twoDimensional = gs1 ? EncodeCcC(bits, ccC, cancellationToken)
+        var twoDimensional = mode == Gs1CompositeMode.CcC ? EncodeCcC(bits, ccC, cancellationToken)
             : EncodeComponent(bits, columns, mode, cancellationToken);
-        var separator = BuildSeparator(element.LinearType, linear, cancellationToken);
-        var topShift = element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcA ? 1 : 0;
+        var linearRows = expandedRows ?? (stackedOmni
+            ? EscPosRasterCanvas.BuildGs1DataBarStackedOmnidirectionalRows(linear, cancellationToken) : stacked
+            ? EscPosRasterCanvas.BuildGs1DataBarStackedRows(linear, cancellationToken) : new[] { linear });
+        linear = linearRows[0];
+        var separators = retail ? BuildEanUpcSeparators(linear.Length)
+            : new[] { BuildSeparator(element.LinearType, linear, cancellationToken) };
+        var topShift = stacked || stackedOmni || element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcA ? 1 : 0;
         if (expanded)
         {
             // ISO/IEC 24723 12.3: align after the first space/bar transition of the linear component.
             topShift = 1;
             while (topShift < linear.Length && linear[topShift - 1] == '0' && linear[topShift] == '1') topShift++;
         }
-        var bottomShift = gs1 ? 7 : element.LinearType == BarcodeType.Gs1DataBarOmnidirectional ? 4
+        var bottomShift = retail ? (element.LinearType == BarcodeType.Ean8 ? (mode == Gs1CompositeMode.CcA ? 3 : 13) : 2)
+            : gs1 ? 7 : (element.LinearType == BarcodeType.Gs1DataBarOmnidirectional || element.LinearType == BarcodeType.Gs1DataBarTruncated) ? 4
             : element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcB ? 9 : 0;
+        if (gs1 && mode != Gs1CompositeMode.CcC)
+        {
+            // ISO/IEC 24723 12.3 g): align the A/B right edge with the last space
+            // of the selected Code 128 character (counted from the stop symbol).
+            var position = ((linear.Length - 2) / 11 - 9) / 2;
+            var shift = linear.Length - position * 11 - 1 - twoDimensional[0].Length;
+            if (position != 0) shift -= 2;
+            topShift = Math.Max(0, shift);
+            bottomShift = Math.Max(0, -shift);
+        }
         var width = Math.Max(twoDimensional[0].Length + topShift, linear.Length + bottomShift);
-        var height = twoDimensional.Length + 2;
+        var height = twoDimensional.Length + separators.Length + linearRows.Length;
         PrintResourceScope.Retain(checked(((width + 31L) / 32) * height * sizeof(int)),
             "Composite.ModuleMatrix");
         var matrix = new BitMatrix(width, height);
@@ -122,13 +158,14 @@ internal static partial class Gs1CompositeEncoder
         {
             cancellationToken.ThrowIfCancellationRequested();
             var pattern = row < twoDimensional.Length ? twoDimensional[row]
-                : row == twoDimensional.Length ? separator : linear;
+                : row < twoDimensional.Length + separators.Length ? separators[row - twoDimensional.Length]
+                : linearRows[row - twoDimensional.Length - separators.Length];
             var shift = row < twoDimensional.Length ? topShift : bottomShift;
             for (var column = 0; column < pattern.Length; column++)
                 if (pattern[column] == '1') matrix[column + shift, row] = true;
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var result = new Gs1CompositeSymbol(matrix, mode);
+        var result = new Gs1CompositeSymbol(matrix, mode, twoDimensional.Length, stacked, expandedStacked ? (linearRows.Length + 3) / 4 : 0, retail, stackedOmni);
         operation?.CommitReservations();
         return result;
     }
@@ -146,7 +183,7 @@ internal static partial class Gs1CompositeEncoder
     {
         var zone = element.QuietZone;
         var width = checked((long)symbol.Matrix.Width * element.ModuleWidth + (zone?.Left ?? 0) + (zone?.Right ?? 0));
-        var height = checked((long)(symbol.ComponentRows * symbol.ComponentRowHeight + 1) * element.ModuleWidth + element.LinearBarHeight
+        var height = checked((long)(symbol.ComponentRows * symbol.ComponentRowHeight + (symbol.EanUpc ? 6 : symbol.StackedOmnidirectional ? 4 : symbol.Stacked ? 2 : 1 + Math.Max(0, symbol.ExpandedStackedRows - 1) * 3)) * element.ModuleWidth + (long)element.LinearBarHeight * (symbol.StackedOmnidirectional ? 2 : Math.Max(1, symbol.ExpandedStackedRows))
             + (zone?.Top ?? 0) + (zone?.Bottom ?? 0));
         if (width > int.MaxValue || height > int.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(element), "Composite 尺寸超过矩阵容量。");
@@ -166,16 +203,16 @@ internal static partial class Gs1CompositeEncoder
         var top = zone?.Top ?? 0;
         var dimensions = Dimensions(element, symbol);
         var width = dimensions.Width;
-        var componentHeight = checked(symbol.ComponentRows * symbol.ComponentRowHeight * module);
         var height = dimensions.Height;
         var rowBytes = checked((int)((width + 7L) / 8));
         var raster = BudgetedBuffer.Create(checked(rowBytes * height), "Composite.Raster", data =>
         {
+            var row = 0;
+            var rowEnd = symbol.RowHeight(row, element);
             for (var y = 0; y < height - top - (zone?.Bottom ?? 0); y++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var row = y < componentHeight ? y / (symbol.ComponentRowHeight * module)
-                    : y < componentHeight + module ? symbol.ComponentRows : symbol.ComponentRows + 1;
+                if (y == rowEnd) rowEnd += symbol.RowHeight(++row, element);
                 for (var x = 0; x < symbol.Matrix.Width; x++)
                 {
                     if (!symbol.Matrix[x, row]) continue;
@@ -198,9 +235,10 @@ internal static partial class Gs1CompositeEncoder
 
     private static string NormalizePrimary(BarcodeType type, string data)
     {
+        if (IsEanUpc(type)) return NormalizeEanUpc(type, data);
         if (type == BarcodeType.UccEan128)
             return Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 48);
-        if (type == BarcodeType.Gs1DataBarExpanded)
+        if (type == BarcodeType.Gs1DataBarExpanded || type == BarcodeType.Gs1DataBarExpandedStacked)
         {
             if (!Gs1ApplicationIdentifierParser.IsBracketed(data))
                 throw new ArgumentException("Expanded Composite 主数据必须为括号式 GS1 AI。", "primaryData");
@@ -374,8 +412,8 @@ internal static partial class Gs1CompositeEncoder
     {
         if (mode == Gs1CompositeMode.CcC) return ccC.TargetBits(length);
         var sizes = mode == Gs1CompositeMode.CcA
-            ? columns == 3 ? AaThreeSizes : AaFourSizes
-            : columns == 3 ? BbThreeSizes : BbFourSizes;
+            ? columns == 2 ? AaTwoSizes : columns == 3 ? AaThreeSizes : AaFourSizes
+            : columns == 2 ? BbTwoSizes : columns == 3 ? BbThreeSizes : BbFourSizes;
         foreach (var size in sizes) if (length <= size) return size;
         return 0;
     }
@@ -407,8 +445,9 @@ internal static partial class Gs1CompositeEncoder
                 }
                 codewords.AddRange(words);
             }
-            var dataCounts = columns == 3 ? new[] { 8, 10, 12, 14, 17 } : new[] { 8, 11, 14, 17, 20 };
-            variant = Array.IndexOf(dataCounts, codewords.Count) + (columns == 3 ? 7 : 12);
+            var dataCounts = columns == 2 ? new[] { 6, 8, 9, 11, 12, 14, 17 }
+                : columns == 3 ? new[] { 8, 10, 12, 14, 17 } : new[] { 8, 11, 14, 17, 20 };
+            variant = Array.IndexOf(dataCounts, codewords.Count) + (columns == 2 ? 0 : columns == 3 ? 7 : 12);
             rows = Gs1CompositeTables.AaVariants[variant];
             correctionCount = Gs1CompositeTables.AaVariants[17 + variant];
             correctionOffset = Gs1CompositeTables.AaVariants[34 + variant];
@@ -438,9 +477,10 @@ internal static partial class Gs1CompositeEncoder
                 }
                 else codewords.Add(bytes[index++]);
             }
-            var dataCounts = columns == 3 ? new[] { 6, 10, 14, 18, 24, 34, 46, 58, 70, 82 }
+            var dataCounts = columns == 2 ? new[] { 8, 13, 19, 24, 29, 33, 37 }
+                : columns == 3 ? new[] { 6, 10, 14, 18, 24, 34, 46, 58, 70, 82 }
                 : new[] { 8, 12, 18, 24, 30, 39, 54, 72, 90, 108, 126 };
-            variant = Array.FindIndex(dataCounts, count => codewords.Count <= count) + (columns == 3 ? 13 : 23);
+            variant = Array.FindIndex(dataCounts, count => codewords.Count <= count) + (columns == 2 ? 6 : columns == 3 ? 13 : 23);
             rows = Gs1CompositeTables.MicroVariants[34 + variant];
             correctionCount = Gs1CompositeTables.MicroVariants[68 + variant];
             correctionOffset = Gs1CompositeTables.MicroVariants[102 + variant];
@@ -489,19 +529,20 @@ internal static partial class Gs1CompositeEncoder
 
     private static string BuildSeparator(BarcodeType type, string linear, CancellationToken cancellationToken)
     {
-        if (type == BarcodeType.Gs1DataBarExpanded)
+        if (type == BarcodeType.Gs1DataBarExpanded || type == BarcodeType.Gs1DataBarExpandedStacked)
             return BuildExpandedSeparator(linear, cancellationToken);
         var separator = new char[linear.Length];
         for (var index = 0; index < separator.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             separator[index] = (type == BarcodeType.UccEan128 ||
-                index >= 4 && index < (type == BarcodeType.Gs1DataBarLimited ? 70 : 92))
+                index >= 4 && index < (type == BarcodeType.Gs1DataBarLimited ? 70 : linear.Length - 4))
                 && linear[index] == '0' ? '1' : '0';
         }
-        if (type == BarcodeType.Gs1DataBarOmnidirectional)
+        if (type == BarcodeType.Gs1DataBarOmnidirectional || type == BarcodeType.Gs1DataBarTruncated ||
+            type == BarcodeType.Gs1DataBarStacked || type == BarcodeType.Gs1DataBarStackedOmnidirectional)
         {
-            foreach (var start in new[] { 18, 63 })
+            foreach (var start in (type == BarcodeType.Gs1DataBarStacked || type == BarcodeType.Gs1DataBarStackedOmnidirectional) ? new[] { 18 } : new[] { 18, 63 })
             {
                 var latch = true;
                 for (var index = start; index < start + 13; index++)
@@ -567,15 +608,61 @@ internal sealed class Gs1CompositeSymbol
 {
     internal BitMatrix Matrix { get; }
     internal Gs1CompositeMode Mode { get; }
-    internal int ComponentRows => Matrix.Height - 2;
+    /// <summary>
+    /// 获取二维组件的逻辑行数，不含任何分隔行或线性行。
+    /// </summary>
+    internal int ComponentRows { get; }
+    /// <summary>
+    /// 获取线性组件是否使用 Stacked 两行布局。
+    /// </summary>
+    internal bool Stacked { get; }
+    /// <summary>ExpandedStacked 的数据行数，其他线性组件为零。</summary>
+    internal int ExpandedStackedRows { get; }
+    /// <summary>是否使用 EAN/UPC 的三条 2X 分隔行。</summary>
+    internal bool EanUpc { get; }
+    /// <summary>是否为具有三个内部分隔行的等高两行 DataBar。</summary>
+    internal bool StackedOmnidirectional { get; }
     /// <summary>
     /// 获取二维组件行高对应的模块数；CC-C 为三，CC-A/B 为二。
     /// </summary>
     internal int ComponentRowHeight => Mode == Gs1CompositeMode.CcC ? 3 : 2;
 
-    internal Gs1CompositeSymbol(BitMatrix matrix, Gs1CompositeMode mode)
+    /// <summary>
+    /// 初始化复合码的逻辑矩阵及行高布局。
+    /// </summary>
+    /// <param name="matrix">已保留资源预算的矩阵。</param>
+    /// <param name="mode">实际采用的二维模式，不为 Auto。</param>
+    /// <param name="componentRows">二维组件行数。</param>
+    /// <param name="stacked">是否使用 Stacked 线性布局。</param>
+    /// <param name="expandedStackedRows">ExpandedStacked 数据行数，其他组件为零。</param>
+    /// <param name="eanUpc">是否使用 EAN/UPC 分隔布局。</param>
+    /// <param name="stackedOmnidirectional">是否为 Stacked Omnidirectional。</param>
+    internal Gs1CompositeSymbol(BitMatrix matrix, Gs1CompositeMode mode, int componentRows, bool stacked, int expandedStackedRows = 0, bool eanUpc = false, bool stackedOmnidirectional = false)
     {
         Matrix = matrix;
         Mode = mode;
+        ComponentRows = componentRows;
+        Stacked = stacked;
+        ExpandedStackedRows = expandedStackedRows;
+        EanUpc = eanUpc;
+        StackedOmnidirectional = stackedOmnidirectional;
+    }
+
+    /// <summary>
+    /// 返回对应逻辑行的打印点高度；Stacked 的条高按 5:7 分配，分隔行单独计高。
+    /// </summary>
+    /// <param name="row">矩阵内从零开始的逻辑行号。</param>
+    /// <param name="element">已经通过尺寸校验的复合码元素。</param>
+    /// <returns>正整数打印点高度，上行取总条高的 5/12 向下取整。</returns>
+    internal int RowHeight(int row, PrintGs1CompositeElement element)
+    {
+        if (row < ComponentRows) return ComponentRowHeight * element.ModuleWidth;
+        if (EanUpc) return row < ComponentRows + 3 ? 2 * element.ModuleWidth : element.LinearBarHeight;
+        if (row == ComponentRows || Stacked && row == ComponentRows + 2) return element.ModuleWidth;
+        if (ExpandedStackedRows > 0 || StackedOmnidirectional)
+            return (row - ComponentRows - 1) % 4 == 0 ? element.LinearBarHeight : element.ModuleWidth;
+        if (!Stacked) return element.LinearBarHeight;
+        var upper = (int)(5L * element.LinearBarHeight / 12);
+        return row == ComponentRows + 1 ? upper : element.LinearBarHeight - upper;
     }
 }

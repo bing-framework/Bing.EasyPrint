@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using Bing.EasyPrint.Printing;
 
 namespace Bing.EasyPrint.Protocols;
 
@@ -107,10 +108,10 @@ internal static partial class Gs1CompositeEncoder
     }
 
     /// <summary>
-    /// 对规范化的 GS1 主数据选择 B/C 码集，追加 CC-C 连接标志并重新计算校验码。
+    /// 对规范化的 GS1 主数据选择 B/C 码集，追加对应二维模式的连接标志并重新计算校验码。
     /// </summary>
     /// <remarks>共享 AI 解析器已排除控制字符；ASCII 29 是字段分隔 FNC1，不是普通 Code A 字符。</remarks>
-    private static string EncodeGs1Linear(string data, CancellationToken cancellationToken)
+    private static string EncodeGs1Linear(string data, Gs1CompositeMode mode, CancellationToken cancellationToken)
     {
         var length = data.Length;
         var costB = new int[length + 1];
@@ -148,7 +149,8 @@ internal static partial class Gs1CompositeEncoder
             else if (inC) { words.Add((data[index] - '0') * 10 + data[index + 1] - '0'); index += 2; }
             else words.Add(data[index++] - 32);
         }
-        words.Add(inC ? 100 : 101); // ISO/IEC 24723 linkage flag, CC-C.
+        // ISO/IEC 24723 linkage flag depends on both the final code set and component mode.
+        words.Add(mode == Gs1CompositeMode.CcC ? (inC ? 100 : 101) : (inC ? 101 : 99));
         var checksum = words[0];
         for (var index = 1; index < words.Count; index++) checksum += words[index] * index;
         words.Add(checksum % 103);

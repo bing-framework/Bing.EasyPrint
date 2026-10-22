@@ -83,7 +83,7 @@ public sealed class Gs1CompositeExpandedTests
             "0011111" + "0010101" + "0110011";
         var method = typeof(EscPosRasterCanvas).GetMethod("EncodeGs1DataBarExpandedBinary",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        var binary = method.Invoke(null, new object[] { "10ABC\u001D21123", CancellationToken.None, true });
+        var binary = method.Invoke(null, new object[] { "10ABC\u001D21123", CancellationToken.None, true, false });
         var bits = (string)binary.GetType().GetProperty("Bits",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(binary);
         Assert.Equal(expected, bits.Substring(0, 60));

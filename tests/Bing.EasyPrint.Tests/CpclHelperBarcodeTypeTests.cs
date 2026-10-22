@@ -47,6 +47,8 @@ public sealed class CpclHelperBarcodeTypeTests
     [InlineData(BarcodeType.Gs1DataBarExpanded)]
     [InlineData(BarcodeType.Code128Auto)]
     [InlineData(BarcodeType.Gs1DataBarStacked)]
+    [InlineData(BarcodeType.Gs1DataBarExpandedStacked)]
+    [InlineData(BarcodeType.Gs1DataBarStackedOmnidirectional)]
     public void ConvertBarcodeType_rejects_valid_but_unmapped_types(BarcodeType type)
     {
         Assert.Throws<NotSupportedException>(() => Helper.ConvertBarcodeType(type));
@@ -54,7 +56,7 @@ public sealed class CpclHelperBarcodeTypeTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(31)]
+    [InlineData(33)]
     public void ConvertBarcodeType_rejects_values_outside_the_enum(int value)
     {
         var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
