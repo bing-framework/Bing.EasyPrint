@@ -122,7 +122,7 @@ export type MatrixElement = BaseElement & { Type: 10; Format: 'DataMatrix' | 'PD
 export type Gs1CompositeElement = BaseElement & {
   Type: 11
   SecondaryField: Field
-  LinearType?: 11 | 25 | 27
+  LinearType?: 11 | 25 | 27 | 28
   Mode?: 0 | 1 | 2 | 3
   ModuleWidth?: number
   LinearBarHeight?: number

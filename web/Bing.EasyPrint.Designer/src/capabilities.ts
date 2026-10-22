@@ -91,6 +91,8 @@ export type DesignerCapabilities = {
   gs1CompositeFeature?: boolean
   /** 来自独立协商响应头；旧 Host 可继续提供基础 DataBar Composite。 */
   gs1CompositeCcCFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Expanded Composite。 */
+  gs1CompositeExpandedFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -600,9 +602,11 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited'
     const ccCComposite = modes === 'Auto,CcA,CcB,CcC' &&
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128'
+    const expandedComposite = modes === 'Auto,CcA,CcB,CcC' &&
+      linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded'
     if (typeof composite !== 'object' || Array.isArray(composite) || composite.elementType !== 11 ||
       composite.dimensionsFromEncoding !== true || composite.includesHumanReadable !== false ||
-      (!legacyComposite && !ccCComposite))
+      (!legacyComposite && !ccCComposite && !expandedComposite))
       throw new Error('能力响应的 gs1Composite 无效。')
     gs1Composite = { rotations: parseRotationArray(composite.rotations, 'gs1Composite.rotations'),
       modes: composite.modes as string[], linearTypes: composite.linearTypes as string[] }
@@ -655,6 +659,7 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsExplicitQuietZone: parseBoolean(input.supportsExplicitQuietZone, 'supportsExplicitQuietZone'),
     supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
     gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
+    gs1CompositeExpandedFeature: input.gs1CompositeExpandedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedFeature, 'gs1CompositeExpandedFeature'),
     gs1Composite,
   }
   const hasEscPosCutFields = Object.prototype.hasOwnProperty.call(input, 'cutModes') &&

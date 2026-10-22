@@ -43,7 +43,7 @@ public sealed class Gs1CompositeHostTests
 
         var composite = root.GetProperty("gs1Composite");
         Assert.Equal(11, composite.GetProperty("elementType").GetInt32());
-        Assert.Equal(new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128" },
+        Assert.Equal(new[] { "Gs1DataBarOmnidirectional", "Gs1DataBarLimited", "UccEan128", "Gs1DataBarExpanded" },
             composite.GetProperty("linearTypes").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal(new[] { "Auto", "CcA", "CcB", "CcC" },
             composite.GetProperty("modes").EnumerateArray().Select(value => value.GetString()));
@@ -53,6 +53,33 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal("bracketed-gs1-ai", composite.GetProperty("secondaryFormat").GetString());
         Assert.False(composite.GetProperty("includesHumanReadable").GetBoolean());
         Assert.True(composite.GetProperty("dimensionsFromEncoding").GetBoolean());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Expanded_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":28,\"Mode\":2");
+        var data = ValidData.Replace("1234567890123", "(01)09506000134352(10)LOT-A");
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-expanded");
+        await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+        Assert.Contains("gs1-composite-expanded", preview.Response.Headers[FeaturesHeader].ToString());
+        using var json = ReadJson(preview);
+        var element = Assert.Single(json.RootElement.GetProperty("pages")[0].GetProperty("elements").EnumerateArray()
+            .Where(value => value.GetProperty("type").GetInt32() == 11));
+        Assert.True(element.GetProperty("width").GetInt32() > 0);
+        Assert.True(element.GetProperty("height").GetInt32() > 0);
+        var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-expanded");
+        await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+        Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+        using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+        Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
         Assert.Equal(0, parent.CurrentBytes);
     }
 
@@ -87,6 +114,7 @@ public sealed class Gs1CompositeHostTests
     [InlineData(11, 1)]
     [InlineData(11, 2)]
     [InlineData(25, 3)]
+    [InlineData(28, 3)]
     public async Task Invalid_cc_c_pair_returns_structured_error(int linearType, int mode)
     {
         var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1",
@@ -96,6 +124,22 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
         using var json = ReadJson(context);
         Assert.Contains("Composite", json.RootElement.GetProperty("errors")[0].GetProperty("message").GetString());
+    }
+
+    [Theory]
+    [InlineData("(01)12345678901230")]
+    [InlineData("0112345678901231")]
+    public async Task Expanded_primary_errors_keep_bound_field_path(string primary)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":28,\"Mode\":0");
+        var data = JsonSerializer.Serialize(new { Primary = primary, Secondary = "(91)123" });
+        var context = CreateContext(BuildRequest("Cpcl", "", template, data));
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var error = response.RootElement.GetProperty("errors")[0];
+        Assert.Equal("Primary", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
     }
 
     [Fact]

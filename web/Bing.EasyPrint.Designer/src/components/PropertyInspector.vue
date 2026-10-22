@@ -16,8 +16,9 @@ import {
   type CapabilitiesState, type DesignerCapabilities,
 } from '../capabilities'
 import {
-  GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE, gs1CompositeModeChoices, setGs1CompositeLinearType,
-  setGs1CompositeMode, supportsGs1CompositeCcC, type Gs1CompositeLinearType, type Gs1CompositeMode,
+  DATABAR_EXPANDED_LINEAR_TYPE, GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE, gs1CompositeModeChoices,
+  setGs1CompositeLinearType, setGs1CompositeMode, supportsGs1CompositeCcC, supportsGs1CompositeExpanded,
+  type Gs1CompositeLinearType, type Gs1CompositeMode,
 } from '../gs1Composite'
 import {
   barcodeOptions, fixedBarcodeWideWidth, isTsplVariableBarcodeType, legacyRatioForTsplBarcodeRatio,
@@ -829,7 +830,7 @@ function setCompositeSize(element: Gs1CompositeElement, key: 'ModuleWidth' | 'Li
 
 function setCompositeLinearType(element: Gs1CompositeElement, event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)
-  if (value === GS1_128_LINEAR_TYPE || value === 25 || value === 27)
+  if (value === GS1_128_LINEAR_TYPE || value === 25 || value === 27 || value === DATABAR_EXPANDED_LINEAR_TYPE)
     setGs1CompositeLinearType(element, value as Gs1CompositeLinearType, props.capabilities)
 }
 
@@ -841,6 +842,7 @@ function setCompositeMode(element: Gs1CompositeElement, event: Event) {
 
 function compositeLinearTypeDisabled(value: Gs1CompositeLinearType): boolean {
   if (value === GS1_128_LINEAR_TYPE) return !supportsGs1CompositeCcC(props.capabilities)
+  if (value === DATABAR_EXPANDED_LINEAR_TYPE) return !supportsGs1CompositeExpanded(props.capabilities)
   const name = value === 25 ? 'Gs1DataBarOmnidirectional' : 'Gs1DataBarLimited'
   const supported = props.capabilities?.gs1Composite?.linearTypes
   return supported !== undefined && !supported.includes(name)
@@ -1196,7 +1198,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
 
         <section v-if="element.Type === 11" class="inspector-section">
           <div class="section-title"><span>GS1 Composite</span></div>
-          <label class="field-label">线性组件<select aria-label="Composite 线性组件" class="field-input" :value="element.LinearType ?? 25" @change="setCompositeLinearType(element, $event)"><option :value="25" :disabled="compositeLinearTypeDisabled(25)">Omnidirectional</option><option :value="27" :disabled="compositeLinearTypeDisabled(27)">Limited</option><option :value="GS1_128_LINEAR_TYPE" :disabled="compositeLinearTypeDisabled(GS1_128_LINEAR_TYPE)">GS1-128</option></select></label>
+          <label class="field-label">线性组件<select aria-label="Composite 线性组件" class="field-input" :value="element.LinearType ?? 25" @change="setCompositeLinearType(element, $event)"><option :value="25" :disabled="compositeLinearTypeDisabled(25)">Omnidirectional</option><option :value="27" :disabled="compositeLinearTypeDisabled(27)">Limited</option><option :value="GS1_128_LINEAR_TYPE" :disabled="compositeLinearTypeDisabled(GS1_128_LINEAR_TYPE)" :title="compositeLinearTypeDisabled(GS1_128_LINEAR_TYPE) ? '当前 Host 未协商 GS1-128 + CC-C Composite' : ''">GS1-128</option><option :value="DATABAR_EXPANDED_LINEAR_TYPE" :disabled="compositeLinearTypeDisabled(DATABAR_EXPANDED_LINEAR_TYPE)" :title="compositeLinearTypeDisabled(DATABAR_EXPANDED_LINEAR_TYPE) ? '当前 Host 未协商 GS1 DataBar Expanded Composite' : ''">Expanded</option></select></label>
           <label class="field-label">二维模式<select aria-label="Composite 二维模式" class="field-input" :value="element.Mode ?? 0" @change="setCompositeMode(element, $event)"><option v-for="mode in gs1CompositeModeOptions" :key="mode.value" :value="mode.value" :disabled="mode.disabled">{{ mode.label }}</option></select></label>
           <label class="field-label">模块宽度（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 模块宽度" :value="element.ModuleWidth ?? 2" @input="setCompositeSize(element, 'ModuleWidth', $event)" /></label>
           <label class="field-label">线性条高（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 线性条高" :value="element.LinearBarHeight ?? 40" @input="setCompositeSize(element, 'LinearBarHeight', $event)" /></label>
@@ -1204,8 +1206,9 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
           <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
           <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
-          <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
+          <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE ? 'Expanded 主数据使用括号式 GS1 AI，例如 (01)09506000134352(10)LOT-A；上方默认值可按业务数据修改。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
           <p v-if="element.LinearType === GS1_128_LINEAR_TYPE && !supportsGs1CompositeCcC(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1-128 + CC-C；此组合的预览与输出不可用。</p>
+          <p v-if="element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE && !supportsGs1CompositeExpanded(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1 DataBar Expanded Composite；请更新 Host 后再预览或输出。</p>
           <p v-if="!capabilitiesReady || !elementTypeSupported(capabilities, 11)" class="field-note capability-warning">当前 Host 尚未确认 Composite 能力，请更新或连接 Host 后验证。</p>
         </section>
 

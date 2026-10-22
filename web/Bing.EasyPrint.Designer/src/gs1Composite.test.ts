@@ -4,8 +4,9 @@ import { exportTemplateBundle, importTemplateBundle } from './archive'
 import { canCreateElement, normalizeDesignerCapabilities, rotationSupported } from './capabilities'
 import { parseDesignerProject, serializeDesignerProject } from './designerProject'
 import {
-  DEFAULT_GS1_128_COMPOSITE_PRIMARY, GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE, gs1CompositeModeChoices,
-  isValidGs1CompositeCombination, setGs1CompositeLinearType, supportsGs1CompositeCcC,
+  DATABAR_EXPANDED_LINEAR_TYPE, DEFAULT_GS1_128_COMPOSITE_PRIMARY, DEFAULT_GS1_EXPANDED_COMPOSITE_PRIMARY,
+  GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE, gs1CompositeModeChoices, isValidGs1CompositeCombination,
+  setGs1CompositeLinearType, supportsGs1CompositeCcC, supportsGs1CompositeExpanded,
 } from './gs1Composite'
 import { buildLocalLayout } from './layout'
 import { assertTemplate, cloneTemplate, type BpTemplate, type Gs1CompositeElement } from './model'
@@ -15,12 +16,12 @@ afterEach(() => vi.unstubAllGlobals())
 
 function template(linearType = 27, mode = 2): BpTemplate {
   return { Version: 3, Width: 400, Height: 300, Rows: [{ Cells: [{ Elements: [{
-    Type: 11, LinearType: linearType as 11 | 25 | 27, Mode: mode as 0 | 1 | 2 | 3, ModuleWidth: 2, LinearBarHeight: 40, Rotation: 90,
+    Type: 11, LinearType: linearType as 11 | 25 | 27 | 28, Mode: mode as 0 | 1 | 2 | 3, ModuleWidth: 2, LinearBarHeight: 40, Rotation: 90,
     Field: { Name: 'Gtin' }, SecondaryField: { Name: 'Lot' }, QuietZone: { Left: 3, Top: 5, Right: 7, Bottom: 11 },
   }] }] }] }
 }
 
-function caps(ccC = false): Record<string, unknown> {
+function caps(ccC = false, expanded = false): Record<string, unknown> {
   return {
     protocol: 'Cpcl', escPosLayoutMode: null, nativeFlow: null, jobFeedUnits: [], dpi: 200,
     elementTypes: [1, 2, 11], fontKinds: [0], deviceFonts: [], textSizes: null, textSize: { minimum: 1, maximum: null },
@@ -32,15 +33,17 @@ function caps(ccC = false): Record<string, unknown> {
     supportsCut: false, supportsExtraFeed: false, supportsFilledRectangles: true,
     supportsCoordinates: true, supportsExplicitQuietZone: true, supportsGs1Composite: true,
     gs1Composite: { elementType: 11,
-      linearTypes: ccC ? ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128'] : ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited'],
-      modes: ccC ? ['Auto', 'CcA', 'CcB', 'CcC'] : ['Auto', 'CcA', 'CcB'],
+      linearTypes: expanded
+        ? ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128', 'Gs1DataBarExpanded']
+        : ccC ? ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128'] : ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited'],
+      modes: ccC || expanded ? ['Auto', 'CcA', 'CcB', 'CcC'] : ['Auto', 'CcA', 'CcB'],
       rotations: [0, 90, 180, 270], includesHumanReadable: false, dimensionsFromEncoding: true },
   }
 }
 
-function headers(composite = true, ccC = false): Record<string, string> {
+function headers(composite = true, ccC = false, expanded = false): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-EasyPrint-Contract-Version': '1',
-    'X-EasyPrint-Features': `structured-errors,strict-options,binding-diagnostics${composite ? ',gs1-composite' : ''}${ccC ? ',gs1-composite-cc-c' : ''}` }
+    'X-EasyPrint-Features': `structured-errors,strict-options,binding-diagnostics${composite ? ',gs1-composite' : ''}${ccC ? ',gs1-composite-cc-c' : ''}${expanded ? ',gs1-composite-expanded' : ''}` }
 }
 
 describe('GS1 Composite designer contract', () => {
@@ -74,11 +77,13 @@ describe('GS1 Composite designer contract', () => {
 
   it('accepts only the declared GS1 Composite linear-type and mode pairs', () => {
     for (const [linearType, mode] of [[25, 0], [25, 1], [25, 2], [27, 0], [27, 1], [27, 2],
+      [DATABAR_EXPANDED_LINEAR_TYPE, 0], [DATABAR_EXPANDED_LINEAR_TYPE, 1], [DATABAR_EXPANDED_LINEAR_TYPE, 2],
       [GS1_128_LINEAR_TYPE, 0], [GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE]] as const) {
       expect(() => assertTemplate(template(linearType, mode))).not.toThrow()
       expect(isValidGs1CompositeCombination(linearType, mode)).toBe(true)
     }
-    for (const [linearType, mode] of [[25, 3], [27, 3], [GS1_128_LINEAR_TYPE, 1], [GS1_128_LINEAR_TYPE, 2], [99, 0]] as const) {
+    for (const [linearType, mode] of [[25, 3], [27, 3], [DATABAR_EXPANDED_LINEAR_TYPE, 3],
+      [GS1_128_LINEAR_TYPE, 1], [GS1_128_LINEAR_TYPE, 2], [99, 0]] as const) {
       expect(() => assertTemplate(template(linearType, mode))).toThrow('LinearType 与 Mode 组合无效')
       expect(isValidGs1CompositeCombination(linearType, mode)).toBe(false)
     }
@@ -96,7 +101,9 @@ describe('GS1 Composite designer contract', () => {
     const result = await loadDesignerCapabilities({ protocol: 'Cpcl' })
     expect(canCreateElement(result, 'ready', 11)).toBe(true)
     expect(result.gs1CompositeCcCFeature).toBe(false)
+    expect(result.gs1CompositeExpandedFeature).toBe(false)
     expect(supportsGs1CompositeCcC(result)).toBe(false)
+    expect(supportsGs1CompositeExpanded(result)).toBe(false)
     expect(gs1CompositeModeChoices(25, result).map((mode) => mode.disabled)).toEqual([false, false, false])
     expect(gs1CompositeModeChoices(GS1_128_LINEAR_TYPE, result).map((mode) => mode.disabled)).toEqual([true, true])
     const existing = template().Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement
@@ -124,6 +131,56 @@ describe('GS1 Composite designer contract', () => {
     const composite = response.gs1Composite as Record<string, unknown>
     composite.linearTypes = ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited']
     expect(() => normalizeDesignerCapabilities(response)).toThrow('gs1Composite 无效')
+  })
+
+  it('accepts Expanded capabilities only with the complete CC-C-era shape', () => {
+    const response = caps(true, true)
+    expect(normalizeDesignerCapabilities(response).gs1Composite?.linearTypes)
+      .toEqual(['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128', 'Gs1DataBarExpanded'])
+    const incomplete = caps(true, true)
+    ;(incomplete.gs1Composite as Record<string, unknown>).linearTypes = ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'Gs1DataBarExpanded']
+    expect(() => normalizeDesignerCapabilities(incomplete)).toThrow('gs1Composite 无效')
+  })
+
+  it('enables Expanded only after its feature and capability are negotiated and supplies a bracketed primary default', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(caps(true, true)), { headers: headers(true, true, true) })))
+    const result = await loadDesignerCapabilities({ protocol: 'Cpcl' })
+    expect(supportsGs1CompositeExpanded(result)).toBe(true)
+    expect(gs1CompositeModeChoices(DATABAR_EXPANDED_LINEAR_TYPE, result).map((mode) => mode.value)).toEqual([0, 1, 2])
+    expect(gs1CompositeModeChoices(DATABAR_EXPANDED_LINEAR_TYPE, result).map((mode) => mode.disabled)).toEqual([false, false, false])
+
+    const empty = template(25, 1).Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement
+    empty.Field = { Value: '' }
+    expect(setGs1CompositeLinearType(empty, DATABAR_EXPANDED_LINEAR_TYPE, result)).toBe(true)
+    expect(empty.LinearType).toBe(DATABAR_EXPANDED_LINEAR_TYPE)
+    expect(empty.Mode).toBe(1)
+    expect(empty.Field?.Value).toBe(DEFAULT_GS1_EXPANDED_COMPOSITE_PRIMARY)
+    expect(() => assertTemplate(template(DATABAR_EXPANDED_LINEAR_TYPE, 2))).not.toThrow()
+
+    const seeded = template(25, 0).Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement
+    seeded.Field = { Value: '12345678901231' }
+    expect(setGs1CompositeLinearType(seeded, DATABAR_EXPANDED_LINEAR_TYPE, result)).toBe(true)
+    expect(seeded.Field?.Value).toBe('12345678901231')
+
+    const edited = template(25, 0).Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement
+    edited.Field = { Value: '(01)12345678901231(10)KEEP-ME' }
+    expect(setGs1CompositeLinearType(edited, DATABAR_EXPANDED_LINEAR_TYPE, result)).toBe(true)
+    expect(edited.Field?.Value).toBe('(01)12345678901231(10)KEEP-ME')
+  })
+
+  it('keeps Expanded unavailable to legacy and CC-C Hosts without the Expanded feature marker', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(caps(true)), { headers: headers(true, true) })))
+    const result = await loadDesignerCapabilities({ protocol: 'Cpcl' })
+    expect(supportsGs1CompositeCcC(result)).toBe(true)
+    expect(supportsGs1CompositeExpanded(result)).toBe(false)
+    const element = template(25, 1).Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement
+    expect(setGs1CompositeLinearType(element, DATABAR_EXPANDED_LINEAR_TYPE, result)).toBe(false)
+    expect(element.LinearType).toBe(25)
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(caps(true, true)), { headers: headers(true, true) })))
+    const capabilityOnly = await loadDesignerCapabilities({ protocol: 'Cpcl' })
+    expect(capabilityOnly.gs1Composite?.linearTypes).toContain('Gs1DataBarExpanded')
+    expect(supportsGs1CompositeExpanded(capabilityOnly)).toBe(false)
   })
 
   it('preserves Composite parameters and both bindings through a project ZIP package', async () => {
@@ -179,6 +236,24 @@ describe('GS1 Composite designer contract', () => {
       .rejects.toMatchObject({ message: '打印服务缺少 GS1-128 + CC-C Composite 功能，请更新 Host。' })
     expect((fetchMock.mock.calls[0]![1] as RequestInit).headers)
       .toMatchObject({ 'X-EasyPrint-Required-Features': expect.stringContaining('gs1-composite-cc-c') })
+  })
+
+  it.each(['preview', 'render'] as const)('requires the Expanded feature for Composite %s', async (operation) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), { headers: headers(true, true) }))
+    vi.stubGlobal('fetch', fetchMock)
+    const request = operation === 'preview' ? previewTemplate : renderTemplate
+    await expect(request(template(DATABAR_EXPANDED_LINEAR_TYPE, 0), {}, []))
+      .rejects.toMatchObject({ message: '打印服务缺少 GS1 DataBar Expanded Composite 功能，请更新 Host。' })
+    expect((fetchMock.mock.calls[0]![1] as RequestInit).headers)
+      .toMatchObject({ 'X-EasyPrint-Required-Features': expect.stringContaining('gs1-composite-expanded') })
+  })
+
+  it('rejects Expanded with CC-C before sending a request', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(previewTemplate(template(DATABAR_EXPANDED_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE), {}, []))
+      .rejects.toMatchObject({ diagnostics: [expect.objectContaining({ code: 'InvalidGs1CompositeMode' })] })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('rejects invalid GS1-128 mode combinations before preview or render requests', async () => {
