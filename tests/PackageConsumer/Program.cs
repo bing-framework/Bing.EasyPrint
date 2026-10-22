@@ -121,8 +121,8 @@ internal static class Program
         RequireAscii(tsplBytes, "PRINT 1,1\r\n", "TSPL PRINT 字节片段");
 
         var zpl = (ZplPrintCommand)ProtocolCommandFactory.Create(PrintProtocol.Zpl, Encoding.ASCII);
-        var zplBytes = zpl.Start().Label(60, 40).Text(1, 2, TemplateText).Print().End().Build().GetBytes();
-        var expectedZpl = "^XA\r\n^PW60\r\n^LL40\r\n" +
+        var zplBytes = zpl.Start().Label(320, 40).Text(1, 2, TemplateText).Print().End().Build().GetBytes();
+        var expectedZpl = "^XA\r\n^PW320\r\n^LL40\r\n" +
             "^FO1,2^A0N,30,30^FDASCII-PACK^FS\r\n^PQ1\r\n^XZ\r\n";
         Require(zpl.Protocol == PrintProtocol.Zpl, "ZPL 工厂协议标识");
         RequireAsciiEqual(expectedZpl, zplBytes, "ZPL 工厂真实字节");
@@ -487,7 +487,7 @@ internal static class Program
         var command = (ZplPrintCommand)ProtocolCommandFactory.Create(
             PrintProtocol.Zpl, Encoding.ASCII, zplOptions: media);
         command.Start()
-            .Label(60, 40)
+            .Label(320, 40)
             .Text(1, 2, "DELAYED")
             .PrintWithCut(new PrintCutOptions { Mode = PrintCutMode.Full })
             .End();
@@ -503,7 +503,7 @@ internal static class Program
         Require(first.Segments[0].Kind == PrintOutputSegmentKind.Commands &&
                 first.Segments[1].Kind == PrintOutputSegmentKind.Control,
             "ZPL Delayed 输出段顺序");
-        RequireAsciiEqual("^XA\r\n^PW60\r\n^LL40\r\n" +
+        RequireAsciiEqual("^XA\r\n^PW320\r\n^LL40\r\n" +
             "^FO1,2^A0N,30,30^FDDELAYED^FS\r\n" +
             "^MMD\r\n^PQ1\r\n^XZ\r\n", first.Segments[0].Data,
             "ZPL Delayed 命令段");
