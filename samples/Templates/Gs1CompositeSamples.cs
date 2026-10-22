@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Bing.EasyPrint;
 using Bing.EasyPrint.Elements;
 using Bing.EasyPrint.Model;
@@ -12,12 +12,32 @@ internal static class Gs1CompositeSamples
     {
         WriteVariant(output, loader, renderer, BarcodeType.UccEan128, Gs1CompositeMode.CcC,
             "(01)12345678901231", "cc-c");
+        WriteVariant(output, loader, renderer, BarcodeType.UccEan128, Gs1CompositeMode.CcA,
+            "(01)12345678901231", "gs1-128-cc-a");
+        WriteVariant(output, loader, renderer, BarcodeType.UccEan128, Gs1CompositeMode.CcB,
+            "(01)12345678901231", "gs1-128-cc-b");
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.Auto,
             "(01)09506000134352(10)LOT-A", "expanded");
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.Auto,
+            "(01)09506000134352(10)LOT-A", "expanded-stacked");
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.Auto,
+            "(01)12345678901231", "stacked");
+        WriteVariant(output, loader, renderer, BarcodeType.Ean8, Gs1CompositeMode.Auto,
+            "12345670", "ean8");
+        WriteVariant(output, loader, renderer, BarcodeType.Ean13, Gs1CompositeMode.Auto,
+            "1234567890128", "ean13");
+        WriteVariant(output, loader, renderer, BarcodeType.UpcA, Gs1CompositeMode.CcB,
+            "012345678905", "upca");
+        WriteVariant(output, loader, renderer, BarcodeType.UpcE, Gs1CompositeMode.Auto,
+            "01234565", "upce");
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarTruncated, Gs1CompositeMode.Auto,
+            "(01)12345678901231", "truncated");
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarStackedOmnidirectional, Gs1CompositeMode.Auto,
+            "(01)12345678901231", "stacked-omnidirectional", 68);
     }
 
     private static void WriteVariant(string output, TemplateLoader loader, TemplateRenderer renderer,
-        BarcodeType linearType, Gs1CompositeMode mode, string primary, string name)
+        BarcodeType linearType, Gs1CompositeMode mode, string primary, string name, int linearHeight = 40)
     {
         var template = new BpTemplate
         {
@@ -28,7 +48,7 @@ internal static class Gs1CompositeSamples
                 {
                     LinearType = linearType, Mode = mode,
                     Field = new BgField { Name = "Primary" }, SecondaryField = new BgField { Name = "Secondary" },
-                    ModuleWidth = 2, LinearBarHeight = 40
+                    ModuleWidth = 2, LinearBarHeight = linearHeight
                 } }
             } } } }
         };

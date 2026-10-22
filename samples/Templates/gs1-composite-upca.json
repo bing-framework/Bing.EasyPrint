@@ -1,0 +1,18 @@
+{
+  "Version": 3,
+  "Width": 600,
+  "Height": 300,
+  "Rows": [{
+    "Cells": [{
+      "Elements": [{
+        "Type": 11,
+        "LinearType": 6,
+        "Mode": 2,
+        "Field": { "Name": "Primary" },
+        "SecondaryField": { "Name": "Secondary" },
+        "ModuleWidth": 2,
+        "LinearBarHeight": 40
+      }]
+    }]
+  }]
+}

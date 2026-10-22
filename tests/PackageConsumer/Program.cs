@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -41,7 +41,12 @@ internal static class Program
             VerifyZplDelayedOutput();
             VerifyImageRotationOutputs();
             VerifyCcCOutputs();
+            VerifyGs1128AbOutputs();
             VerifyExpandedOutputs();
+            VerifyExpandedStackedOutputs();
+            VerifyEanUpcCompositeOutputs();
+            VerifyDataBarCompletionOutputs();
+            VerifyStackedOutputs();
 
             Console.WriteLine("Package consumer verification PASS");
             return 0;
@@ -71,6 +76,43 @@ internal static class Program
         }
     }
 
+    private static void VerifyGs1128AbOutputs()
+    {
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            byte[] previous = null;
+            foreach (var mode in new[] { Gs1CompositeMode.CcA, Gs1CompositeMode.CcB, Gs1CompositeMode.CcC })
+            {
+                var document = new PrintDocument();
+                document.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.UccEan128,
+                    "(01)12345678901231", "(10)LOT123", 40, mode: mode));
+                var output = Single(provider.Render(document), "GS1-128 " + mode);
+                Require(output.Length > 0, $"GS1-128 {mode} 输出: {protocol}");
+                Require(previous == null || !previous.SequenceEqual(output), $"GS1-128 {mode} 不得被静默改成其他模式: {protocol}");
+                RequireBytesEqual(output, Single(provider.Render(document), "GS1-128 重用"), $"GS1-128 {mode} 重用字节: {protocol}");
+                previous = output;
+            }
+        }
+    }
+
+    private static void VerifyStackedOutputs()
+    {
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarStacked,
+                "(01)12345678901231", "(10)LOT123", 40, mode: Gs1CompositeMode.CcA));
+            var auto = new PrintDocument();
+            auto.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarStacked,
+                "(01)12345678901231", "(10)LOT123", 40));
+            var output = Single(provider.Render(explicitMode), "Stacked");
+            Require(output.Length > 0, $"Stacked 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(auto), "Stacked Auto"), $"Stacked Auto 字节: {protocol}");
+        }
+    }
+
     private static void VerifyExpandedOutputs()
     {
         foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
@@ -85,6 +127,74 @@ internal static class Program
             var output = Single(provider.Render(explicitMode), "Expanded");
             Require(output.Length > 0, $"Expanded 输出: {protocol}");
             RequireBytesEqual(output, Single(provider.Render(auto), "Expanded Auto"), $"Expanded Auto 字节: {protocol}");
+        }
+    }
+
+    private static void VerifyExpandedStackedOutputs()
+    {
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked,
+                "(01)09506000134352(10)LOT-A", "(10)LOT123", 40, mode: Gs1CompositeMode.CcA));
+            var auto = new PrintDocument();
+            auto.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked,
+                "(01)09506000134352(10)LOT-A", "(10)LOT123", 40));
+            var output = Single(provider.Render(explicitMode), "ExpandedStacked");
+            Require(output.Length > 0, $"ExpandedStacked 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(auto), "ExpandedStacked Auto"), $"ExpandedStacked Auto 字节: {protocol}");
+        }
+    }
+
+    private static void VerifyEanUpcCompositeOutputs()
+    {
+        foreach (var pair in new[] { (BarcodeType.Ean8, "12345670"), (BarcodeType.Ean13, "1234567890128"),
+            (BarcodeType.UpcA, "012345678905"), (BarcodeType.UpcE, "01234565") })
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var auto = new PrintDocument();
+            auto.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2, "(91)123456", 40));
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+                "(91)123456", 40, mode: Gs1CompositeMode.CcA));
+            var output = Single(provider.Render(auto), "EAN/UPC Auto");
+            Require(output.Length > 0, $"{pair.Item1} Composite 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(explicitMode), "EAN/UPC CC-A"), $"{pair.Item1} Auto 字节: {protocol}");
+            var ccB = new PrintDocument();
+            ccB.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+                "(91)123456", 40, mode: Gs1CompositeMode.CcB));
+            Require(Single(provider.Render(ccB), "EAN/UPC CC-B").Length > 0, $"{pair.Item1} CC-B 输出: {protocol}");
+        }
+    }
+
+    private static void VerifyDataBarCompletionOutputs()
+    {
+        var ordinaryProvider = PrintProtocolProviderFactory.Create(PrintProtocol.EscPos, Encoding.ASCII, EscPosLayoutMode.Raster);
+        Require(ordinaryProvider.Capabilities.SupportsBarcodeType(BarcodeType.Gs1DataBarStackedOmnidirectional), "Stacked Omnidirectional Raster 能力");
+        var ordinary = new PrintDocument();
+        ordinary.AddPage(100, 142).Add(new PrintBarcodeElement(0, 0,
+            BarcodeType.Gs1DataBarStackedOmnidirectional, "1234567890123", 68, 2, humanReadable: false));
+        Require(Single(ordinaryProvider.Render(ordinary), "Stacked Omnidirectional").Length > 0, "普通32包消费输出");
+
+        foreach (var pair in new[] { (BarcodeType.Gs1DataBarTruncated, "12345678901231"),
+            (BarcodeType.Gs1DataBarStackedOmnidirectional, "12345678901231") })
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var auto = new PrintDocument();
+            auto.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2, "(91)123456", 68));
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+                "(91)123456", 68, mode: Gs1CompositeMode.CcA));
+            var output = Single(provider.Render(auto), "DataBar Auto");
+            Require(output.Length > 0, $"{pair.Item1} Composite 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(explicitMode), "DataBar CC-A"), $"{pair.Item1} Auto 字节: {protocol}");
+            var ccB = new PrintDocument();
+            ccB.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+                "(91)123456", 68, mode: Gs1CompositeMode.CcB));
+            Require(Single(provider.Render(ccB), "DataBar CC-B").Length > 0, $"{pair.Item1} CC-B 输出: {protocol}");
         }
     }
 
