@@ -2,6 +2,50 @@
 
 > 历史验证记录：本文件按迭代轮次保存当时的测试证据、阻塞和设备边界，不代表当前工作区自动通过。当前功能入口见[文档索引](README.md)，发布前验证方式见[开发与验证](development.md)。
 
+## G6 候选证据与完成记录归并（2026-10-15）
+
+候选为 `1f590cb92317f928ab689dc65c0e6ca85d22cf56`，分支 `feat/print-template-designer`。本节接收两份计划的验证与完成索引；源码/测试逐项断言见[核对报告](plan-audit-2026-10-15.md)，剩余验收只在[打印计划](../ai_docs/plans/multi-protocol-todo-progress.md)和[注释计划](../ai_docs/plans/chinese-comments-plan.md)维护。
+
+### 原能力编号的维护位置
+
+每个原条目指定一个主维护位置，跨功能关联以核对报告为准。共 51 条：50 条限定范围代码实现确认，T8 部分完成；L10 和 R154-11 的代码确认不关闭浏览器验收。该索引用于追溯已迁出记录，不作为新待办清单。
+
+| 大功能 | 原条目编号 | 主维护位置 |
+| --- | --- | --- |
+| G1 | T1、T5、T7、S2、S3、S7、L3、R141–R143、R144、R145、R146、R147、R148、R149、R153-2、R153-4、R154-7 | [协议文档 G1](protocols.md) |
+| G2 | T2、T3、T4、T6、S1、S4、L1、L2、L4、L5、L9、R153-1、R153-3、R154-5、R154-6、R154-8、R154-9 | [协议文档 G2](protocols.md) |
+| G3 | L6、L7、L8、R152、R154-1、R154-2、R154-3、R154-4 | [协议文档 G3](protocols.md) |
+| G4 | S5、S6、R150 | [开发文档 G4](development.md) |
+| G5 | S8、L10、R151、R154-10、R154-11 | [开发文档 G5](development.md) |
+| G6 | T8 | 本节及[注释治理](development.md#中文-xml-注释治理) |
+
+### 本会话实际执行且适用的验证
+
+以下命令在先前分组提交阶段已实际执行。核对及本次文档清理未改动源码、测试、工具或前端，复用相同候选范围证据，不把文档整理记作重跑测试。
+
+| 验证命令 | 实际结果 | 适用范围 |
+| --- | --- | --- |
+| `dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --no-restore --filter FullyQualifiedName~Gs1Composite --verbosity minimal` | 102/102，0 跳过 | Composite 编码、Provider、模板 |
+| `dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --no-restore --verbosity minimal` | 3360/3360，0 跳过 | Core/Templates 的 .NET 6 自动测试 |
+| `dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj --no-restore -p:EnableDefaultContentItems=false --verbosity minimal` | 135/135，0 跳过 | .NET 8 Host 请求、能力、预览、输出等测试；沿用避开 artifacts 内容复制的命令行属性 |
+| `npm test`，工作目录 `web/Bing.EasyPrint.Designer` | 20 文件、267/267 | 前端单元测试；不包含浏览器 E2E |
+| `npm run build`，同上 | vue-tsc 与 Vite 成功；主包超过 500 kB 提示 | 类型检查、前端生产构建 |
+| `dotnet build src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj --no-restore --verbosity minimal` | Core/Templates 的 net7.0、net6.0、netcoreapp3.1、netstandard2.0、netstandard2.1 均成功，0 警告、0 错误 | 普通构建；未开启计划要求的严格注释验收 |
+
+T8 的固定字体、golden-byte、跨 Provider 比对和独立向量可复用；[运行时验证脚本](../tools/Verify-ProtocolRuntimes.ps1)与[包消费者脚本](../tools/Verify-PackageConsumer.ps1)是验证入口，不等于当前矩阵已经执行。标准安装目录缺 .NET 7；未执行本候选完整运行时矩阵、隔离包消费者重建、跨平台 CI、正式性能门禁、浏览器 E2E 或设备打印/扫描。旧 R87 五运行时各 2705/2705 和六消费者结果只证明当时源码，不关闭 T8/U18。
+
+### 从计划迁入的 R154 历史记录（2026-10-13）
+
+原计划记录当时 Composite 定向 net6.0 102/102，相关静区/反白组合精准回归 186/186，旧 DataBar 定向兼容通过；Core/Templates 完整 net6.0 和 netcoreapp3.1 均 3360/3360；五 TFM 构建 0 警告/错误；Host net8.0 Composite 定向 13/13、完整 135/135；前端完整 267/267、类型检查和构建成功，主块超过 500 kB 提示保留。其 netcoreapp3.1、186 项和 13 项等数据为迁入的历史记录，不冒充本会话重跑结果。
+
+该轮没有执行浏览器 E2E 或真实设备验收，也未建立新依赖、workflow、运行时 matrix 或性能基线。Host 测试命令沿用 `EnableDefaultContentItems=false` 避开已有生成物递归复制。历史临时 Host obj 目录可由构建重建，不作为证据源文件维护。修复仅由明确问题触发：Type=11 静区 JSON 校验和反白空格黑底静区漏判；设备缺失、环境与未批准阈值不触发自动反复 Fix。
+
+### 注释证据与设备验收
+
+中文 XML 的扫描排除规则、继承/契约规范、严格十次构建命令及旧 88 文件/858 声明审计数字统一见[开发文档](development.md#中文-xml-注释治理)。旧实施未保存初始 token 快照，严格前后 token 等价仍未独立验证；普通构建不能关闭注释验收。
+
+设备验收须记录型号、固件、实际协议、代码页、DPI、纸宽、字距、打印与扫描结果、进纸/切刀以及字体/HRI 墨迹误差，按[协议实机清单](protocols.md#实机验收)执行。校准 API、人工参数测试、模块矩阵和预览尺寸均不能替代该证据。
+
 ## R139 验证补充：TSPL/ZPL 文本单元字体度量
 
 逐字体校准现在可按 `StringInfo` 文本单元覆盖 24 点下的 advance，并可选提供相对命令原点的墨迹四边。该配置参与 TSPL/ZPL 换行、分页、Fit、旋转布局和边界预检；DesignerHost 的严格 JSON DTO 接受 `textElements` 并把值映射到同一模板渲染选项。配置只承载调用方实测数据，本轮没有目标机型测量值。

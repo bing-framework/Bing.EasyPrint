@@ -2,7 +2,7 @@
 
 > 文档定位：本文件是模板版本、元素和兼容规则的详细参考。快速接入请先阅读[模板渲染指南](templates-guide.md)；当前模块关系见[架构与模块](architecture.md)。带 `Rxx` 的段落保留历史实现脉络。
 
-> 当前范围：模板条码会通过共享 GS1 解析器使用协议文档 R152 已声明的 AI `253`、`254`、`255` 规则；四协议 `WriteRestrictedRaw` 属于直接命令层，不是模板 JSON 能力。协议新增轮次未必需要修改模板格式，因此本文件的最高 `Rxx` 不表示整个项目的最新轮次。
+> 当前范围：模板条码会通过共享 GS1 解析器使用协议文档 R152 已声明的 AI `253`、`254`、`255` 规则；GS1 Composite 是 Type 11 的 V2/V3 模板元素，当前能力和输入限制见[GS1 Composite](#gs1-composite)。四协议 `WriteRestrictedRaw` 属于直接命令层，不是模板 JSON 能力。带日期的 `Rxx` 段落保留当时行为，不表示当前能力矩阵；本文件最高 `Rxx` 也不表示整个项目的最新轮次。
 
 ### R140：ESC/POS Raster GS1 DataBar Stacked
 
@@ -578,6 +578,12 @@ ESC/POS Raster 显式开启条码可读文字时必须声明正的 `HumanReadabl
 
 `LoadJsonWithPaths` 对非法静区返回带完整元素或四边字段路径的 `TemplateRenderException`，Host 将其保留为 `sourcePath`；此时尚未分页，页面和输出元素索引为 null。普通 `LoadJson` 保持原有 `JsonSerializationException` 契约。
 
+## GS1 Composite
+
+`BpGs1CompositeElement` 使用 `Type: 11`，仅用于 V2/V3；V1 模板必须先升级。继承的 `Field` 提供主数据，必需的 `SecondaryField` 提供次数据。线性部分仅支持 `Gs1DataBarOmnidirectional` 和 `Gs1DataBarLimited`；模式为 `Auto`、`CcA` 或 `CcB`，`ModuleWidth` 与 `LinearBarHeight` 均为正的打印点数。主数据接受 GTIN-13 数据、GTIN-14 或 AI `(01)` 的 GTIN-14；次数据采用当前支持的括号式 GS1 AI 子集，不是完整 GS1 AI 字典。
+
+复合符号不可拆分。预览与布局按真实编码结果计算宽高，旋转、四边静区、单元格占位和整页边界共同作用；发生编码或空间错误时不会返回部分页，并尽可能保留元素路径。能力受目标 Provider 限制，ESC/POS Native 不支持；设计器还要求 Host 协商 `gs1-composite` 特性并返回支持能力。浏览器验收见 [`reviewFixes.spec.ts`](../web/Bing.EasyPrint.Designer/e2e/reviewFixes.spec.ts)：真实 Host 的创建、属性编辑、预览尺寸、CPCL CG 二进制导出、项目保存/重载及模拟旧 Host 缺少特性时禁用入口的断言已通过；完整 Chromium E2E 为 154/154 通过。画布显示布局占位，不绘制可扫描的编码位图，详细结果见[本轮修复验收报告](review-fixes-2026-10-22.md)。
+
 ## 资源与失败语义
 
 | 选项 | 默认值 |
@@ -593,6 +599,8 @@ ESC/POS Raster 显式开启条码可读文字时必须声明正的 `HumanReadabl
 | MaxPageHeight | 4096 点 |
 
 这些值可由应用调整。字段、图片打印数据及缓存也按输出预算进行提前检查；页数和最终字节数在生成时检查。限额是拒绝边界，不是吞吐或峰值内存保证。渲染器在遍历、分页和资源流读取之间检查取消；同步解码和应用 getter 无法在执行中强制中断。
+
+CPCL 与模板图片入口会在 `Image.Identify` 前检查 TIFF 头及 IFD 目录链的边界，包含 Classic TIFF/BigTIFF 的字节序、目录偏移、条目长度和链路前进性；检测到截断、越界、循环或异常目录时按现有图片输入错误处理。模板错误会在可知时保留 `ResourceName`。这项预检仅覆盖 TIFF 结构，不会通用中断第三方同步解码；其他格式及合法 TIFF 的实际解析仍受 ImageSharp 行为、现有字节/像素限制和工作资源预算约束。
 
 `MaxWorkingBytes` 是可选的显式资源估计预算，与 `MaxOutputBytes` 分别检查。它覆盖已接入的编码缓存、解码/缩放 RGBA 图、单色画布、回滚副本、命令缓冲及输出复制；扩容期间旧、新缓冲同时计入。超限抛出 `PrintResourceLimitException`，提供资源名称、本次请求字节、已预留字节及限制。未设置该值时仍可通过外层 `PrintResourceScope` 限制渲染；已有单图、页数和输出限制继续生效。
 

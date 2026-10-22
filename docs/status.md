@@ -16,11 +16,13 @@
 
 处理方向：取得目标机型协议手册和抓包样本后新增独立协议、能力与 golden-byte 测试，不能将 ESC/POS 结果直接视为兼容。
 
-### CPCL 旧 Helper 的未映射条码
+## 已接受边界
 
-`src/Bing.EasyPrint/CPCL/Helper.cs` 对未映射的 `BarcodeType` 仍抛出 `NotImplementedException`。结构化 Provider 和协议命令已有更完整的按协议能力校验，但旧转换帮助方法并未覆盖所有枚举值。
+### CPCL 旧 Helper 的条码映射范围
 
-处理方向：明确旧 API 的支持集合；可映射类型补充转换和测试，不可映射类型改为一致的能力/参数异常。
+`src/Bing.EasyPrint/CPCL/Helper.cs` 对已定义但尚未映射的 `BarcodeType` 抛出 `NotSupportedException`；非法枚举值抛出 `ArgumentOutOfRangeException`。结构化 Provider 和协议命令已有更完整的按协议能力校验，但旧转换帮助方法并未覆盖所有枚举值。
+
+这是旧 API 的受控支持边界，不属于待修复异常语义。若要支持新的条码制式，应单独扩展映射并补充对应转换测试。
 
 ## 待确认
 
@@ -38,7 +40,7 @@ Profile 会收窄能力并参与预检，但库不会自动发现设备，也不
 
 ### 当前分支的完整回归状态
 
-`multi-protocol-verification.md` 保存的是分轮证据，其中部分轮次记录了环境或 Host 测试失败。它不能证明当前工作区全部通过；本次仅整理文档，没有重新执行完整 Core、Host 和浏览器 E2E。
+截至 2026-10-22，本轮自动化验收已完成。Core 的 `net6.0` 与 `netcoreapp3.1` 完整测试各为 3397/3397 通过；Core 与 Templates 的严格 XML 门禁为 10/10 通过。Host 的 140 项测试、五模式能力加载、旧 Host Composite 降级及 Composite Host 预览/导出/项目往返断言已通过。前端生产构建与 Vitest 277 项通过；新增五模式能力及 Composite 定向 E2E 为 3/3 通过；ZPL、Code39 与复选框案例在完整回归中通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`。命令和结果见[本轮修复验收报告](review-fixes-2026-10-22.md)。旧分轮证据见 `multi-protocol-verification.md`，不替代本轮结果。
 
 处理方向：发布前按[开发与验证](development.md)重新运行当前分支门禁，并单独记录网络、SDK、浏览器或设备造成的阻塞。
 

@@ -20,6 +20,8 @@ npm run dev
 
 开发代理和端口以 `vite.config.ts` 为准。Playwright 配置会同时启动 Host 与 Vite。
 
+首次执行浏览器验收时，在设计器目录执行 `npm ci` 后运行 `npx playwright install chromium` 安装 Chromium 浏览器。完整验证命令见[开发与验证](development.md)。
+
 ## HTTP 接口
 
 | 方法 | 路径 | 用途 |
@@ -31,6 +33,10 @@ npm run dev
 | POST | `/api/designer/render` | 返回实际协议输出 |
 
 Host 通过 `X-EasyPrint-Contract-Version`、`X-EasyPrint-Features` 和 `X-EasyPrint-Required-Features` 协商契约。错误响应使用稳定的 HTTP 状态、`code`、`phase`、可选 `fieldPath` 和资源诊断。
+
+能力响应中的 `supportedNativeBarcodeHumanReadablePositions` 只描述 ESC/POS Native 的设备可读文字位置。字段可缺省或为 `null`；提供数组时（包括空数组）只允许出现在 ESC/POS Native 能力中，数组成员仍须是已知位置且不能重复。Host 的现有响应结构不变；设计器兼容字段缺省和 `null`，其他协议不得携带该数组。
+
+GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。新增入口要求能力响应声明 `gs1-composite` 特性且确认能力；缺少该特性的旧 Host 响应会使工具禁用并显示原因。真实 Host 浏览器用例已覆盖创建、编辑、编码预览尺寸、CPCL CG 二进制导出和项目保存重载；完整 Chromium E2E 为 154/154 通过。画布显示选择/布局占位，不绘制可扫描的编码位图；命令及结果见[开发与验证](development.md)和[本轮修复验收报告](review-fixes-2026-10-22.md)。
 
 ## 关键文件
 
@@ -63,4 +69,5 @@ HTTP 请求体上限由 `DesignerRequestProcessor.MaxRequestBytes` 固定为 44 
 - 预览坐标不能替代真实设备的字体、DPI、走纸和切刀校准。
 - 导出的页面或输出段需要调用方按顺序发送；设计器不提供打印队列。
 - Host 使用严格 DTO，未知固定字段会被拒绝；业务 `data` 和资源键保持开放。
+- Host 项目在 Web SDK 默认内容 glob 中排除项目内 `artifacts/**` 与 `output/**`；样例模板仍通过四个显式内容项复制到输出目录。
 - 更完整的界面与模板包行为见[设计器详细说明](designer.md)。

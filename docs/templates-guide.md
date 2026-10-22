@@ -2,7 +2,7 @@
 
 ## 功能说明
 
-`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出。
+`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。
 
 ## 基本用法
 
@@ -48,7 +48,11 @@ foreach (var page in result.Pages)
 
 图片通过 `ITemplateResourceProvider` 按资源键读取。渲染器不根据模板内容读取任意文件或 URL。设计器模板包把资源放入 ZIP 并经过路径、数量和大小校验。
 
+CPCL 与模板图片入口在 `Image.Identify` 前预检 TIFF 目录结构；截断、越界或循环目录进入图片输入错误路径，模板诊断在资源键可知时保留 `ResourceName`。预检不保证可中断任意同步解码；单图字节数、像素数和工作资源上限仍然生效。GIF/TIFF 等多帧资源仍只处理首帧。
+
 字段绑定支持常量值和对象路径；重复区从集合来源生成实例。绑定和资源异常会携带模板路径，Host 还会将其转换为结构化诊断。
+
+Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`；仅接受 GS1 DataBar Omnidirectional 或 Limited 线性部分、Auto/CC-A/CC-B 模式及正的模块宽度和条高。整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 缺少 `gs1-composite` 协商特性时，设计器禁用新增入口。
 
 ## 配置
 
@@ -63,6 +67,8 @@ foreach (var page in result.Pages)
 编辑器可先调用 `TemplateProtocolCapabilities.Create(options)` 获取当前协议、布局和 Profile 的能力快照。该快照用于约束 UI 和静态校验，最终内容仍以实际渲染预检为准。
 
 结构化 GS1 条码由 `Gs1ApplicationIdentifierParser` 统一解析括号 AI 和 FNC1 边界，当前包含 AI `253`、`254`、`255` 及 Scan4Transport 等已声明子集。模板条码与协议 Provider 共用这些规则；这不是完整 GS1 AI 字典，业务关系仍应由业务层校验。
+
+自定义 `IPrintProtocolProvider` 可用于直接渲染统一 `PrintDocument`，但 `TemplateRenderer` 当前固定创建内置 Provider，不能通过 `TemplateRenderOptions` 注入自定义 Provider 或工厂。自定义 Provider 的任务收尾和部分切纸编码也不自动获得内置实现；新增协议要接入模板/Host，需扩展其明确的 Provider 分发与收尾路径。
 
 ## 价签与示例
 
@@ -80,5 +86,6 @@ dotnet run --project samples/Templates -- artifacts/template-samples
 - 默认输出 CPCL；跨协议模板必须按目标协议能力设计，不能假设同一模板在四协议中具有完全相同的物理结果。
 - TSPL/ZPL 设备字体的真实字宽、墨迹和 HRI 需要 Profile 或校准数据；严格模式会拒绝未声明边界。
 - ESC/POS Native 适合顺序小票；坐标图形、图片、旋转和复杂布局应使用 Raster。
+- ZPL 的整页 `ZplMediaOptions.Orientation` 只接受默认、`None` 或 `Down`；`Left`/`Right` 配置会在预检阶段明确拒绝。
 - 详细元素和兼容规则见[模板详细说明](templates.md)。
 - 输入、图片、输出与工作内存限制见[资源限制与错误处理](resource-limits.md)。

@@ -66,6 +66,10 @@ byte[] firstPage = pages[0];
 
 能力查询使用 `PrintCapabilities`。统一模型与直接命令的能力并不完全相同，例如 ESC/POS Raster 可由主机绘制码图，但不等于设备支持原生 `GS k`。
 
+`PrintGs1CompositeElement` 将 GS1 线性码与 CC-A/CC-B 次码作为一个不可拆分符号处理，尺寸由编码结果确定。只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
+
+应用可以直接向统一模型提供自定义 `IPrintProtocolProvider`；静态 `PrintProtocolProviderFactory` 只创建内置四协议 Provider。`TemplateRenderer` 目前固定使用该内置工厂，`TemplateRenderOptions` 没有 Provider/工厂注入点。自定义 Provider 也不能直接复用内置任务收尾与部分切纸编码；请求这些功能时会按不支持处理。实现接口本身不会自动把新协议接入模板或 Host。
+
 ## 打印任务与输出段
 
 `PrintJobOptions` 描述整份文档的份数、Collated/Uncollated 顺序、进纸单位和执行范围、裁切范围及显式裁切参数。`PrintJobRenderer` 输出带源页、份数和收尾标志的结果。页面级份数/进纸/裁切不能与任务策略叠加。
@@ -84,6 +88,7 @@ byte[] firstPage = pages[0];
 - 默认严格拒绝无法表达的样式、旋转、条码、切纸和介质操作；不要把 `Capabilities` 当作真实固件证明。
 - ESC/POS Native 不能表达通用绝对坐标；需要线框、任意坐标或主机字体时使用 Raster。
 - Raster 输出会增加字节量和主机计算成本，并受图片块、总输出及工作内存预算限制。
+- CPCL 图片识别前会检查 TIFF 头和目录链边界；异常 TIFF 结构进入既有图片输入错误路径。该检查只预检 TIFF 目录结构，不能中断 ImageSharp 对任意合法或其他格式图片的同步解码；图片字节、像素和工作资源限制仍须配合使用。
 - Core、模板和 Host 的预算并不等价，配置方式见[资源限制与错误处理](resource-limits.md)。
 - Raw 可信入口可以绕过结构化校验，只适合已审查的固定指令。
 - 项目不发送字节到设备，也不读取打印状态。

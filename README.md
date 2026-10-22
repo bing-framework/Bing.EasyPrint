@@ -13,6 +13,7 @@ Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打�
 - [模板渲染指南](docs/templates-guide.md)
 - [设计器与 Host](docs/designer-host.md)
 - [开发与验证](docs/development.md)
+- [2026-10-22 工程修复与验收](docs/review-fixes-2026-10-22.md)
 - [待实现与待确认](docs/status.md)
 
 ## 目标框架

@@ -2,6 +2,42 @@
 
 > 文档定位：本文件保存协议能力、设备 Profile 和各轮兼容细节。首次接入请先阅读[核心打印与协议](core-printing.md)；未完成和设备验收项见[待实现与待确认](status.md)。带 `Rxx` 的段落是对应迭代的记录，不等同于当前分支验证结论。
 
+## 已实现能力：协议、布局与编码
+
+本节从任务计划迁入可复用契约，按大功能维护，不再逐轮复制完成任务。逐项源码/测试依据与原条目编号见[计划核对报告](plan-audit-2026-10-15.md)；实际执行结果见[候选验证记录](multi-protocol-verification.md)。代码能力与真实设备验收分别判断，未完成要求继续由[多协议计划](../ai_docs/plans/multi-protocol-todo-progress.md)跟踪。
+
+### G1 多协议输出与设备契约
+
+- **统一能力准入**：CPCL、ESC/POS、TSPL、ZPL 共用 Provider 和细粒度能力查询。ESC/POS Profile 贯通命令、模板、Host、设计器及保存；CPCL/Profile 明确横纵 DPI，模板、Provider 与 direct 命令保持对等。协议未支持的条码、HRI、图片、文字样式和 QR 参数组合在预检或命令入口拒绝，不从通用 Profile 推断具体机型兼容。
+- **任务与设备收尾**：标签 Profile 显式声明切刀能力；Job 按页/份/任务组织份数、进纸与裁切，展开前检查页数和输出预算。ZPL 延迟切刀、Kiosk 与独立控制段保留分段/顺序契约，不能把多文件输出任意拼接为旧 Build 单段输出。
+- **Native 与 Raster**：Native 混合收据维护顺序游标和占位，可通过模板使用；不承诺任意坐标位图或 Composite。CPCL 统一条码仅支持 0/270 度，90/180 度拒绝；TSPL 把旋转占位左上角换算为设备锚点，ZPL 映射原生方向，旧 CPCL/TSPL 入口保留原角度与字节语义。
+- **受限 Raw 状态事务**：四协议白名单共用几何状态与拒绝原子性；TSPL BITMAP 使用二进制载荷，ASCII HEX 经结构化入口转换；ZPL 校验格式闭合、切刀/Kiosk 配对和分段；ESC/POS 校验行游标；CPCL 拒绝完整 Raw 后继续追加，重置可恢复；CPCL/TSPL 校验跨次行分隔。任意 `WriteRaw` 仍是可信逃生口，令几何状态失效，后续受限绘制须显式重建，不参与结构化边界预检，也不被白名单替换。
+- **旧 Helper 的拒绝语义**：CPCL 既有可映射条码保留命令标记；有效但未映射枚举抛出 `NotSupportedException`，无效枚举抛出参数异常。
+
+实现入口：[Provider](../src/Bing.EasyPrint/Printing/PrintProtocolProviders.cs)、[能力矩阵](../src/Bing.EasyPrint/PrintCapabilities.cs)、[Job](../src/Bing.EasyPrint/Printing/PrintJobRenderer.cs)。回归入口：[Profile](../tests/Bing.EasyPrint.Tests/ProtocolProfileCapabilitiesTests.cs)、[Job](../tests/Bing.EasyPrint.Tests/PrintJobTests.cs)、[受限 Raw](../tests/Bing.EasyPrint.Tests/ProtocolRestrictedRawTests.cs)、[CPCL Raw](../tests/Bing.EasyPrint.Tests/CPCL/CPCLRestrictedRawTests.cs)、[旧 Helper](../tests/Bing.EasyPrint.Tests/CpclHelperBarcodeTypeTests.cs)。
+
+### G2 模板布局、字体与图像渲染
+
+- **度量与布局**：语义字体适配旧 CPCL 参数，未知字体样式在资源/数据访问前拒绝；图片按横纵 DPI 重采样并在追加前校验。文字 Width 是旋转前行宽，旋转后占位参与对齐、结束坐标和分页；旋转文字块不可拆页，空行保留间隔且不输出空字形命令。图片支持四角旋转，TSPL/ZPL 支持原生填充矩形及公共实心工厂。
+- **边界和诊断**：显式静区同时检查页面与相邻元素，失败可回滚并支持保存往返；HRI 预留、静区、角度占位、重复组件、换行与分页联合校验。绑定错误保留字段路径、组件定义/实例及重复索引，跨页失败不混淆组件归属。
+- **文字样式**：Native 顺序文字支持粗体、单线下划线与反白；Raster 背景/字形/粗体/下划线整体旋转。TSPL/ZPL 默认仍用设备字体，只有显式 `AllowRasterizedTextStyles` 且允许图片时才走样式位图路径，不静默降级。反白空格按真实黑底布局校验静区，真正空字符串不绘背景、不占位；反白换行、整块分页和失败清理已有回归。
+- **校准接口**：固定主机字体与设备字体度量分开；调用方可按字体、`StringInfo` 文本单元和角度提供 advance、墨迹及 HRI 四边数据。`TextElements` 精确匹配、不做 Unicode 规范化；接口和人工数值测试不等于任一机型完成实际校准。固定字体不混合逐字替代、不合成粗体，不代表完整复杂塑形、双向布局或 TTC 支持。
+- **Composite 模板块**：Type=11 的 `BpGs1CompositeElement` 支持 V2/V3，V1 要求升级；Field/SecondaryField 分别绑定主/次数据，整个符号不可拆分，整页超限失败。实际编码尺寸、四角旋转、非对称静区、精确贴边、双字段 JSON 往返及错误归属均沿用统一布局契约。
+
+实现入口：[模板渲染器](../src/Bing.EasyPrint.Templates/Rendering/TemplateRenderer.cs)、[字体解析](../src/Bing.EasyPrint.Templates/Rendering/TemplateFontResolver.cs)、[校准接口](../src/Bing.EasyPrint.Templates/Rendering/DeviceFontCalibration.cs)、[静区](../src/Bing.EasyPrint/Printing/PrintQuietZoneValidator.cs)。回归入口：[旋转布局](../tests/Bing.EasyPrint.Tests/TemplateRotationTests.cs)、[语义字体](../tests/Bing.EasyPrint.Tests/TemplateSemanticFontTests.cs)、[模板静区](../tests/Bing.EasyPrint.Tests/TemplateQuietZoneTests.cs)、[反白](../tests/Bing.EasyPrint.Tests/EscPosRasterReverseTextTests.cs)、[Composite 模板](../tests/Bing.EasyPrint.Tests/Gs1CompositeTemplateTests.cs)。
+
+### G3 条码与 GS1 编码
+
+- **制式矩阵**：零售码、Code39/93、I2OF5 校验变体、MSI、GS1-128、邮政码等按协议能力映射；Raster 有 PLANET、FIM A–E、IMb、Code11、Plessey、ITF14、China Post、Telepen/Telepenn、Code49、DataBar Omnidirectional/Truncated/Limited/Expanded/Stacked 主机编码。能力矩阵是支持范围依据，不能外推到任意协议/制式组合。
+- **共享 AI/FNC1**：严格括号解析统一长度、字符集、校验位、日期和变量字段 FNC1，未知 AI 拒绝；已接入常用压缩 AI、Scan4Transport、内部 AI 和 253/254/255 限定子集。GDTI/GCN 键校验、AI 254 与 414 配对、跨 Provider 输出和 HRI 共用该规则；不是完整字典、全部业务关系或扫描器返回值契约。
+- **Composite 编码**：独立 `PrintGs1CompositeElement` 与 `Gs1CompositeMode` 保留普通条码枚举和构造兼容；Omnidirectional/Limited × CC-A/CC-B 由托管代码编码。Auto 先 CC-A 后 CC-B，显式模式超限报错；主数据接受有效 13 位数据、14 位 GTIN 或单 AI 01，Limited 单独校验范围，次数据复用严格 AI 解析器。
+- **公共位图输出**：托管编码处理压缩、纠错、码字、行指示、链接 DataBar、分隔与对齐；CPCL/TSPL/ZPL/ESC/POS Raster 共用位图和图片输出路径，Native 与禁图 Profile 在解析/编码前拒绝。无内置 Composite HRI，普通条码的 HRI/校验语义保持按制式处理。
+- **独立向量与许可**：四种 Composite 组合以六个独立完整模块矩阵逐模块比对，覆盖日期、数字、字母、FNC1 和较大 CC-B；另有输入/容量/自动模式测试。编码表与向量固定 Zint 2.15.0（commit `4896136bdbebb1a0908a5cc419513efa5bf4bf70`）来源及许可，不依赖外部编码进程。CC-C、Expanded/Stacked Composite 和其他线性组件继续延期，不能由 DataBar 独立制式的支持推导 Composite 支持。
+
+实现入口：[共享 AI 解析器](../src/Bing.EasyPrint/Protocols/Gs1ApplicationIdentifierParser.cs)、[Composite 编码器](../src/Bing.EasyPrint/Protocols/Gs1CompositeEncoder.cs)、[固定编码表](../src/Bing.EasyPrint/Protocols/Gs1CompositeTables.cs)。回归入口：[制式矩阵](../tests/Bing.EasyPrint.Tests/ProtocolBarcodeModuleTests.cs)、[Scan4Transport](../tests/Bing.EasyPrint.Tests/Gs1Scan4TransportTests.cs)、[Composite 向量](../tests/Bing.EasyPrint.Tests/Fixtures/Gs1CompositeVectors.cs)、[编码测试](../tests/Bing.EasyPrint.Tests/Gs1CompositeEncoderTests.cs)、[Provider 输出](../tests/Bing.EasyPrint.Tests/Gs1CompositeProviderTests.cs)。
+
+以下 `Rxx` 章节继续保留历史兼容细节，不重复作为待办入口。
+
 ### R152：GS1 GDTI、GLN 扩展与 GCN
 
 共享括号 AI 解析器新增 AI `253`、`254`、`255`。AI `253` 接受含有效 GS1 校验位的 13 位 GDTI 键及可选 1–17 位 CSET 82 序列组件；AI `255` 接受含有效校验位的 13 位 GCN 键及可选 1–12 位数字序列组件；AI `254` 接受 1–20 位 CSET 82 GLN 扩展组件，并要求同一元素串包含含有效校验位的 AI `414` 物理位置 GLN。GS1 的 GLN+扩展示例按 AI `414` 后接 AI `254` 排列。变量字段后续还有元素时会插入 FNC1。单个新 AI 也进入严格解析；其他历史单元素括号输入兼容行为保持不变。
