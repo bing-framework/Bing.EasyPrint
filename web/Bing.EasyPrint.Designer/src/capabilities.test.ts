@@ -125,6 +125,22 @@ describe('capability request races', () => {
 })
 
 describe('capability response contract', () => {
+  it.each([
+    ['Cpcl', null], ['Tspl', null], ['Zpl', null], ['EscPos', 'Raster'], ['EscPos', 'Native'],
+  ] as const)('accepts absent/null HRI positions for %s %s and validates actual arrays', (protocol, layout) => {
+    const native = layout === 'Native'
+    const base = capabilities({ protocol, escPosLayoutMode: layout,
+      nativeFlow: native ? 'Rows' : null, imageRotations: native ? [0] : [0, 90, 180, 270] })
+    expect(normalizeDesignerCapabilities(base).supportedNativeBarcodeHumanReadablePositions).toBeUndefined()
+    expect(normalizeDesignerCapabilities({ ...base, supportedNativeBarcodeHumanReadablePositions: null })
+      .supportedNativeBarcodeHumanReadablePositions).toBeNull()
+    for (const positions of [[], ['Below']] as const) {
+      const input = { ...base, supportedNativeBarcodeHumanReadablePositions: [...positions] }
+      if (native) expect(normalizeDesignerCapabilities(input).supportedNativeBarcodeHumanReadablePositions).toEqual(positions)
+      else expect(() => normalizeDesignerCapabilities(input)).toThrow('仅能用于 ESC/POS Native')
+    }
+  })
+
   it('recognizes confirmed cut metadata through Vue proxies without upgrading old Host responses', () => {
     const response = capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', supportsCut: true,
       cutModes: ['Partial'], cutFeedUnits: ['MotionUnits'], cutFeedMotionUnits: { minimum: 0, maximum: 255 } })

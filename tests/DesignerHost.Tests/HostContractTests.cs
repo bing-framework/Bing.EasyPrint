@@ -242,6 +242,24 @@ public sealed class HostContractTests
     }
 
     [Theory]
+    [InlineData("Cpcl", null)]
+    [InlineData("Tspl", null)]
+    [InlineData("Zpl", null)]
+    [InlineData("EscPos", "Raster")]
+    [InlineData("EscPos", "Native")]
+    public async Task Default_capabilities_serialize_absent_hri_position_restriction_as_null(string protocol, string? layout)
+    {
+        var request = "{\"template\":" + TemplateJson + ",\"data\":{},\"encoding\":\"ASCII\",\"protocol\":\"" + protocol + "\"" +
+            (layout == null ? "" : ",\"escPosLayoutMode\":\"" + layout + "\"") + "}";
+        var context = CreateContext(request);
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Capabilities);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        context.Response.Body.Position = 0;
+        using var response = JsonDocument.Parse(context.Response.Body);
+        Assert.Equal(JsonValueKind.Null, response.RootElement.GetProperty("supportedNativeBarcodeHumanReadablePositions").ValueKind);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("structured-errors, strict-options, binding-diagnostics, multi-protocol, ordered-output-segments")]
     public async Task Legacy_and_feature_negotiated_requests_execute_with_contract_headers(string? requiredFeatures)

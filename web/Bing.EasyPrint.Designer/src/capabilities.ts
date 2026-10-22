@@ -527,7 +527,7 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     input.supportedNativeBarcodeHumanReadableTypes, 'supportedNativeBarcodeHumanReadableTypes')
   const supportedNativeBarcodeHumanReadablePositions = parseBarcodeTextPositions(
     input.supportedNativeBarcodeHumanReadablePositions, 'supportedNativeBarcodeHumanReadablePositions')
-  if (supportedNativeBarcodeHumanReadablePositions !== undefined &&
+  if (supportedNativeBarcodeHumanReadablePositions != null &&
     (protocol !== 'EscPos' || escPosLayoutMode !== 'Native')) {
     throw new Error('能力响应的 supportedNativeBarcodeHumanReadablePositions 仅能用于 ESC/POS Native 模式。')
   }
