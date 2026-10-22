@@ -1,5 +1,7 @@
 # 打印指令集
 
+2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+
 > 文档定位：本文件保存协议能力、设备 Profile 和各轮兼容细节。首次接入请先阅读[核心打印与协议](core-printing.md)；未完成和设备验收项见[待实现与待确认](status.md)。带 `Rxx` 的段落是对应迭代的记录，不等同于当前分支验证结论。
 
 ## 已实现能力：协议、布局与编码

@@ -1,5 +1,7 @@
 # 开发与验证
 
+2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+
 ## 项目与依赖
 
 | 项目 | 目标框架 | 主要依赖 |

@@ -35,6 +35,7 @@
 
 - [协议详细说明](protocols.md)：协议选项、Profile、条码、裁切、Raw 校验和设备边界的详细记录。
 - [模板详细说明](templates.md)：模板版本、元素、布局、字体校准和历史兼容细节。
+- [单行 Expanded Composite](gs1-composite-expanded.md)：Expanded + CC-A/CC-B 的输入、尺寸、模板与能力协商。
 - [设计器详细说明](designer.md)：设计器交互、项目文件、模板包与 Host 契约细节。
 
 ## 历史证据

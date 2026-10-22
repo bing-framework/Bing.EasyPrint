@@ -1,5 +1,7 @@
 # 多协议模板渲染
 
+2026-10-22 新增单行 DataBar Expanded + CC-A/CC-B Composite，使用、输入与协商限制见[Expanded 使用说明](gs1-composite-expanded.md)，本次验证见[阶段报告](gs1-composite-expanded-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
+
 > 文档定位：本文件是模板版本、元素和兼容规则的详细参考。快速接入请先阅读[模板渲染指南](templates-guide.md)；当前模块关系见[架构与模块](architecture.md)。带 `Rxx` 的段落保留历史实现脉络。
 
 > 当前范围：模板条码会通过共享 GS1 解析器使用协议文档 R152 已声明的 AI `253`、`254`、`255` 规则；GS1 Composite 是 Type 11 的 V2/V3 模板元素，当前能力和输入限制见[GS1 Composite](#gs1-composite)。四协议 `WriteRestrictedRaw` 属于直接命令层，不是模板 JSON 能力。带日期的 `Rxx` 段落保留当时行为，不表示当前能力矩阵；本文件最高 `Rxx` 也不表示整个项目的最新轮次。

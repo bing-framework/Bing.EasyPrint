@@ -10,9 +10,10 @@
 |---|---:|---:|---:|---:|
 | GS1 DataBar Omnidirectional | 是 | 是 | 是 | 否 |
 | GS1 DataBar Limited | 是 | 是 | 是 | 否 |
+| 单行 DataBar Expanded | A→B | 支持 | 支持 | 不支持 |
 | GS1-128 (`UccEan128`) | 是 | 否 | 否 | 是 |
 
-GS1-128 的 `Auto` 直接选择 CC-C。DataBar 的 `Auto` 保持原策略：先尝试 CC-A，容量不足时选择 CC-B。DataBar+CC-C 和 GS1-128+CC-A/CC-B 是非法组合；构造、模板导入验证、预览和渲染都会拒绝它们。Expanded、Stacked 等其他 Composite 线性制式尚未支持。
+GS1-128 的 `Auto` 直接选择 CC-C。DataBar 的 `Auto` 保持原策略：先尝试 CC-A，容量不足时选择 CC-B。DataBar+CC-C 和 GS1-128+CC-A/CC-B 是非法组合；构造、模板导入验证、预览和渲染都会拒绝它们。单行 Expanded 已在[后续阶段](gs1-composite-expanded.md)支持 A/B；Stacked 等其他 Composite 线性制式尚未支持。
 
 ## 数据和尺寸
 

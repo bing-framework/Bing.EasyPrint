@@ -66,7 +66,7 @@ byte[] firstPage = pages[0];
 
 能力查询使用 `PrintCapabilities`。统一模型与直接命令的能力并不完全相同，例如 ESC/POS Raster 可由主机绘制码图，但不等于设备支持原生 `GS k`。
 
-`PrintGs1CompositeElement` 将 GS1 线性组件和 CC-A、CC-B 或 CC-C 次码作为一个不可拆分符号处理，尺寸由编码结果确定。组合受限：DataBar Omnidirectional/Limited 支持 Auto、CC-A、CC-B；GS1-128 (`BarcodeType.UccEan128`) 支持 Auto 和 CC-C，且 Auto 直接选择 CC-C。其他配对会被拒绝。该功能只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。完整输入、模式和 Host 协商说明见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
+`PrintGs1CompositeElement` 将 GS1 线性组件和 CC-A、CC-B 或 CC-C 次码作为一个不可拆分符号处理，尺寸由编码结果确定。组合受限：DataBar Omnidirectional/Limited/单行 Expanded 支持 Auto、CC-A、CC-B；GS1-128 (`BarcodeType.UccEan128`) 支持 Auto 和 CC-C，且 Auto 直接选择 CC-C。其他配对会被拒绝。该功能只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。完整输入、模式和 Host 协商说明见 [GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)及[单行 Expanded 使用说明](gs1-composite-expanded.md)。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
 
 应用可以直接向统一模型提供自定义 `IPrintProtocolProvider`；静态 `PrintProtocolProviderFactory` 只创建内置四协议 Provider。`TemplateRenderer` 目前固定使用该内置工厂，`TemplateRenderOptions` 没有 Provider/工厂注入点。自定义 Provider 也不能直接复用内置任务收尾与部分切纸编码；请求这些功能时会按不支持处理。实现接口本身不会自动把新协议接入模板或 Host。
 

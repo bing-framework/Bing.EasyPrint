@@ -1,5 +1,7 @@
 # 待实现与待确认
 
+2026-10-22 单行 Expanded Composite 后续阶段见[实施计划](../ai_docs/plans/gs1-composite-expanded-2026-10-22.md)和[验证报告](gs1-composite-expanded-verification-2026-10-22.md)。本地验收已通过：两运行时各 3478、Host 155、Vitest 294、Chromium 158；当前软件范围新增 Expanded + A/B；Stacked Composite 仍为后续阶段，实机验收状态保持独立。
+
 本页只记录代码和现有验证资料尚不能证明完成的事项。历史轮次中的 TODO 以当前代码重新核对为准。
 
 ## 待实现
