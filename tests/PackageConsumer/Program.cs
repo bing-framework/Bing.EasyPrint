@@ -40,6 +40,7 @@ internal static class Program
             VerifyFilledRectangleOutputs(fonts);
             VerifyZplDelayedOutput();
             VerifyImageRotationOutputs();
+            VerifyCcCOutputs();
 
             Console.WriteLine("Package consumer verification PASS");
             return 0;
@@ -49,6 +50,23 @@ internal static class Program
             Console.Error.WriteLine("Package consumer verification FAILED");
             Console.Error.WriteLine(error);
             return 1;
+        }
+    }
+
+    private static void VerifyCcCOutputs()
+    {
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
+        {
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            var explicitMode = new PrintDocument();
+            explicitMode.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.UccEan128,
+                "(01)12345678901231", "(10)LOT123", 40, mode: Gs1CompositeMode.CcC));
+            var auto = new PrintDocument();
+            auto.AddPage(600, 300).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.UccEan128,
+                "(01)12345678901231", "(10)LOT123", 40));
+            var output = Single(provider.Render(explicitMode), "CC-C");
+            Require(output.Length > 0, $"CC-C 输出: {protocol}");
+            RequireBytesEqual(output, Single(provider.Render(auto), "CC-C Auto"), $"CC-C Auto 字节: {protocol}");
         }
     }
 
