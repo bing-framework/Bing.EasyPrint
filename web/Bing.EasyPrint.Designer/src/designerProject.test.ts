@@ -11,6 +11,18 @@ import {
 } from './designerProject'
 
 describe('designer project serialization', () => {
+  it.each(['Left', 'Right'])('rejects unsupported legacy ZPL orientation %s on project import', (orientation) => {
+    const project = JSON.parse(serializeDesignerProject(createProductSample(), defaultDesignerOutputSettings()))
+    project.outputSettings.zplMedia = { orientation }
+    expect(() => parseDesignerProject(project)).toThrow('outputSettings.zplMedia.orientation')
+  })
+
+  it.each([undefined, 'None', 'Down'] as const)('round-trips supported ZPL orientation %s', (orientation) => {
+    const settings = { ...defaultDesignerOutputSettings(), zplMedia: { orientation } }
+    const parsed = parseDesignerProject(JSON.parse(serializeDesignerProject(createProductSample(), settings)))
+    expect(parsed.outputSettings?.zplMedia.orientation).toBe(orientation)
+  })
+
   it('returns independent default settings objects', () => {
     const first = defaultDesignerOutputSettings()
     const second = defaultDesignerOutputSettings()

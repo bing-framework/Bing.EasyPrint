@@ -70,7 +70,7 @@ export class DesignerProjectValidationError extends Error {}
 const DESIGNER_PROJECT_FORMAT = 'Bing.EasyPrint.DesignerProject' as const
 const OUTPUT_TARGETS = ['Cpcl', 'Tspl', 'Zpl', 'EscPosRaster', 'EscPosNative'] as const
 const ENCODINGS = ['Gbk', 'Utf8', 'Ascii', 'Device'] as const
-const ZPL_ORIENTATIONS = ['None', 'Down', 'Left', 'Right'] as const
+const ZPL_ORIENTATIONS = ['None', 'Down'] as const
 const ZPL_TRACKING = ['N', 'Y', 'W', 'M', 'A', 'V'] as const
 const ESC_POS_IMAGE_COMMANDS = ['RasterGsV0', 'BitImageEscStar'] as const
 const ESC_POS_BIT_IMAGE_MODES = ['SingleDensity8', 'DoubleDensity8', 'SingleDensity24', 'DoubleDensity24'] as const

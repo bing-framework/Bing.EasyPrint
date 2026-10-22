@@ -494,7 +494,7 @@ describe('designer preview errors', () => {
       dpi: 300, gapDistance: 2, gapOffset: 1, direction: 1,
       referenceX: 3, referenceY: 4, speed: 5, density: 8,
     }
-    const zplMedia = { dpi: 300, printSpeed: 6, orientation: 'Right' as const, mediaTracking: 'M' as const, darkness: -4 }
+    const zplMedia = { dpi: 300, printSpeed: 6, orientation: 'Down' as const, mediaTracking: 'M' as const, darkness: -4 }
     await previewTemplate(template, {}, [], undefined, 'Tspl', 'Native', false,
       undefined, undefined, undefined, undefined, undefined, undefined, tsplMedia)
     await renderTemplate(template, {}, [], 'Tspl', 'Native', false,

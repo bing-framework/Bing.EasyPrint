@@ -181,7 +181,7 @@ export type TsplMediaRequest = {
   referenceX?: number; referenceY?: number; speed?: number; density?: number;
   profile?: TsplPrinterProfile
 }
-export type ZplMediaOrientation = 'None' | 'Down' | 'Left' | 'Right'
+export type ZplMediaOrientation = 'None' | 'Down'
 export type ZplMediaTracking = 'N' | 'Y' | 'W' | 'M' | 'A' | 'V'
 export type ZplMediaRequest = {
   allowRasterizedTextStyles?: boolean;

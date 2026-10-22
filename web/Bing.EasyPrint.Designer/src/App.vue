@@ -12,7 +12,7 @@ import TemplateTree from './components/TemplateTree.vue'
 import LabelPrinterProfileEditor from './components/LabelPrinterProfileEditor.vue'
 import { DesignerValidationError, loadDesignerSamples, previewTemplate, renderTemplate, type DesignerSample,
   loadDesignerCapabilities, type PrintProtocol, type EscPosLayoutMode, type TsplMediaRequest, type ZplMediaRequest,
-  type ZplMediaOrientation, type ZplMediaTracking, type PrintEncoding, type EscPosDeviceRequest,
+  type ZplMediaTracking, type PrintEncoding, type EscPosDeviceRequest,
   type EscPosNativeFlowMode,
   type PrintJobCopyOrder, type PrintJobFeedUnit, type PrintJobOptions, type PrintJobScope,
   type PrintCutMode, type PrintCutOptions,
@@ -1344,7 +1344,8 @@ function setTsplDirection(event: Event) {
 
 function setZplOrientation(event: Event) {
   const value = (event.target as HTMLSelectElement).value
-  zplMedia.value = { ...zplMedia.value, orientation: value === '' ? undefined : value as ZplMediaOrientation }
+  if (value !== '' && value !== 'None' && value !== 'Down') return
+  zplMedia.value = { ...zplMedia.value, orientation: value === '' ? undefined : value }
 }
 
 function setZplMediaTracking(event: Event) {
@@ -2463,7 +2464,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
               <label class="raster-line-option" title="允许将粗体、下划线和反白文字转换为主机位图"><input v-model="zplMedia.allowRasterizedTextStyles" type="checkbox" aria-label="允许 ZPL 文字样式位图" /><span>文字样式位图</span></label>
               <label class="field-label">DPI <span>主机元数据</span><input class="field-input" type="number" min="1" step="1" :value="optionalNumberValue(zplMedia.dpi)" aria-label="ZPL DPI" placeholder="默认 203" @input="setZplMediaNumber('dpi', $event)" /></label>
               <label class="field-label">打印速度 <span>正整数</span><input class="field-input" type="number" min="1" step="1" :value="optionalNumberValue(zplMedia.printSpeed)" aria-label="ZPL 打印速度" placeholder="协议默认" @input="setZplMediaNumber('printSpeed', $event)" /></label>
-              <label class="field-label">方向 <span>打印方向</span><select class="field-input" :value="zplMedia.orientation ?? ''" aria-label="ZPL 方向" @change="setZplOrientation"><option value="">协议默认</option><option value="None">默认方向</option><option value="Down">向下</option><option value="Left">向左</option><option value="Right">向右</option></select></label>
+              <label class="field-label">方向 <span>打印方向</span><select class="field-input" :value="zplMedia.orientation ?? ''" aria-label="ZPL 方向" @change="setZplOrientation"><option value="">协议默认</option><option value="None">默认方向</option><option value="Down">向下</option></select></label>
               <label class="field-label">介质跟踪 <span>N / Y / W / M / A / V</span><select class="field-input" :value="zplMedia.mediaTracking ?? ''" aria-label="ZPL 介质跟踪" @change="setZplMediaTracking"><option value="">协议默认</option><option value="N">N · 连续</option><option value="Y">Y · 间隙</option><option value="W">W · 间隙</option><option value="M">M · 黑标</option><option value="A">A · 自动</option><option value="V">V · 可变长度</option></select></label>
               <label class="field-label">打印浓度 <span>-30–30</span><input class="field-input" type="number" min="-30" max="30" step="1" :value="optionalNumberValue(zplMedia.darkness)" aria-label="ZPL 打印浓度" placeholder="协议默认" @input="setZplMediaNumber('darkness', $event)" /></label>
             </template>
