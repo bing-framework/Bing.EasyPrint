@@ -226,7 +226,7 @@ public sealed class Gs1CompositeEncoderTests
     [Fact]
     public void Constructor_rejects_unsupported_or_invalid_contract_values()
     {
-        Assert.Throws<NotSupportedException>(() => Element(BarcodeType.Gs1DataBarExpanded));
+        Assert.Throws<NotSupportedException>(() => Element(BarcodeType.Gs1DataBarStacked));
         Assert.Throws<ArgumentOutOfRangeException>(() => Element((BarcodeType)(-1)));
         Assert.Throws<ArgumentOutOfRangeException>(() => Element(mode: (Gs1CompositeMode)4));
         Assert.Throws<ArgumentNullException>(() => Element(primary: null));

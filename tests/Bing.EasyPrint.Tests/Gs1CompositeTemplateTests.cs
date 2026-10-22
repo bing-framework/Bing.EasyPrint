@@ -17,6 +17,28 @@ public sealed class Gs1CompositeTemplateTests
     [Theory]
     [InlineData(2)]
     [InlineData(3)]
+    public void Expanded_roundtrip_keeps_fields_mode_and_exact_output(int version)
+    {
+        var template = SingleComposite(version, Composite(BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.CcB), width: 600);
+        var options = Options();
+        var loader = new TemplateLoader();
+        var restored = loader.LoadJson(loader.SaveJson(template, options), options);
+        var element = Assert.IsType<BpGs1CompositeElement>(restored.Rows[0].Cells[0].Elements[0]);
+        Assert.Equal(BarcodeType.Gs1DataBarExpanded, element.LinearType);
+        Assert.Equal(Gs1CompositeMode.CcB, element.Mode);
+        var data = new { Primary = "(01)09506000134352(10)LOT-A", Secondary = "(91)123456" };
+        var renderer = new TemplateRenderer();
+        var expected = renderer.RenderWithLayout(template, data, options: options);
+        var actual = renderer.RenderWithLayout(restored, data, options: options);
+        Assert.Equal(expected.Pages[0].Data, actual.Pages[0].Data);
+        var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
+        var size = Gs1CompositeEncoder.Measure(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpanded, data.Primary, data.Secondary, 20, mode: Gs1CompositeMode.CcB));
+        Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
     public void Cc_c_roundtrip_keeps_fields_mode_and_exact_output(int version)
     {
         var template = SingleComposite(version, Composite(BarcodeType.UccEan128, Gs1CompositeMode.CcC));
@@ -40,6 +62,7 @@ public sealed class Gs1CompositeTemplateTests
     [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcA)]
     [InlineData(BarcodeType.UccEan128, Gs1CompositeMode.CcB)]
     [InlineData(BarcodeType.Gs1DataBarLimited, Gs1CompositeMode.CcC)]
+    [InlineData(BarcodeType.Gs1DataBarExpanded, Gs1CompositeMode.CcC)]
     public void Cc_c_invalid_pair_is_rejected_before_binding(BarcodeType type, Gs1CompositeMode mode)
         => Assert.Throws<ArgumentException>(() => new TemplateRenderer().Render(
             SingleComposite(3, Composite(type, mode)), new { }, options: Options()));

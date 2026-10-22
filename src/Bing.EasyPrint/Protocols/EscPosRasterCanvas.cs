@@ -1162,6 +1162,8 @@ public sealed class EscPosRasterCanvas
         CancellationToken cancellationToken)
         => type == BarcodeType.Gs1DataBarLimited
             ? EncodeGs1DataBarLimitedPattern(normalizedData, cancellationToken, composite: true)
+            : type == BarcodeType.Gs1DataBarExpanded
+            ? EncodeGs1DataBarExpandedPattern(normalizedData, cancellationToken, composite: true)
             : EncodeGs1DataBarPattern(normalizedData, cancellationToken, composite: true);
 
     private static string EncodeGs1DataBarLimitedPattern(string normalizedData,
@@ -1250,11 +1252,11 @@ public sealed class EscPosRasterCanvas
             CancellationToken.None);
 
     private static string EncodeGs1DataBarExpandedPattern(string normalizedData,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool composite = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken);
+        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken, composite);
         var dataCharacters = encoded.DataCharacters;
         var symbolCharacters = encoded.SymbolCharacters;
         var binary = encoded.Bits;
@@ -1306,7 +1308,7 @@ public sealed class EscPosRasterCanvas
             // Preserve the R108 GTIN-only byte stream. That historical
             // five-character path used the legacy value-4 table slot; all
             // variable-length symbols use the ISO/Zint table ordering.
-            var finder = symbolCharacters == 5 && finderValue == 4 ? 1 : finderValue - 1;
+            var finder = !composite && symbolCharacters == 5 && finderValue == 4 ? 1 : finderValue - 1;
             for (var element = 0; element < 5; element++)
                 elements[21 * block + element + 10] =
                     Gs1DataBarExpandedFinderPatterns[finder, element];
@@ -1672,8 +1674,49 @@ public sealed class EscPosRasterCanvas
         }
     }
 
+    /// <summary>
+    /// 为 Composite 主数据选择标准 Expanded 压缩方法；不满足压缩条件时保留通用 AI 字段。
+    /// </summary>
+    /// <param name="data">已经严格解析为 FNC1 分隔的 GS1 元素串。</param>
+    /// <returns>供 Expanded 编码器使用的内部规范化数据，可能包含方法标记。</returns>
+    internal static string NormalizeCompositeExpanded(string data)
+    {
+        // Zint rss.c: methods 3–14 require a leading 9 in the GTIN. Fixed weight/date
+        // methods consume the whole payload; extra AIs must use the general field.
+        if (data.Length < 20 || !data.StartsWith("019", StringComparison.Ordinal)) return data;
+        var ai = data.Substring(16, 4);
+        char marker;
+        if ((ai.StartsWith("310", StringComparison.Ordinal) || ai.StartsWith("320", StringComparison.Ordinal)) &&
+            (data.Length == 26 || data.Length == 34))
+        {
+            if (!int.TryParse(data.Substring(20, 6), out var weight) || weight > 99999) return data;
+            var metric = ai[1] == '1';
+            if (data.Length == 26)
+                marker = metric
+                    ? ai == "3103" && weight <= 32767 ? ExpandedMethod3Marker : ExpandedMethod7Marker
+                    : (ai == "3202" && weight <= 9999) || (ai == "3203" && weight <= 22767)
+                        ? ExpandedMethod4Marker : ExpandedMethod8Marker;
+            else
+            {
+                if (!IsExpandedDateAi(data.Substring(26, 2)) || !TryParseExpandedDate(data.Substring(28), out _))
+                    return data;
+                var method = (metric ? 6 : 7) + data[27] - '0';
+                marker = method == 7 ? ExpandedMethod7Marker : method == 8 ? ExpandedMethod8Marker
+                    : method == 9 ? ExpandedMethod9Marker : method == 10 ? ExpandedMethod10Marker
+                    : method == 11 ? ExpandedMethod11Marker : method == 12 ? ExpandedMethod12Marker
+                    : method == 13 ? ExpandedMethod13Marker : ExpandedMethod14Marker;
+            }
+        }
+        else if (ai.StartsWith("392", StringComparison.Ordinal) && ai[3] >= '0' && ai[3] <= '3')
+            marker = ExpandedMethod5Marker;
+        else if (ai.StartsWith("393", StringComparison.Ordinal) && ai[3] >= '0' && ai[3] <= '3')
+            marker = ExpandedMethod6Marker;
+        else return data;
+        return data.Insert(16, marker.ToString());
+    }
+
     private static ExpandedBinary EncodeGs1DataBarExpandedBinary(string normalizedData,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool composite = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1700,13 +1743,13 @@ public sealed class EscPosRasterCanvas
             ((method7 || method8) && encodedData.Length >= 34);
         var generalStart = method2 ? 0 : method3 || method4 ? 26 : method5 ? 20 : method6 ? 23 :
             dateMethod ? 34 : method7 || method8 ? 26 : 16;
-        // Method 1: linkage flag 0, method field 1XX. Method 2 uses 0000 and
+        // Linkage is 1 only for Composite. Method 1 uses 1XX. Method 2 uses 0000 and
         // sends the complete input through the general field. Methods 3 and 4 use
         // fixed variable-weight fields 0100 and 0101; Methods 5 and 6 use
         // 01100XX and 01101XX before the same GTIN triplets.
         var generalLength = encodedData.Length - generalStart;
         var binary = new StringBuilder(checked(64 + generalLength * 8 + 32));
-        binary.Append('0');
+        binary.Append(composite ? '1' : '0');
         if (method2)
             AppendBinary(binary, 0, 4); // 0000; general-purpose AI data.
         else if (method3)
@@ -1730,7 +1773,9 @@ public sealed class EscPosRasterCanvas
             AppendBinary(binary, 4, 3); // 1XX; the two variable bits are patched below.
         if (!method2)
         {
-            AppendBinary(binary, encodedData[2] - '0', 4);
+            // Composite compressed methods imply the leading GTIN digit 9.
+            // Ordinary Expanded retains its historical stream for compatibility.
+            if (!composite || !compressedMethod) AppendBinary(binary, encodedData[2] - '0', 4);
             for (var index = 3; index < 15; index += 3)
             {
                 cancellationToken.ThrowIfCancellationRequested();

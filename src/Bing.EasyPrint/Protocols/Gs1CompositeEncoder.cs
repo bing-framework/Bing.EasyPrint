@@ -63,7 +63,8 @@ internal static partial class Gs1CompositeEncoder
         cancellationToken.ThrowIfCancellationRequested();
         using var operation = PrintResourceScope.BeginTemporary();
         var gs1 = element.LinearType == BarcodeType.UccEan128;
-        if (element.PrimaryData.Length > (gs1 ? 192 : 18))
+        var expanded = element.LinearType == BarcodeType.Gs1DataBarExpanded;
+        if (element.PrimaryData.Length > (expanded ? 2990 : gs1 ? 192 : 18))
             throw new ArgumentException("Composite 主数据超过线性组件输入长度限制。", "primaryData");
         if (element.SecondaryData.Length > 2990)
             throw new ArgumentException("Composite 次数据超过编码容量。", "secondaryData");
@@ -81,8 +82,16 @@ internal static partial class Gs1CompositeEncoder
         var columns = element.LinearType == BarcodeType.Gs1DataBarLimited ? 3 : 4;
         var mode = gs1 ? Gs1CompositeMode.CcC
             : element.Mode == Gs1CompositeMode.CcB ? Gs1CompositeMode.CcB : Gs1CompositeMode.CcA;
-        var linear = gs1 ? EncodeGs1Linear(primary, cancellationToken)
-            : EscPosRasterCanvas.EncodeGs1CompositeLinearPattern(element.LinearType, primary, cancellationToken);
+        string linear;
+        try
+        {
+            linear = gs1 ? EncodeGs1Linear(primary, cancellationToken)
+                : EscPosRasterCanvas.EncodeGs1CompositeLinearPattern(element.LinearType, primary, cancellationToken);
+        }
+        catch (ArgumentException error) when (expanded)
+        {
+            throw new ArgumentException(error.Message, "primaryData", error);
+        }
         var ccC = gs1 ? new CcCLayout(linear.Length) : null;
         var bits = BuildBinary(secondary, columns, mode, cancellationToken, ccC);
         if (bits == null && !gs1 && element.Mode == Gs1CompositeMode.Auto)
@@ -96,8 +105,14 @@ internal static partial class Gs1CompositeEncoder
             : EncodeComponent(bits, columns, mode, cancellationToken);
         var separator = BuildSeparator(element.LinearType, linear, cancellationToken);
         var topShift = element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcA ? 1 : 0;
+        if (expanded)
+        {
+            // ISO/IEC 24723 12.3: align after the first space/bar transition of the linear component.
+            topShift = 1;
+            while (topShift < linear.Length && linear[topShift - 1] == '0' && linear[topShift] == '1') topShift++;
+        }
         var bottomShift = gs1 ? 7 : element.LinearType == BarcodeType.Gs1DataBarOmnidirectional ? 4
-            : mode == Gs1CompositeMode.CcB ? 9 : 0;
+            : element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcB ? 9 : 0;
         var width = Math.Max(twoDimensional[0].Length + topShift, linear.Length + bottomShift);
         var height = twoDimensional.Length + 2;
         PrintResourceScope.Retain(checked(((width + 31L) / 32) * height * sizeof(int)),
@@ -185,6 +200,20 @@ internal static partial class Gs1CompositeEncoder
     {
         if (type == BarcodeType.UccEan128)
             return Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 48);
+        if (type == BarcodeType.Gs1DataBarExpanded)
+        {
+            if (!Gs1ApplicationIdentifierParser.IsBracketed(data))
+                throw new ArgumentException("Expanded Composite 主数据必须为括号式 GS1 AI。", "primaryData");
+            var normalized = Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 2990);
+            if (normalized.StartsWith("01", StringComparison.Ordinal))
+            {
+                var checksum = 0;
+                for (var index = 2; index < 15; index++) checksum += (normalized[index] - '0') * (index % 2 == 0 ? 3 : 1);
+                if (normalized[15] - '0' != (10 - checksum % 10) % 10)
+                    throw new ArgumentException("Expanded Composite GTIN 校验位无效。", "primaryData");
+            }
+            return EscPosRasterCanvas.NormalizeCompositeExpanded(normalized);
+        }
         var bracketed = data.StartsWith("(01)", StringComparison.Ordinal) || data.StartsWith("[01]", StringComparison.Ordinal);
         if (bracketed) data = data.Substring(4);
         if (data.Length != 13 && data.Length != 14 || bracketed && data.Length != 14)
@@ -460,6 +489,8 @@ internal static partial class Gs1CompositeEncoder
 
     private static string BuildSeparator(BarcodeType type, string linear, CancellationToken cancellationToken)
     {
+        if (type == BarcodeType.Gs1DataBarExpanded)
+            return BuildExpandedSeparator(linear, cancellationToken);
         var separator = new char[linear.Length];
         for (var index = 0; index < separator.Length; index++)
         {
@@ -478,6 +509,35 @@ internal static partial class Gs1CompositeEncoder
                     separator[index] = linear[index] == '0' && latch ? '1' : '0';
                     latch = linear[index] == '1' || !latch;
                 }
+            }
+        }
+        return new string(separator);
+    }
+
+    /// <summary>
+    /// 生成单行 Expanded 的 Composite 分隔图案，调整二维组件下方的前四组交替定位符。
+    /// </summary>
+    /// <param name="linear">包含连接标志和保护条的完整线性模块串。</param>
+    /// <param name="cancellationToken">观察调用方取消，不持有调用方资源。</param>
+    /// <returns>与线性组件等宽的一模块高分隔行。</returns>
+    private static string BuildExpandedSeparator(string linear, CancellationToken cancellationToken)
+    {
+        // Zint 2.15.0 rss.c dbar_exp_separator, BSD-3-Clause (see ThirdPartyNotices.txt).
+        var separator = new char[linear.Length];
+        for (var index = 0; index < linear.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            separator[index] = index >= 4 && index < linear.Length - 4 && linear[index] == '0' ? '1' : '0';
+        }
+        var spaceLatch = false;
+        for (var block = 0; block < 4; block++)
+        {
+            var start = 49 * block + 19 + (block % 2 == 0 ? 0 : 2);
+            for (var index = start; index < start + 13 && index < linear.Length; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                separator[index] = linear[index] == '0' && !spaceLatch ? '1' : '0';
+                spaceLatch = linear[index] == '0' && !spaceLatch;
             }
         }
         return new string(separator);

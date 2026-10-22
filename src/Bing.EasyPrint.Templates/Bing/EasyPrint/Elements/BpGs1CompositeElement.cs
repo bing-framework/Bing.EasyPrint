@@ -17,7 +17,7 @@ public sealed class BpGs1CompositeElement : BpElement
     /// </summary>
     public BgField SecondaryField { get; set; }
     /// <summary>
-    /// 获取或设置线性制式，默认 Omnidirectional。
+    /// 获取或设置线性制式，支持 Omnidirectional、Limited、单行 Expanded 和 GS1-128；默认 Omnidirectional。
     /// </summary>
     public BarcodeType LinearType { get; set; } = BarcodeType.Gs1DataBarOmnidirectional;
     /// <summary>
