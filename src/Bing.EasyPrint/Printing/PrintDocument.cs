@@ -143,6 +143,15 @@ public abstract class PrintElement
         return bytes;
     }
 
+    /// <summary>
+    /// 创建协议无关的打印元素基类。
+    /// </summary>
+    /// <param name="x">元素左上角的 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">元素左上角的 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="width">元素旋转前的预留宽度；零表示未知。</param>
+    /// <param name="height">元素旋转前的预留高度；零表示未知。</param>
+    /// <param name="rotation">元素的顺时针旋转角度，默认为不旋转。</param>
+    /// <exception cref="ArgumentOutOfRangeException">坐标或预留尺寸为负数时抛出。</exception>
     protected PrintElement(int x, int y, int width, int height, RotationAngle rotation = RotationAngle.None)
     {
         if (x < 0 || y < 0) throw new ArgumentOutOfRangeException(x < 0 ? nameof(x) : nameof(y));
@@ -175,6 +184,23 @@ public sealed class PrintTextElement : PrintElement
     /// <summary>获取统一字体描述；使用旧构造器创建时为 <see langword="null" />。</summary>
     public PrintFont Font { get; }
 
+    /// <summary>
+    /// 创建使用旧式字体参数的文本元素。
+    /// </summary>
+    /// <param name="x">元素左上角的 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">元素左上角的 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="text">要打印的文本；不能为 <see langword="null" />，空文本是否有效由目标协议决定。</param>
+    /// <param name="fontSize">字体大小，单位由目标协议 Provider 解释，必须为正数。</param>
+    /// <param name="bold">是否请求加粗，默认为否。</param>
+    /// <param name="underline">是否请求下划线，默认为否。</param>
+    /// <param name="rotation">顺时针旋转角度，默认为不旋转。</param>
+    /// <param name="width">文字预留宽度；零表示未知。</param>
+    /// <param name="height">文字预留高度；零表示未知。</param>
+    /// <param name="fontFamily">主机字体名称或固定 Raster 字体别名；仅 ESC/POS Raster 使用。</param>
+    /// <param name="reverse">是否请求反白输出，默认为否。</param>
+    /// <param name="deviceFontName">设备字体标识；具体支持范围由目标协议决定。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="fontSize" /> 非正数，或坐标及预留尺寸为负数。</exception>
     public PrintTextElement(int x, int y, string text, int fontSize, bool bold = false, bool underline = false,
         RotationAngle rotation = RotationAngle.None, int width = 0, int height = 0, string fontFamily = null,
         bool reverse = false, string deviceFontName = null)
@@ -238,6 +264,16 @@ public sealed class PrintLineElement : PrintElement
     /// <summary>线条宽度。</summary>
     public int LineWidth { get; }
 
+    /// <summary>
+    /// 创建由起点和终点定义的线元素。
+    /// </summary>
+    /// <param name="x">起点 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">起点 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="endX">终点 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="endY">终点 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="lineWidth">线宽，单位为打印点，必须为正数。</param>
+    /// <exception cref="ArgumentException">起点与终点相同时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标为负数或线宽非正数时抛出。</exception>
     public PrintLineElement(int x, int y, int endX, int endY, int lineWidth = 1)
         : base(x, y, Math.Abs(endX - x), Math.Abs(endY - y))
     {
@@ -279,6 +315,16 @@ public sealed class PrintRectangleElement : PrintElement
         return new PrintRectangleElement(x, y, width, height, filled: true) { ExactFillBounds = true };
     }
 
+    /// <summary>
+    /// 创建矩形边框或填充矩形元素。
+    /// </summary>
+    /// <param name="x">矩形左上角的 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">矩形左上角的 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="width">矩形宽度，单位为打印点。</param>
+    /// <param name="height">矩形高度，单位为打印点。</param>
+    /// <param name="lineWidth">边框线宽，单位为打印点，必须为正数。</param>
+    /// <param name="filled">是否填充；旧 CPCL 命令的填充语义保持兼容。</param>
+    /// <exception cref="ArgumentOutOfRangeException">坐标或尺寸为负数，或线宽非正数时抛出。</exception>
     public PrintRectangleElement(int x, int y, int width, int height, int lineWidth = 1, bool filled = false)
         : base(x, y, width, height)
     {
@@ -318,6 +364,23 @@ public sealed class PrintBarcodeElement : PrintElement
     /// <summary>为设备绘制的条码可读文字预留的高度，单位为打印点；零表示不额外预留。</summary>
     public int HumanReadableReserveHeight { get; }
 
+    /// <summary>
+    /// 创建协议无关的一维条码元素。
+    /// </summary>
+    /// <param name="x">条码编码区左上角 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">条码编码区左上角 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="type">条码制式。</param>
+    /// <param name="data">条码编码数据；不能为 <see langword="null" />，具体内容规则由目标协议决定。</param>
+    /// <param name="barHeight">条高，单位为打印点，必须为正数。</param>
+    /// <param name="narrowWidth">窄模块宽度，单位为打印点，默认 2。</param>
+    /// <param name="wideWidth">宽模块宽度，单位为打印点，默认 2。</param>
+    /// <param name="rotation">顺时针旋转角度，默认为不旋转。</param>
+    /// <param name="cpclRatioCode">旧 CPCL 比例编码；仅允许 0–4 或 20–30，默认不指定。</param>
+    /// <param name="humanReadable">是否请求条码可读文字；<see langword="null" /> 表示使用协议默认值。</param>
+    /// <param name="humanReadableReserveHeight">为设备可读文字预留的高度，单位为打印点；默认不额外预留。</param>
+    /// <param name="reservedWidth">条码编码区预留宽度，单位为打印点；零表示未知。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="data" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">条高或模块宽度非正数、预留高度为负数，或 CPCL 比例编码超出允许范围时抛出。</exception>
     public PrintBarcodeElement(int x, int y, BarcodeType type, string data, int barHeight, int narrowWidth = 2,
         int wideWidth = 2, RotationAngle rotation = RotationAngle.None, int? cpclRatioCode = null,
         bool? humanReadable = null, int humanReadableReserveHeight = 0, int reservedWidth = 0)
@@ -368,6 +431,19 @@ public sealed class PrintQrCodeElement : PrintElement
     /// <summary>二维码纠错级别。</summary>
     public QrCodeCorrectionLevel ErrorLevel { get; }
 
+    /// <summary>
+    /// 创建协议无关的二维码元素。
+    /// </summary>
+    /// <param name="x">编码区左上角 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">编码区左上角 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="data">二维码内容；不能为 <see langword="null" />，空字符串是否有效由目标协议决定。</param>
+    /// <param name="moduleSize">二维码单个模块的尺寸，单位为打印点，必须为正数。</param>
+    /// <param name="errorLevel">二维码纠错级别。</param>
+    /// <param name="width">编码区预留宽度，单位为打印点；零表示未知。</param>
+    /// <param name="height">编码区预留高度，单位为打印点；零表示未知。</param>
+    /// <param name="rotation">顺时针旋转角度，默认为不旋转。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="data" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">模块尺寸非正数、纠错级别无效，或坐标及预留尺寸为负数时抛出。</exception>
     public PrintQrCodeElement(int x, int y, string data, int moduleSize, QrCodeCorrectionLevel errorLevel,
         int width = 0, int height = 0, RotationAngle rotation = RotationAngle.None)
         : base(x, y, width, height, rotation)
@@ -407,6 +483,18 @@ public sealed class PrintImageElement : PrintElement
     internal int OutputHeight => Rotation == RotationAngle.Rotate90 || Rotation == RotationAngle.Rotate270 ? Width : Height;
     internal int OutputRowBytes => checked((int)(((long)OutputWidth + 7) / 8));
 
+    /// <summary>
+    /// 创建不旋转的 MSB 优先单色图片元素。
+    /// </summary>
+    /// <param name="x">图片左上角 X 坐标，单位为逻辑打印点。</param>
+    /// <param name="y">图片左上角 Y 坐标，单位为逻辑打印点。</param>
+    /// <param name="width">图片宽度，单位为像素。</param>
+    /// <param name="height">图片高度，单位为像素。</param>
+    /// <param name="raster">逐行排列的 MSB 优先位图；每行字节数为向上取整的宽度除以 8。</param>
+    /// <param name="compressed">是否请求 CPCL 二进制 CG 编码；其他协议忽略此偏好。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="raster" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">位图长度与尺寸不匹配时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">图片尺寸非正数，或坐标及尺寸超出可表示范围时抛出。</exception>
     public PrintImageElement(int x, int y, int width, int height, byte[] raster, bool compressed = false)
         : this(x, y, width, height, raster, RotationAngle.None, compressed)
     {

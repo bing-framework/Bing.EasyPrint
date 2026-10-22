@@ -7,13 +7,19 @@ using Bing.EasyPrint.Printing;
 
 namespace Bing.EasyPrint.Protocols;
 
-/// <summary>协议命令的通用动作记录和可重复构建实现。</summary>
+/// <summary>
+/// 提供协议命令的动作记录和可重复构建实现。
+/// </summary>
+/// <typeparam name="TCommand">具体命令构建器类型，用于保持流式调用返回类型。</typeparam>
 public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TCommand>, ICancelableProtocolPrintCommand
     where TCommand : ProtocolPrintCommandBase<TCommand>
 {
     private readonly BudgetedList<Action<IBufferWriter, CancellationToken>> _actions =
         new BudgetedList<Action<IBufferWriter, CancellationToken>>("Command.Actions", itemBytes: 96);
     private int _actionRecordingSuppression;
+    /// <summary>
+    /// 获取命令文本使用的字符编码。
+    /// </summary>
     protected Encoding Encoding { get; }
 
     /// <summary>获取命令所属协议。</summary>
@@ -22,13 +28,27 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
     /// <summary>获取协议能力描述。</summary>
     public abstract PrintCapabilities Capabilities { get; }
 
+    /// <summary>
+    /// 创建协议命令构建器基类。
+    /// </summary>
+    /// <param name="encoding">写入文本时使用的编码；不能为 <see langword="null" />。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="encoding" /> 为 <see langword="null" />。</exception>
     protected ProtocolPrintCommandBase(Encoding encoding)
     {
         Encoding = encoding ?? throw new ArgumentNullException(nameof(encoding));
     }
 
+    /// <summary>
+    /// 获取当前命令构建器的强类型引用。
+    /// </summary>
     protected TCommand Self => (TCommand)this;
 
+    /// <summary>
+    /// 将写入动作追加到可重复构建的命令序列。
+    /// </summary>
+    /// <param name="action">向输出缓冲区写入该动作协议数据的委托。</param>
+    /// <returns>当前具体命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="action" /> 为 <see langword="null" />。</exception>
     protected virtual TCommand Add(Action<IBufferWriter> action)
     {
         if (action == null) throw new ArgumentNullException(nameof(action));
@@ -79,6 +99,13 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
         }
     }
 
+    /// <summary>
+    /// 校验文本字段不含空值或换行符。
+    /// </summary>
+    /// <param name="value">待校验的文本。</param>
+    /// <param name="name">发生错误时使用的参数名。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="value" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException"><paramref name="value" /> 含回车或换行符。</exception>
     protected static void Validate(string value, string name)
     {
         if (value == null) throw new ArgumentNullException(name);
@@ -98,6 +125,13 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
                 throw new ArgumentException("协议字段包含保留分隔符。", name);
     }
 
+    /// <summary>
+    /// 记录未经换行包装的协议文本。
+    /// </summary>
+    /// <param name="raw">要写入的原始文本；必须可由当前协议编码表示。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raw" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">文本包含无法由当前编码表示的字符时抛出。</exception>
     public TCommand WriteRaw(string raw)
     {
         if (raw == null) throw new ArgumentNullException(nameof(raw));
@@ -120,6 +154,13 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
         return Self;
     }
 
+    /// <summary>
+    /// 记录协议文本并追加 CRLF 行结束符。
+    /// </summary>
+    /// <param name="raw">不含换行符且可由当前协议编码表示的文本。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raw" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">文本含换行符或无法由当前编码表示时抛出。</exception>
     public TCommand WriteRawLine(string raw)
     {
         Validate(raw, nameof(raw));
@@ -143,6 +184,10 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
         return result;
     }
 
+    /// <summary>
+    /// 执行当前已记录的所有命令动作并生成新的输出缓冲区。
+    /// </summary>
+    /// <returns>包含完整命令字节的缓冲区；已记录动作保留，可再次构建。</returns>
     public virtual IBufferWriter Build()
         => Build(CancellationToken.None);
 
@@ -173,6 +218,11 @@ public abstract class ProtocolPrintCommandBase<TCommand> : IPrintCommand<TComman
         return writer;
     }
 
+    /// <summary>
+    /// 记录已编码的协议字节。
+    /// </summary>
+    /// <param name="bytes">要追加到输出缓冲区的字节。</param>
+    /// <returns>当前命令构建器。</returns>
     protected TCommand WriteEncoded(byte[] bytes) => AddWithStorage(w => w.Write(bytes), bytes?.LongLength ?? 0);
 
     /// <summary>

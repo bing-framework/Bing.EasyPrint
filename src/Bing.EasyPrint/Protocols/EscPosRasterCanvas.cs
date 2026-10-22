@@ -82,6 +82,12 @@ public sealed class EscPosRasterCanvas
     /// <summary>每行字节数。</summary>
     public int RowBytes { get; }
 
+    /// <summary>
+    /// 创建不指定固定字体且不响应外部取消的 Raster 画布。
+    /// </summary>
+    /// <param name="width">画布宽度，单位为像素，必须为正数。</param>
+    /// <param name="height">画布高度，单位为像素，必须为正数。</param>
+    /// <exception cref="ArgumentOutOfRangeException">画布宽度或高度非正数时抛出。</exception>
     public EscPosRasterCanvas(int width, int height) : this(width, height, null, CancellationToken.None) { }
 
     /// <summary>使用固定字体配置创建画布；配置为空时保留系统字体选择。</summary>

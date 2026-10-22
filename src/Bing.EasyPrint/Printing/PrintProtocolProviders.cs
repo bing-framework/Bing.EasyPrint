@@ -41,15 +41,34 @@ public static class PrintProtocolProviderFactory
     }
 }
 
+/// <summary>
+/// 提供协议 Provider 共用的文档校验和页面范围辅助逻辑。
+/// </summary>
 public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvider
 {
+    /// <summary>
+    /// 获取编码协议文本时使用的字符集。
+    /// </summary>
     protected readonly Encoding Encoding;
     private readonly AsyncLocal<CancellationToken> _validationCancellation = new AsyncLocal<CancellationToken>();
     /// <summary>当前预检的取消令牌；按执行上下文隔离并在调用结束时恢复。</summary>
     protected CancellationToken ValidationCancellationToken => _validationCancellation.Value;
+    /// <summary>
+    /// 创建协议 Provider 基类。
+    /// </summary>
+    /// <param name="encoding">协议文本编码；为空时使用 UTF-8。</param>
     protected PrintProtocolProviderBase(Encoding encoding) => Encoding = encoding ?? Encoding.UTF8;
+
+    /// <inheritdoc />
     public abstract PrintProtocol Protocol { get; }
+
+    /// <inheritdoc />
     public abstract PrintCapabilities Capabilities { get; }
+
+    /// <summary>
+    /// 获取是否要求 Native 元素显式声明可验证的占用范围。
+    /// </summary>
+    /// <remarks>默认不要求；面向有明确页面边界的设备配置可以启用该校验。</remarks>
     protected virtual bool RequireDeclaredNativeBounds => false;
     // 自动批次裁切必须在 PRINT 前配置；旧 ZPL ^CN 同样位于格式内部。
     internal virtual bool JobCutInPage => Protocol == PrintProtocol.Zpl;
@@ -97,6 +116,7 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         finally { _validationCancellation.Value = previous; }
     }
 
+    /// <inheritdoc cref="IPrintProtocolProvider.Validate(PrintDocument)" />
     public virtual void Validate(PrintDocument document)
     {
         var cancellationToken = ValidationCancellationToken;
@@ -272,9 +292,23 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         return true;
     }
 
+    /// <summary>
+    /// 估算条码在指定协议下所需的水平范围。
+    /// </summary>
+    /// <param name="barcode">待测量的条码元素。</param>
+    /// <param name="protocol">目标打印协议。</param>
+    /// <returns>估算宽度，单位为逻辑打印点；TSPL 和 ZPL 使用原生条码估算，其他协议至少采用声明宽度。</returns>
     protected internal static long MeasureBarcodeWidth(PrintBarcodeElement barcode, PrintProtocol protocol)
         => MeasureBarcodeWidth(barcode, protocol, CancellationToken.None);
 
+    /// <summary>
+    /// 可取消地估算条码在指定协议下所需的水平范围。
+    /// </summary>
+    /// <param name="barcode">待测量的条码元素。</param>
+    /// <param name="protocol">目标打印协议。</param>
+    /// <param name="cancellationToken">用于取消条码测量的令牌。</param>
+    /// <returns>估算宽度，单位为逻辑打印点。</returns>
+    /// <exception cref="OperationCanceledException">测量期间请求取消时抛出。</exception>
     protected internal static long MeasureBarcodeWidth(PrintBarcodeElement barcode, PrintProtocol protocol,
         CancellationToken cancellationToken)
         => Math.Max(barcode.Width,
@@ -594,6 +628,12 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         return Math.Max((long)barcode.BarHeight, minimum) + barcode.HumanReadableReserveHeight;
     }
 
+    /// <summary>
+    /// 估算协议无关文本元素所需的宽高范围。
+    /// </summary>
+    /// <param name="text">待测量的文本元素。</param>
+    /// <param name="protocol">目标打印协议。</param>
+    /// <returns>宽和高，单位为逻辑打印点；TSPL 固定设备字体的 ASCII 文本会按字体单元补足范围。</returns>
     protected internal static (long Width, long Height) MeasureTextExtent(PrintTextElement text, PrintProtocol protocol)
     {
         long width = text.Width, height = text.Height;
@@ -608,6 +648,15 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         return (width, height);
     }
 
+    /// <summary>
+    /// 计算 TSPL 原生旋转文字对应的设备命令原点。
+    /// </summary>
+    /// <param name="x">旋转前的逻辑左上角 X 坐标。</param>
+    /// <param name="y">旋转前的逻辑左上角 Y 坐标。</param>
+    /// <param name="width">旋转前预留宽度。</param>
+    /// <param name="height">旋转前预留高度。</param>
+    /// <param name="rotation">顺时针旋转角度。</param>
+    /// <returns>用于 TSPL 输出的设备原点坐标。</returns>
     protected static (int X, int Y) TsplRotationOrigin(int x, int y, long width, long height, RotationAngle rotation)
     {
         switch (rotation)
@@ -619,6 +668,11 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         }
     }
 
+    /// <summary>
+    /// 在严格页面范围模式下检查 Native 元素是否声明了必要占用尺寸。
+    /// </summary>
+    /// <param name="element">待检查的打印元素。</param>
+    /// <exception cref="ArgumentException">条码或文字缺少严格范围校验所需的预留尺寸时抛出。</exception>
     protected void ValidateDeclaredNativeBounds(PrintElement element)
     {
         if (!RequireDeclaredNativeBounds) return;
@@ -634,6 +688,13 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
             throw new ArgumentException("严格设备边界校验要求声明文字的目标设备预留宽高。", nameof(element));
     }
 
+    /// <summary>
+    /// 校验页面尺寸、份数、进纸及切纸设置是否受当前 Provider 支持。
+    /// </summary>
+    /// <param name="page">待校验的页面。</param>
+    /// <exception cref="ArgumentException">页面收尾参数组合无效时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">份数或进纸行数越界时抛出。</exception>
+    /// <exception cref="NotSupportedException">页面尺寸或收尾能力超出 Provider 能力时抛出。</exception>
     protected virtual void ValidatePage(PrintPage page)
     {
         if (Capabilities.DeviceProfileName != null &&
@@ -664,6 +725,12 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
             throw new NotSupportedException($"机型 {Capabilities.DeviceProfileName} 不支持此元素类型。");
     }
 
+    /// <summary>
+    /// 校验元素类型、协议能力、条码数据容量及旋转值。
+    /// </summary>
+    /// <param name="element">待校验的打印元素。</param>
+    /// <exception cref="ArgumentOutOfRangeException">元素旋转值无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">当前协议或设备配置不能表达元素时抛出。</exception>
     protected virtual void ValidateElement(PrintElement element)
     {
         ValidateProfileElementKind(element);
@@ -757,13 +824,27 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         => barcode.HumanReadable == true ||
            barcode.HumanReadable == null && (Protocol == PrintProtocol.Tspl || Protocol == PrintProtocol.Zpl);
 
+    /// <inheritdoc cref="IPrintProtocolProvider.Render(PrintDocument, CancellationToken)" />
     public abstract IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken));
 
     // Every provider sends the same encoded raster through its existing image path.
+    /// <summary>
+    /// 将 GS1 Composite 元素转换为协议可复用的光栅图片元素。
+    /// </summary>
+    /// <param name="element">待转换的元素；非 Composite 元素原样返回。</param>
+    /// <param name="cancellationToken">用于取消编码和光栅化的令牌。</param>
+    /// <returns>原元素或由 Composite 编码生成的图片元素。</returns>
+    /// <exception cref="OperationCanceledException">转换期间请求取消时抛出。</exception>
     protected static PrintElement PrepareComposite(PrintElement element, CancellationToken cancellationToken)
         => element is PrintGs1CompositeElement composite
             ? Gs1CompositeEncoder.Rasterize(composite, cancellationToken) : element;
 
+    /// <summary>
+    /// 将统一条码制式映射为 TSPL 条码标识。
+    /// </summary>
+    /// <param name="type">统一条码制式。</param>
+    /// <returns>TSPL 原生条码命令使用的制式文本。</returns>
+    /// <exception cref="NotSupportedException">TSPL 没有对应映射时抛出。</exception>
     protected static string TsplBarcodeType(BarcodeType type)
     {
         switch (type)
@@ -796,6 +877,12 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         }
     }
 
+    /// <summary>
+    /// 执行页面写入委托并取回该页面生成的字节。
+    /// </summary>
+    /// <param name="action">向输出缓冲区写入页面命令的委托。</param>
+    /// <param name="writer">接收页面命令的缓冲区。</param>
+    /// <returns>页面完整输出字节。</returns>
     protected static byte[] RenderPage(Action action, IBufferWriter writer)
     {
         action();
@@ -806,11 +893,20 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
 /// <summary>将统一打印文档编码为 CPCL。</summary>
 public sealed class CpclPrintProtocolProvider : PrintProtocolProviderBase
 {
+    /// <summary>
+    /// 创建 CPCL Provider。
+    /// </summary>
+    /// <param name="encoding">CPCL 文本编码；为空时使用 GBK。</param>
     public CpclPrintProtocolProvider(Encoding encoding = null) : base(encoding ?? Encoding.GetEncoding("gbk")) { }
+
+    /// <inheritdoc />
     public override PrintProtocol Protocol => PrintProtocol.Cpcl;
+
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; } = new PrintCapabilities(PrintProtocol.Cpcl, 200, true, true, true, true, false,
         supportsReverseText: true);
 
+    /// <inheritdoc />
     protected override void ValidatePage(PrintPage page)
     {
         base.ValidatePage(page);
@@ -818,6 +914,7 @@ public sealed class CpclPrintProtocolProvider : PrintProtocolProviderBase
             throw new NotSupportedException("CPCL Provider 当前不支持页级额外进纸。");
     }
 
+    /// <inheritdoc />
     protected override void ValidateElement(PrintElement element)
     {
         base.ValidateElement(element);
@@ -846,6 +943,7 @@ public sealed class CpclPrintProtocolProvider : PrintProtocolProviderBase
         candidate.Build(ValidationCancellationToken);
     }
 
+    /// <inheritdoc />
     public override IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken))
     {
         using var operation = PrintResourceScope.BeginTemporary();
@@ -947,6 +1045,12 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
     }
     private readonly TsplMediaOptions _mediaOptions;
     private readonly bool _requireDeclaredNativeBounds;
+    /// <summary>
+    /// 创建 TSPL Provider 及可选的介质、设备配置。
+    /// </summary>
+    /// <param name="encoding">TSPL 文本编码；为空时使用 GBK。</param>
+    /// <param name="options">可选介质和机型配置；为空时采用默认 DPI。</param>
+    /// <param name="requireDeclaredNativeBounds">是否要求 Native 文字和条码声明预留范围，默认为否。</param>
     public TsplPrintProtocolProvider(Encoding encoding = null, TsplMediaOptions options = null,
         bool requireDeclaredNativeBounds = false)
         : base(encoding ?? Encoding.GetEncoding("gbk"))
@@ -956,10 +1060,16 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
         _requireDeclaredNativeBounds = requireDeclaredNativeBounds;
         Capabilities = configuration.Capabilities;
     }
+    /// <inheritdoc />
     public override PrintProtocol Protocol => PrintProtocol.Tspl;
+
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; }
+
+    /// <inheritdoc />
     protected override bool RequireDeclaredNativeBounds => _requireDeclaredNativeBounds;
 
+    /// <inheritdoc />
     protected override void ValidatePage(PrintPage page)
     {
         base.ValidatePage(page);
@@ -969,6 +1079,7 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
         new TsplPrintCommand(Encoding, _mediaOptions).Size(page.Width, page.Height, "dot");
     }
 
+    /// <inheritdoc />
     protected override void ValidateElement(PrintElement element)
     {
         base.ValidateElement(element);
@@ -997,6 +1108,7 @@ public sealed class TsplPrintProtocolProvider : PrintProtocolProviderBase
         Add(new TsplPrintCommand(Encoding, _mediaOptions), element, Capabilities.Dpi, ValidationCancellationToken);
     }
 
+    /// <inheritdoc />
     public override IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken))
     {
         using var operation = PrintResourceScope.BeginTemporary();
@@ -1122,6 +1234,12 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
     }
     private readonly ZplMediaOptions _mediaOptions;
     private readonly bool _requireDeclaredNativeBounds;
+    /// <summary>
+    /// 创建 ZPL Provider 及可选的介质、设备配置。
+    /// </summary>
+    /// <param name="encoding">ZPL 文本编码；为空时使用 UTF-8。</param>
+    /// <param name="options">可选介质和机型配置。</param>
+    /// <param name="requireDeclaredNativeBounds">是否要求 Native 文字和条码声明预留范围，默认为否。</param>
     public ZplPrintProtocolProvider(Encoding encoding = null, ZplMediaOptions options = null,
         bool requireDeclaredNativeBounds = false)
         : base(encoding ?? Encoding.UTF8)
@@ -1131,10 +1249,16 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
         _requireDeclaredNativeBounds = requireDeclaredNativeBounds;
         Capabilities = configuration.Capabilities;
     }
+    /// <inheritdoc />
     public override PrintProtocol Protocol => PrintProtocol.Zpl;
+
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; }
+
+    /// <inheritdoc />
     protected override bool RequireDeclaredNativeBounds => _requireDeclaredNativeBounds;
 
+    /// <inheritdoc />
     protected override void ValidatePage(PrintPage page)
     {
         base.ValidatePage(page);
@@ -1146,6 +1270,7 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
             ValidateCutOptions(page.CutOptions ?? new PrintCutOptions());
     }
 
+    /// <inheritdoc />
     protected override void ValidateElement(PrintElement element)
     {
         base.ValidateElement(element);
@@ -1200,6 +1325,7 @@ public sealed class ZplPrintProtocolProvider : PrintProtocolProviderBase, IPrint
         Add(new ZplPrintCommand(Encoding, _mediaOptions), element, ValidationCancellationToken);
     }
 
+    /// <inheritdoc />
     public override IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken))
     {
         using var operation = PrintResourceScope.BeginTemporary();
@@ -1412,6 +1538,15 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
     private readonly EscPosLayoutMode _layoutMode;
     private readonly EscPosDeviceOptions _deviceOptions;
     private readonly int _rasterHumanReadableFontSize;
+    /// <summary>
+    /// 创建 ESC/POS Provider。
+    /// </summary>
+    /// <param name="encoding">ESC/POS 文本编码；为空时使用 GB18030，并要求 ASCII 兼容。</param>
+    /// <param name="layoutMode">使用 Native 或 Raster 布局，默认为 Native。</param>
+    /// <param name="options">可选设备能力和 Raster 字体配置。</param>
+    /// <exception cref="ArgumentException">Raster 字体选项与 Native 模式不兼容时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="layoutMode" /> 无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">编码不满足 ESC/POS 的 ASCII 兼容要求时抛出。</exception>
     public EscPosPrintProtocolProvider(Encoding encoding = null, EscPosLayoutMode layoutMode = EscPosLayoutMode.Native,
         EscPosDeviceOptions options = null)
         : base(encoding ?? Encoding.GetEncoding("gb18030"))
@@ -1435,9 +1570,13 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
         Capabilities = configuration.Capabilities;
         _rasterHumanReadableFontSize = Capabilities.RasterBarcodeHumanReadableFontSize ?? RasterHumanReadableFontSize;
     }
+    /// <inheritdoc />
     public override PrintProtocol Protocol => PrintProtocol.EscPos;
+
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; }
 
+    /// <inheritdoc />
     public override void Validate(PrintDocument document)
     {
         base.Validate(document);
@@ -1560,6 +1699,7 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
             throw new ArgumentOutOfRangeException(nameof(width), "线条画笔超出打印页范围。");
     }
 
+    /// <inheritdoc />
     protected override void ValidatePage(PrintPage page)
     {
         base.ValidatePage(page);
@@ -1578,6 +1718,7 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
             EscPosImageEncoder.Validate(page.Width, page.Height, _deviceOptions?.Profile, false, false);
     }
 
+    /// <inheritdoc />
     protected override void ValidateElement(PrintElement element)
     {
         base.ValidateElement(element);
@@ -1639,6 +1780,7 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
             throw new NotSupportedException("ESC/POS Raster Provider 不支持此元素类型。");
     }
 
+    /// <inheritdoc />
     public override IReadOnlyList<byte[]> Render(PrintDocument document, CancellationToken cancellationToken = default(CancellationToken))
     {
         using var operation = PrintResourceScope.BeginTemporary();

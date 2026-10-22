@@ -11,6 +11,7 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
 {
     /// <summary>获取 TSPL 的基础能力描述。</summary>
     public override PrintProtocol Protocol => PrintProtocol.Tspl;
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities => _capabilities;
 
     private PrintCapabilities _capabilities;
@@ -29,7 +30,15 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
     private int _referenceY;
     private bool _validatePageBounds = true;
 
+    /// <summary>
+    /// 创建使用默认编码和默认 DPI 的 TSPL 命令构建器。
+    /// </summary>
     public TsplPrintCommand() : this((Encoding)null, null) { }
+
+    /// <summary>
+    /// 创建使用指定文本编码的 TSPL 命令构建器。
+    /// </summary>
+    /// <param name="encoding">文本编码；为空时使用 GBK。</param>
     public TsplPrintCommand(Encoding encoding = null) : this(encoding, null) { }
 
     internal TsplPrintCommand DisablePageBoundsValidation()
@@ -95,6 +104,16 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         return this;
     }
 
+    /// <summary>
+    /// 设置 TSPL 标签宽度和高度，并输出介质初始化命令。
+    /// </summary>
+    /// <param name="width">标签宽度，单位由 <paramref name="unit" /> 指定，必须为正数。</param>
+    /// <param name="height">标签高度，单位由 <paramref name="unit" /> 指定，必须为正数。</param>
+    /// <param name="unit">尺寸单位，只接受 <c>mm</c> 或 <c>dot</c>，默认为 <c>mm</c>。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException"><paramref name="unit" /> 不是 <c>mm</c> 或 <c>dot</c> 时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">宽度或高度非正数，或超出机型页面范围时抛出。</exception>
+    /// <exception cref="NotSupportedException">编码没有对应的 TSPL 设备代码页映射时抛出。</exception>
     public TsplPrintCommand Size(int width, int height, string unit = "mm")
     {
         if (width <= 0 || height <= 0) throw new ArgumentOutOfRangeException();
@@ -118,11 +137,24 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
     }
     /// <summary>清空打印机的标签图像缓冲区。</summary>
     public TsplPrintCommand ClearImageBuffer() => WriteTsplLine("CLS");
+    /// <summary>
+    /// 设置标签间隙距离及定位偏移。
+    /// </summary>
+    /// <param name="distance">介质间隙距离，单位为毫米。</param>
+    /// <param name="offset">定位偏移，单位为毫米，默认为 0。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">间隙距离或偏移为负数时抛出。</exception>
     public TsplPrintCommand Gap(int distance, int offset = 0)
     {
         if (distance < 0 || offset < 0) throw new ArgumentOutOfRangeException();
         return WriteTsplLine($"GAP {distance},{offset}");
     }
+    /// <summary>
+    /// 设置 TSPL 打印方向参数。
+    /// </summary>
+    /// <param name="direction">方向参数，只接受 0 或 1，默认为 0。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="direction" /> 不是 0 或 1 时抛出。</exception>
     public TsplPrintCommand Direction(int direction = 0)
     {
         if (direction < 0 || direction > 1) throw new ArgumentOutOfRangeException(nameof(direction));
@@ -130,6 +162,13 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         _direction = direction;
         return result;
     }
+    /// <summary>
+    /// 设置标签参考原点。
+    /// </summary>
+    /// <param name="x">参考原点 X 坐标，单位为打印点。</param>
+    /// <param name="y">参考原点 Y 坐标，单位为打印点。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">任一坐标为负数时抛出。</exception>
     public TsplPrintCommand Reference(int x, int y)
     {
         ValidateCoordinate(x, nameof(x));
@@ -139,16 +178,42 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         _referenceY = y;
         return result;
     }
+    /// <summary>
+    /// 设置 TSPL 打印速度参数。
+    /// </summary>
+    /// <param name="value">由目标打印机解释的速度档位；必须为正数。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value" /> 非正数时抛出。</exception>
     public TsplPrintCommand Speed(int value)
     {
         if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
         return WriteTsplLine($"SPEED {value}");
     }
+    /// <summary>
+    /// 设置打印浓度。
+    /// </summary>
+    /// <param name="value">浓度值，范围为 0 到 15。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value" /> 不在 0 到 15 范围内时抛出。</exception>
     public TsplPrintCommand Density(int value)
     {
         if (value < 0 || value > 15) throw new ArgumentOutOfRangeException(nameof(value));
         return WriteTsplLine($"DENSITY {value}");
     }
+    /// <summary>
+    /// 使用 TSPL 原生文字命令输出文本。
+    /// </summary>
+    /// <param name="x">文本左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">文本左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="font">设备字体标识。</param>
+    /// <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+    /// <param name="xScale">水平放大倍数；字体 0 支持 1 到 256，其他字体支持 1 到 10。</param>
+    /// <param name="yScale">垂直放大倍数；字体 0 支持 1 到 256，其他字体支持 1 到 10。</param>
+    /// <param name="data">待输出文本。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">字段含有 TSPL 保留字符或设备字体不支持文本时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、旋转角度或放大倍数无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持请求的文字旋转时抛出。</exception>
     public TsplPrintCommand Text(int x, int y, string font, int rotation, int xScale, int yScale, string data)
     {
         ValidateCoordinate(x, nameof(x));
@@ -166,6 +231,15 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
             "TSPL 原生文字", estimated: true);
         return WriteTsplLine($"TEXT {x},{y},\"{font}\",{rotation},{xScale},{yScale},\"{data}\"");
     }
+    /// <summary>
+    /// 使用设备默认字体和原始大小输出未旋转文本。
+    /// </summary>
+    /// <param name="x">文本左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">文本左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">待输出文本。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">文本包含 TSPL 保留字符或设备字体不支持文本时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标为负数时抛出。</exception>
     public TsplPrintCommand Text(int x, int y, string data) => Text(x, y, "0", 0, 1, 1, data);
 
     /// <summary>
@@ -201,6 +275,17 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
             reverse, cancellationToken: cancellationToken);
         return Bitmap(x, y, raster.RowBytes, raster.Height, 0, raster.Data, cancellationToken);
     }
+    /// <summary>
+    /// 在标签上绘制线段；斜线会转换为光栅图片。
+    /// </summary>
+    /// <param name="x0">起点 X 坐标，单位为打印点。</param>
+    /// <param name="y0">起点 Y 坐标，单位为打印点。</param>
+    /// <param name="x1">终点 X 坐标，单位为打印点。</param>
+    /// <param name="y1">终点 Y 坐标，单位为打印点。</param>
+    /// <param name="width">线宽，单位为打印点，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、线宽或页面边界无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持图形，或不支持将斜线光栅化时抛出。</exception>
     public TsplPrintCommand Line(int x0, int y0, int x1, int y1, int width = 1)
         => Line(x0, y0, x1, y1, width, CancellationToken.None);
 
@@ -247,6 +332,17 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         return Bitmap(left, top, canvas.RowBytes, bitmapHeight, 1,
             canvas.ToBytes(cancellationToken), cancellationToken);
     }
+    /// <summary>
+    /// 绘制矩形边框。
+    /// </summary>
+    /// <param name="x0">矩形左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y0">矩形左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="x1">矩形右下角 X 坐标，单位为打印点，必须大于 <paramref name="x0" />。</param>
+    /// <param name="y1">矩形右下角 Y 坐标，单位为打印点，必须大于 <paramref name="y0" />。</param>
+    /// <param name="width">边框线宽，单位为打印点，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">端点顺序、坐标、线宽或页面边界无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持图形时抛出。</exception>
     public TsplPrintCommand Box(int x0, int y0, int x1, int y1, int width = 1)
     {
         _profile?.Require(_profile.Graphics, "线框绘图");
@@ -302,6 +398,22 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         return WriteTsplLine($"BAR {x},{y},{width},{height}", cancellationToken);
     }
 
+    /// <summary>
+    /// 使用 TSPL 原生条码命令输出条码。
+    /// </summary>
+    /// <param name="x">条码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">条码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="type">TSPL 条码制式标识。</param>
+    /// <param name="height">条高，单位为打印点。</param>
+    /// <param name="humanReadable">是否输出可读文字；0 为关闭，1 为开启。</param>
+    /// <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270。</param>
+    /// <param name="narrow">窄模块宽度，单位为打印点。</param>
+    /// <param name="wide">宽模块宽度，单位为打印点。</param>
+    /// <param name="data">条码数据。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">制式或数据包含 TSPL 保留字符，或数据不符合制式时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、条高、模块宽度、可读文字开关或角度无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生条码、请求的可读文字或旋转时抛出。</exception>
     public TsplPrintCommand Barcode(int x, int y, string type, int height, int humanReadable, int rotation, int narrow, int wide, string data)
     {
         _profile?.Require(_profile.Barcode, "原生条码");
@@ -566,7 +678,31 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         int humanReadable = 1, int rotation = 0, int narrow = 2, int wide = 2)
         => Barcode(x, y, "EAN128", height, humanReadable, rotation, narrow, wide, data);
 
+    /// <summary>
+    /// 使用默认参数输出 TSPL Code 128 条码。
+    /// </summary>
+    /// <param name="x">条码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">条码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">Code 128 条码数据。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">条码数据不符合 Code 128 输入规则时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标或条码尺寸无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生条码时抛出。</exception>
     public TsplPrintCommand Barcode(int x, int y, string data) => Barcode(x, y, "128", 80, 1, 0, 2, 2, data);
+
+    /// <summary>
+    /// 使用指定纠错级别、模块宽度及模式输出原生二维码。
+    /// </summary>
+    /// <param name="x">二维码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">二维码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="ecc">纠错级别索引：0、1、2、3 分别表示 L、M、Q、H。</param>
+    /// <param name="cellWidth">模块宽度，单位为打印点，范围为 1 到 10。</param>
+    /// <param name="mode">编码模式，只接受 A 或 M。</param>
+    /// <param name="data">二维码内容。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">模式或二维码内容不符合 TSPL 字段规则时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、纠错级别、模块宽度或旋转角度无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生二维码或请求的旋转时抛出。</exception>
     public TsplPrintCommand QrCode(int x, int y, int ecc, int cellWidth, string mode, string data)
         => QrCode(x, y, ecc, cellWidth, mode, 0, data);
 
@@ -592,6 +728,16 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
             "TSPL 二维码", estimated: true);
         return WriteTsplLine($"QRCODE {x},{y},{levels[ecc]},{cellWidth},{mode},{rotation},\"{data}\"");
     }
+    /// <summary>
+    /// 使用默认模块宽度和纠错级别输出二维码。
+    /// </summary>
+    /// <param name="x">二维码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">二维码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">二维码内容。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">二维码内容不符合 TSPL 字段规则时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标或编码尺寸无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生二维码时抛出。</exception>
     public TsplPrintCommand QrCode(int x, int y, string data) => QrCode(x, y, 0, 4, "A", data);
 
     /// <summary>将十六进制位图输入解码后写入 TSPL BITMAP 二进制数据。</summary>
@@ -661,11 +807,42 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         operation?.CommitReservations();
         return result;
     }
+    /// <summary>
+    /// 写入 TSPL BITMAP 单色位图数据。
+    /// </summary>
+    /// <param name="x">位图左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">位图左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="widthBytes">每行字节数。</param>
+    /// <param name="height">位图高度，单位为像素。</param>
+    /// <param name="mode">TSPL BITMAP 模式值。</param>
+    /// <param name="data">逐行排列的位图字节。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="data" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">位图长度与尺寸不匹配时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、尺寸或模式超出 TSPL 命令范围时抛出。</exception>
     public TsplPrintCommand Image(int x, int y, int widthBytes, int height, int mode, byte[] data)
         => Bitmap(x, y, widthBytes, height, mode, data);
+    /// <summary>
+    /// 可取消地写入 TSPL BITMAP 单色位图数据。
+    /// </summary>
+    /// <param name="x">位图左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">位图左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="widthBytes">每行字节数。</param>
+    /// <param name="height">位图高度，单位为像素。</param>
+    /// <param name="mode">TSPL BITMAP 模式值。</param>
+    /// <param name="data">逐行排列的位图字节。</param>
+    /// <param name="cancellationToken">用于取消校验、复制或命令记录的令牌。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="OperationCanceledException">操作被取消时抛出，且不会追加部分位图命令。</exception>
     public TsplPrintCommand Image(int x, int y, int widthBytes, int height, int mode, byte[] data,
         CancellationToken cancellationToken)
         => Bitmap(x, y, widthBytes, height, mode, data, cancellationToken);
+    /// <summary>
+    /// 请求打印机沿介质进纸指定距离。
+    /// </summary>
+    /// <param name="distance">TSPL FEED 命令的进纸距离参数，必须非负，默认为 0。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="distance" /> 为负数时抛出。</exception>
     public TsplPrintCommand Feed(int distance = 0)
     {
         if (distance < 0) throw new ArgumentOutOfRangeException(nameof(distance));
@@ -698,6 +875,10 @@ public sealed partial class TsplPrintCommand : ProtocolPrintCommandBase<TsplPrin
         _pendingMediaOptions = null;
         return result;
     }
+    /// <summary>
+    /// 请求打印机执行自检。
+    /// </summary>
+    /// <returns>当前命令构建器。</returns>
     public TsplPrintCommand SelfTest() => WriteTsplLine("SELFTEST");
 
     private static PrintCapabilities CreateCapabilities(int dpi, LabelDeviceContract profile, TsplCutterProfile cutter,

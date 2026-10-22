@@ -13,6 +13,7 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
 {
     /// <summary>获取 ZPL 的基础能力描述。</summary>
     public override PrintProtocol Protocol => PrintProtocol.Zpl;
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; }
     private readonly ZplMediaOptions _mediaOptions;
     private readonly LabelDeviceContract _profile;
@@ -33,7 +34,15 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
     private readonly BudgetedList<(int End, bool Cut)> _outputBoundaries =
         new BudgetedList<(int End, bool Cut)>("Zpl.OutputBoundaries", slotBytes: 16);
 
+    /// <summary>
+    /// 创建使用 UTF-8 编码和默认介质设置的 ZPL 命令构建器。
+    /// </summary>
     public ZplPrintCommand() : this((Encoding)null, null) { }
+
+    /// <summary>
+    /// 创建使用指定文本编码的 ZPL 命令构建器。
+    /// </summary>
+    /// <param name="encoding">文本编码；为空时使用 UTF-8。</param>
     public ZplPrintCommand(Encoding encoding = null) : this(encoding, null) { }
 
     internal ZplPrintCommand DisablePageBoundsValidation()
@@ -75,6 +84,11 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         if (_cutter != null) Capabilities.CutModes = Array.AsReadOnly((PrintCutMode[])_cutter.SupportedCutModes.Clone());
     }
 
+    /// <summary>
+    /// 开始一个 ZPL 标签格式。
+    /// </summary>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="InvalidOperationException">已有标签格式尚未结束，或打印任务约束不允许开始新格式时抛出。</exception>
     public ZplPrintCommand Start()
     {
         if (_formatOpen)
@@ -93,6 +107,11 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         _restrictedKioskCutCommandSeen = false;
         return this;
     }
+    /// <summary>
+    /// 结束当前 ZPL 标签格式并记录必要的格式收尾命令。
+    /// </summary>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="InvalidOperationException">没有活动标签格式，或受控格式不满足收尾条件时抛出。</exception>
     public ZplPrintCommand End()
     {
         if (!_formatOpen)
@@ -125,6 +144,14 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         _formatOpen = false;
         return this;
     }
+    /// <summary>
+    /// 设置标签宽高及可选打印速度。
+    /// </summary>
+    /// <param name="width">标签宽度，单位为打印点，必须为正数。</param>
+    /// <param name="height">标签高度，单位为打印点，必须为正数。</param>
+    /// <param name="printSpeed">可选的设备打印速度值；未指定时使用介质配置值。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">尺寸非正数、速度非正数或超出设备页面范围时抛出。</exception>
     public ZplPrintCommand Label(int width, int height, int? printSpeed = null)
     {
         if (width <= 0 || height <= 0) throw new ArgumentOutOfRangeException();
@@ -147,6 +174,20 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         _hasLabelSize = true;
         return result;
     }
+    /// <summary>
+    /// 使用 ZPL 原生字体命令输出文本。
+    /// </summary>
+    /// <param name="x">文本左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">文本左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">要输出的文本。</param>
+    /// <param name="fontHeight">字体高度，单位为打印点，默认为 30。</param>
+    /// <param name="fontWidth">字体宽度，单位为打印点，默认为 30。</param>
+    /// <param name="font">单个 ASCII 数字或大写字母形式的设备字体标识，默认为 <c>0</c>。</param>
+    /// <param name="rotation">顺时针旋转角度，只接受 0、90、180 或 270，默认为 0。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">文本含 ZPL 保留字符、字体标识无效或设备不支持文本时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、字体尺寸或旋转角度无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持请求的文字旋转时抛出。</exception>
     public ZplPrintCommand Text(int x, int y, string data, int fontHeight = 30, int fontWidth = 30, string font = "0", int rotation = 0)
     {
         ValidateCoordinate(x, nameof(x)); ValidateCoordinate(y, nameof(y));
@@ -241,6 +282,17 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
             canvas.ToBytes(cancellationToken), cancellationToken);
     }
 
+    /// <summary>
+    /// 绘制由两个角点界定的 ZPL 矩形边框。
+    /// </summary>
+    /// <param name="x0">左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y0">左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="x1">右下角 X 坐标，单位为打印点，必须大于 <paramref name="x0" />。</param>
+    /// <param name="y1">右下角 Y 坐标，单位为打印点，必须大于 <paramref name="y0" />。</param>
+    /// <param name="thickness">边框线宽，单位为打印点，默认为 2。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、角点顺序、线宽或页面边界无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">设备配置不支持图形时抛出。</exception>
     public ZplPrintCommand Box(int x0, int y0, int x1, int y1, int thickness = 2)
     {
         _profile?.Require(_profile.Graphics, "线框绘图");
@@ -302,6 +354,19 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
             cancellationToken);
     }
 
+    /// <summary>
+    /// 使用 ZPL Code 128 原生条码命令输出数据。
+    /// </summary>
+    /// <param name="x">条码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">条码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">非空可打印 ASCII 的 Code 128 数据。</param>
+    /// <param name="height">条码高度，单位为打印点，默认为 80。</param>
+    /// <param name="printText">是否请求条码下方的设备可读文字，默认为开启。</param>
+    /// <param name="moduleWidth">条码模块宽度，单位为打印点，范围为 1 到 10，默认为 2。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">条码数据不符合 Code 128 字段规则时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、条高或模块宽度无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生条码、可读文字或请求的能力时抛出。</exception>
     public ZplPrintCommand Barcode(int x, int y, string data, int height = 80, bool printText = true, int moduleWidth = 2)
         => Barcode(x, y, data, height, printText, moduleWidth, 0);
 
@@ -913,6 +978,18 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         return WriteBarcodeField($"^FO{x},{y}^BY{moduleWidth}^{command}{orientation},{height},{(printText ? "Y" : "N")},N{suffix}^FD{normalized}^FS",
             x, y, barcodeType, normalized, height, moduleWidth, rotation, printText);
     }
+    /// <summary>
+    /// 使用 ZPL 原生二维码命令输出内容。
+    /// </summary>
+    /// <param name="x">二维码左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">二维码左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="data">二维码内容。</param>
+    /// <param name="magnification">模块放大倍数，范围为 1 到 10，默认为 4。</param>
+    /// <param name="errorCorrection">纠错级别，只接受 L、M、Q 或 H，默认为 M。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">内容包含 ZPL 保留字符或为空时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、放大倍数、纠错级别或旋转无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">机型不支持原生二维码时抛出。</exception>
     public ZplPrintCommand QrCode(int x, int y, string data, int magnification = 4, char errorCorrection = 'M')
         => QrCode(x, y, data, magnification, errorCorrection, 0);
 
@@ -980,6 +1057,18 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         }
     }
 
+    /// <summary>
+    /// 将 MSB 优先单色位图编码为 ZPL ^GFA 图形字段。
+    /// </summary>
+    /// <param name="x">图形左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">图形左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="widthBytes">每行位图字节数。</param>
+    /// <param name="height">位图高度，单位为像素。</param>
+    /// <param name="raster">逐行排列的 MSB 优先单色位图。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raster" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">位图长度与尺寸不匹配时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、尺寸或输出长度超出可表示范围时抛出。</exception>
     public ZplPrintCommand GraphicField(int x, int y, int widthBytes, int height, byte[] raster)
         => GraphicField(x, y, widthBytes, height, raster, CancellationToken.None);
 
@@ -1003,11 +1092,41 @@ public sealed partial class ZplPrintCommand : ProtocolPrintCommandBase<ZplPrintC
         operation?.CommitReservations();
         return result;
     }
+    /// <summary>
+    /// 将 MSB 优先单色位图写入 ZPL ^GFA 图形字段。
+    /// </summary>
+    /// <param name="x">图形左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">图形左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="widthBytes">每行位图字节数。</param>
+    /// <param name="height">位图高度，单位为像素。</param>
+    /// <param name="raster">逐行排列的 MSB 优先单色位图。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raster" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">位图长度与尺寸不匹配时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">坐标、尺寸或输出长度超出可表示范围时抛出。</exception>
     public ZplPrintCommand Image(int x, int y, int widthBytes, int height, byte[] raster)
         => GraphicField(x, y, widthBytes, height, raster);
+    /// <summary>
+    /// 可取消地将 MSB 优先单色位图写入 ZPL ^GFA 图形字段。
+    /// </summary>
+    /// <param name="x">图形左上角 X 坐标，单位为打印点。</param>
+    /// <param name="y">图形左上角 Y 坐标，单位为打印点。</param>
+    /// <param name="widthBytes">每行位图字节数。</param>
+    /// <param name="height">位图高度，单位为像素。</param>
+    /// <param name="raster">逐行排列的 MSB 优先单色位图。</param>
+    /// <param name="cancellationToken">用于取消位图复制和十六进制编码的令牌。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="OperationCanceledException">操作取消时抛出，且不会记录部分图形字段。</exception>
     public ZplPrintCommand Image(int x, int y, int widthBytes, int height, byte[] raster,
         CancellationToken cancellationToken)
         => GraphicField(x, y, widthBytes, height, raster, cancellationToken);
+    /// <summary>
+    /// 请求打印当前标签格式指定份数。
+    /// </summary>
+    /// <param name="quantity">打印份数，必须为正数，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="quantity" /> 不是有效的打印数量时抛出。</exception>
+    /// <exception cref="InvalidOperationException">没有可打印的活动格式或受控格式状态无效时抛出。</exception>
     public ZplPrintCommand Print(int quantity = 1)
     {
         ZplCutEncoder.ValidateQuantity(quantity);

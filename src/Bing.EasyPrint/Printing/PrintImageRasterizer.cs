@@ -10,6 +10,12 @@ namespace Bing.EasyPrint.Printing;
 /// <summary>将图片按 CPCL 兼容的抖动规则转换为 MSB 优先单色位图。</summary>
 public static class PrintImageRasterizer
 {
+    /// <summary>
+    /// 将源图片转换为 CPCL 使用的单色位图。
+    /// </summary>
+    /// <param name="source">待转换的 ImageSharp 图片；由调用方管理其生命周期。</param>
+    /// <returns>逐行排列、每行 MSB 优先的单色位图字节。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source" /> 为 <see langword="null" />。</exception>
     public static byte[] ToCpclMonochrome(Image source)
         => ToCpclMonochrome(source, CancellationToken.None);
 

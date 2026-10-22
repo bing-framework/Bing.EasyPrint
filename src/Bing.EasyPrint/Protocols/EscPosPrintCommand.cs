@@ -11,7 +11,11 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
 {
     /// <summary>获取 ESC/POS 的基础能力描述。</summary>
     public override PrintProtocol Protocol => PrintProtocol.EscPos;
+    /// <inheritdoc />
     public override PrintCapabilities Capabilities { get; }
+    /// <summary>
+    /// 获取当前使用的 ESC/POS 布局模式。
+    /// </summary>
     public EscPosLayoutMode LayoutMode { get; }
     private readonly byte? _codePageIndex;
     private readonly int? _printAreaWidthUnits;
@@ -26,8 +30,20 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
     private int _restrictedAlignment;
     private int _restrictedTextWidthScale = 1;
 
+    /// <summary>
+    /// 创建使用默认编码和 Native 布局的 ESC/POS 命令构建器。
+    /// </summary>
     public EscPosPrintCommand() : this(null, EscPosLayoutMode.Native) { }
 
+    /// <summary>
+    /// 创建 ESC/POS 命令构建器。
+    /// </summary>
+    /// <param name="encoding">命令文本编码；默认为 GB18030，且必须与 ASCII 字节兼容。</param>
+    /// <param name="layoutMode">使用设备原生命令还是主机光栅布局，默认为 <see cref="EscPosLayoutMode.Native" />。</param>
+    /// <param name="options">可选的设备能力、裁切及 Raster 字体配置。</param>
+    /// <exception cref="ArgumentException">Raster 字体选项与 Native 模式不兼容时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="layoutMode" /> 无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">编码不满足 ESC/POS 的 ASCII 兼容要求时抛出。</exception>
     public EscPosPrintCommand(Encoding encoding = null, EscPosLayoutMode layoutMode = EscPosLayoutMode.Native,
         EscPosDeviceOptions options = null)
         : base(encoding ?? Encoding.GetEncoding("gb18030"))
@@ -200,6 +216,12 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return result;
     }
 
+    /// <summary>
+    /// 设置后续 Native 文本的水平对齐方式。
+    /// </summary>
+    /// <param name="alignment">对齐值：0 为左对齐、1 为居中、2 为右对齐。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="alignment" /> 大于 2 时抛出。</exception>
     public EscPosPrintCommand Align(byte alignment)
     {
         if (alignment > 2) throw new ArgumentOutOfRangeException(nameof(alignment));
@@ -220,6 +242,13 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
     /// <remarks>对应 ESC/POS <c>GS B n</c>；Native 使用 0/1，Raster 仍由主机画布处理。</remarks>
     public EscPosPrintCommand Reverse(bool enabled = true) =>
         WriteEncoded(new byte[] { 0x1D, 0x42, (byte)(enabled ? 1 : 0) });
+    /// <summary>
+    /// 记录 Native 文本并在末尾追加换行。
+    /// </summary>
+    /// <param name="value">要打印的文本，必须符合当前设备配置和编码。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">文本包含设备不接受或无法编码的字符时抛出。</exception>
     public EscPosPrintCommand Text(string value)
         => Text(value, System.Threading.CancellationToken.None);
 
@@ -273,6 +302,17 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         _restrictedLineWidthDots = 0;
         return result;
     }
+    /// <summary>
+    /// 在活动 Raster 页按默认 24 点字号绘制文本。
+    /// </summary>
+    /// <param name="x">绘制原点 X 坐标，单位为 Raster 像素。</param>
+    /// <param name="y">绘制原点 Y 坐标，单位为 Raster 像素。</param>
+    /// <param name="value">要绘制的文本。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">绘制原点超出活动 Raster 页时抛出。</exception>
+    /// <exception cref="InvalidOperationException">没有活动 Raster 页时抛出。</exception>
+    /// <exception cref="NotSupportedException">当前为 Native 模式时抛出。</exception>
     public EscPosPrintCommand Text(int x, int y, string value)
     {
         var canvas = RequireRasterPage("绝对坐标文本");
@@ -384,6 +424,14 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return this;
     }
 
+    /// <summary>
+    /// 设置 Native 字体的水平和垂直放大倍数。
+    /// </summary>
+    /// <param name="width">水平倍数，范围为 1 到 8。</param>
+    /// <param name="height">垂直倍数，范围为 1 到 8。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">任一倍数超出 1 到 8 时抛出。</exception>
+    /// <exception cref="NotSupportedException">设备配置不支持文字倍数命令时抛出。</exception>
     public EscPosPrintCommand TextSize(int width, int height)
     {
         if (_profile?.SupportsTextSize == false)
@@ -395,6 +443,12 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return result;
     }
 
+    /// <summary>
+    /// 进纸指定行数。
+    /// </summary>
+    /// <param name="lines">进纸行数，范围为 0 到 255，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="lines" /> 超出 0 到 255 时抛出。</exception>
     public EscPosPrintCommand Feed(int lines = 1)
     {
         if (lines < 0 || lines > 255) throw new ArgumentOutOfRangeException(nameof(lines));
@@ -403,6 +457,13 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return result;
     }
 
+    /// <summary>
+    /// 请求按设备配置执行整切或半切。
+    /// </summary>
+    /// <param name="partial"><see langword="true" /> 请求半切；默认请求整切。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentException">设备裁切配置无效时抛出。</exception>
+    /// <exception cref="NotSupportedException">当前设备配置无法表达请求的裁切方式时抛出。</exception>
     public EscPosPrintCommand Cut(bool partial = false)
     {
         return Cut(new PrintCutOptions { Mode = partial ? PrintCutMode.Partial : PrintCutMode.Full });
@@ -421,6 +482,18 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return result;
     }
 
+    /// <summary>
+    /// 在活动 Raster 页绘制线段。
+    /// </summary>
+    /// <param name="x0">起点 X 坐标，单位为 Raster 像素。</param>
+    /// <param name="y0">起点 Y 坐标，单位为 Raster 像素。</param>
+    /// <param name="x1">终点 X 坐标，单位为 Raster 像素。</param>
+    /// <param name="y1">终点 Y 坐标，单位为 Raster 像素。</param>
+    /// <param name="width">线条笔画宽度，单位为像素，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">端点超出画布或笔画宽度非正数时抛出。</exception>
+    /// <exception cref="InvalidOperationException">没有活动 Raster 页时抛出。</exception>
+    /// <exception cref="NotSupportedException">当前为 Native 模式时抛出。</exception>
     public EscPosPrintCommand Line(int x0, int y0, int x1, int y1, int width = 1)
     {
         var canvas = RequireRasterPage("线段");
@@ -431,6 +504,18 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return this;
     }
 
+    /// <summary>
+    /// 在活动 Raster 页绘制矩形边框。
+    /// </summary>
+    /// <param name="x0">左边界 X 坐标，单位为 Raster 像素。</param>
+    /// <param name="y0">上边界 Y 坐标，单位为 Raster 像素。</param>
+    /// <param name="x1">右边界 X 坐标，单位为 Raster 像素，必须大于 <paramref name="x0" />。</param>
+    /// <param name="y1">下边界 Y 坐标，单位为 Raster 像素，必须大于 <paramref name="y0" />。</param>
+    /// <param name="width">边框线宽，单位为像素，默认为 1。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">坐标超出画布、端点顺序无效或线宽非正数时抛出。</exception>
+    /// <exception cref="InvalidOperationException">没有活动 Raster 页时抛出。</exception>
+    /// <exception cref="NotSupportedException">当前为 Native 模式时抛出。</exception>
     public EscPosPrintCommand Box(int x0, int y0, int x1, int y1, int width = 1)
     {
         var canvas = RequireRasterPage("矩形");
@@ -443,6 +528,19 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return this;
     }
 
+    /// <summary>
+    /// 使用 ESC/POS Function B 原生条码命令输出条码。
+    /// </summary>
+    /// <param name="data">符合指定条码制式的数据。</param>
+    /// <param name="symbology">Function B 制式编号，范围为 65 到 79；默认为 73。</param>
+    /// <param name="height">条码高度，单位为打印机点，默认为 80。</param>
+    /// <param name="width">条码模块宽度，取值限制由当前 ESC/POS 命令校验。</param>
+    /// <param name="textPosition">可读文字位置：0 关闭，1 上方，2 下方，3 上下；默认为关闭。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="data" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">条码数据不符合指定制式时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">制式、条高、模块宽度或可读文字位置超出支持范围时抛出。</exception>
+    /// <exception cref="NotSupportedException">设备配置不支持原生条码或请求的可读文字位置时抛出。</exception>
     public EscPosPrintCommand Barcode(string data, byte symbology = 73, byte height = 80, byte width = 2, byte textPosition = 0)
     {
         if (_profile?.SupportsNativeBarcode == false)
@@ -546,6 +644,17 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         byte textPosition = 0)
         => Barcode(data, 74, height, width, textPosition);
 
+    /// <summary>
+    /// 使用 ESC/POS 原生二维码命令输出二维码。
+    /// </summary>
+    /// <param name="data">二维码内容；不能为空且必须能由当前编码表示。</param>
+    /// <param name="moduleSize">二维码模块尺寸，范围为 1 到 16，默认为 4。</param>
+    /// <param name="errorCorrection">纠错级别命令值：48、49、50 或 51，默认为 48。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="data" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">内容为空或超过 ESC/POS 长度字段容量时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">模块尺寸或纠错级别超出支持范围时抛出。</exception>
+    /// <exception cref="NotSupportedException">设备配置不支持原生二维码时抛出。</exception>
     public EscPosPrintCommand QrCode(string data, byte moduleSize = 4, byte errorCorrection = 48)
     {
         if (_profile?.SupportsNativeQrCode == false)
@@ -604,6 +713,19 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return result;
     }
 
+    /// <summary>
+    /// 记录 MSB 优先单色光栅图片。
+    /// </summary>
+    /// <param name="width">图片宽度，单位为像素。</param>
+    /// <param name="height">图片高度，单位为像素。</param>
+    /// <param name="raster">逐行排列的 MSB 优先位图数据。</param>
+    /// <param name="doubleWidth">是否请求打印机水平放大一倍，默认为否。</param>
+    /// <param name="doubleHeight">是否请求打印机垂直放大一倍，默认为否。</param>
+    /// <returns>当前命令构建器。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raster" /> 为 <see langword="null" />。</exception>
+    /// <exception cref="ArgumentException">位图长度与尺寸不匹配时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">尺寸超出 ESC/POS 光栅命令范围时抛出。</exception>
+    /// <exception cref="InvalidOperationException">当前布局模式不是 Raster 时抛出。</exception>
     public EscPosPrintCommand Image(int width, int height, byte[] raster, bool doubleWidth = false, bool doubleHeight = false)
         => RasterImage(width, height, raster, doubleWidth, doubleHeight);
 
@@ -674,6 +796,8 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return this;
     }
 
+    /// <inheritdoc />
+    /// <remarks>活动 Raster 页绘制期间会拒绝插入 Native 或 Raw 命令。</remarks>
     protected override EscPosPrintCommand Add(Action<IBufferWriter> action)
     {
         if (_activeRasterPage != null && !_endingRasterPage)
@@ -681,6 +805,8 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return base.Add(action);
     }
 
+    /// <inheritdoc />
+    /// <remarks>活动 Raster 页绘制期间会拒绝插入 Native 或 Raw 命令。</remarks>
     protected override EscPosPrintCommand AddCancellable(Action<IBufferWriter, System.Threading.CancellationToken> action)
     {
         if (_activeRasterPage != null && !_endingRasterPage)
@@ -688,6 +814,8 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return base.AddCancellable(action);
     }
 
+    /// <inheritdoc />
+    /// <remarks>活动 Raster 页必须先结束，否则构建会失败。</remarks>
     public override IBufferWriter Build()
         => Build(System.Threading.CancellationToken.None);
 
@@ -700,6 +828,10 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return base.Build(cancellationToken);
     }
 
+    /// <summary>
+    /// 进纸一行以输出当前收据内容。
+    /// </summary>
+    /// <returns>当前命令构建器。</returns>
     public EscPosPrintCommand Print() => Feed(1);
 
     private EscPosRasterCanvas RequireRasterPage(string operation)
