@@ -45,6 +45,8 @@ internal static class Program
             VerifyExpandedOutputs();
             VerifyExpandedStackedOutputs();
             VerifyExpandedStackedColumns();
+            VerifyExpandedStackedRows();
+            VerifyCompleteGs1DictionaryEntryPoints();
             VerifyEanUpcCompositeOutputs();
             VerifyDataBarCompletionOutputs();
             VerifyStackedOutputs();
@@ -168,8 +170,43 @@ internal static class Program
             composite.AddPage(302, 90).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked,
                 primary, "[20]12", 35, mode: Gs1CompositeMode.CcA).WithExpandedStackedColumns(3));
             var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
-            Require(Single(provider.Render(composite), "Composite 三列").Length > 0, $"Composite 三列输出：{protocol}");
+            Require(Single(provider.Render(composite), "Composite 三列").Length > 0, $"Composite 三列输出: {protocol}");
         }
+    }
+
+    private static void VerifyExpandedStackedRows()
+    {
+        const string primary = "[91]12345678901234567890123456789012345678901234567890123456789012345678";
+        var size = EscPosRasterCanvas.MeasureExpandedStackedSizeByRows(primary, 35, 2, 2);
+        Require(size.Width == 596 && size.Height == 76, "ExpandedStacked 最大行数精确尺寸");
+        var barcode = new PrintBarcodeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked, primary, 35,
+            humanReadable: false).WithExpandedStackedRows(2);
+        var document = new PrintDocument();
+        document.AddPage(size.Width, size.Height).Add(barcode);
+        var rasterProvider = PrintProtocolProviderFactory.Create(PrintProtocol.EscPos, Encoding.ASCII, EscPosLayoutMode.Raster);
+        var command = new EscPosPrintCommand(Encoding.ASCII, EscPosLayoutMode.Raster).Initialize()
+            .BeginRasterPage(size.Width, size.Height).RasterExpandedStackedBarcodeByRows(0, 0, primary, 35, 2)
+            .EndRasterPage().Build().GetBytes();
+        RequireBytesEqual(command, Single(rasterProvider.Render(document), "ExpandedStacked 行数"), "行数新公共入口一致");
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.EscPos, PrintProtocol.Tspl, PrintProtocol.Zpl })
+        {
+            var composite = new PrintDocument();
+            composite.AddPage(302, 90).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked,
+                "[91]1234567890123456789012345678901234", "[20]12", 35, mode: Gs1CompositeMode.CcA)
+                .WithExpandedStackedRows(2));
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            Require(Single(provider.Render(composite), "Composite 最大行数").Length > 0,
+                $"Composite 最大行数输出: {protocol}");
+        }
+    }
+
+    private static void VerifyCompleteGs1DictionaryEntryPoints()
+    {
+        var document = new PrintDocument();
+        document.AddPage(1200, 200).Add(new PrintBarcodeElement(0, 0, BarcodeType.UccEan128,
+            "(01)12345678901231(7030)840ABC(242)123(710)PZN-A", 40, humanReadable: false));
+        var provider = PrintProtocolProviderFactory.Create(PrintProtocol.EscPos, Encoding.ASCII, EscPosLayoutMode.Raster);
+        Require(Single(provider.Render(document), "完整 AI 字典入口").Length > 0, "完整 AI 字典入口输出");
     }
 
     private static void VerifyEanUpcCompositeOutputs()

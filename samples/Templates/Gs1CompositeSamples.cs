@@ -22,7 +22,10 @@ internal static class Gs1CompositeSamples
             "(01)09506000134352(10)LOT-A", "expanded-stacked");
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.Auto,
             "[91]1234567890123456789012345678901234", "expanded-stacked-columns", expandedStackedColumns: 3);
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.Auto,
+            "[91]1234567890123456789012345678901234", "expanded-stacked-rows", expandedStackedRows: 2);
         WriteOrdinaryColumns(output, loader, renderer);
+        WriteOrdinaryRows(output, loader, renderer);
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.Auto,
             "(01)12345678901231", "stacked");
         WriteVariant(output, loader, renderer, BarcodeType.Ean8, Gs1CompositeMode.Auto,
@@ -49,7 +52,7 @@ internal static class Gs1CompositeSamples
 
     private static void WriteVariant(string output, TemplateLoader loader, TemplateRenderer renderer,
         BarcodeType linearType, Gs1CompositeMode mode, string primary, string name, int linearHeight = 40,
-        int? expandedStackedColumns = null)
+        int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
         var template = new BpTemplate
         {
@@ -60,7 +63,8 @@ internal static class Gs1CompositeSamples
                 {
                     LinearType = linearType, Mode = mode,
                     Field = new BgField { Name = "Primary" }, SecondaryField = new BgField { Name = "Secondary" },
-                    ModuleWidth = 2, LinearBarHeight = linearHeight, ExpandedStackedColumns = expandedStackedColumns
+                    ModuleWidth = 2, LinearBarHeight = linearHeight, ExpandedStackedColumns = expandedStackedColumns,
+                    ExpandedStackedRows = expandedStackedRows
                 } }
             } } } }
         };
@@ -104,5 +108,27 @@ internal static class Gs1CompositeSamples
             throw new InvalidOperationException("普通 ExpandedStacked 单列 C#/JSON/往返输出不一致。");
         File.WriteAllBytes(Path.Combine(output, "expanded-stacked-columns.escpos"), code);
         Console.WriteLine("普通 ExpandedStacked 单列 Raster C#/JSON/往返输出一致。");
+    }
+
+    private static void WriteOrdinaryRows(string output, TemplateLoader loader, TemplateRenderer renderer)
+    {
+        var template = new BpTemplate { Version = 3, Width = 700, Height = 500,
+            Rows = new List<BpRow> { new BpRow { Cells = new List<BpCell> { new BpCell {
+                Elements = new List<BpElement> { new BpBarcodeElement {
+                    BarcodeType = BarcodeType.Gs1DataBarExpandedStacked, ExpandedStackedRows = 2,
+                    Height = 35, NarrowModuleWidth = 2, HumanReadable = false, Field = new BgField { Name = "Primary" }
+                } }
+            } } } } };
+        var data = new { Primary = "[91]12345678901234567890123456789012345678901234567890123456789012345678" };
+        var options = new TemplateRenderOptions { Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Raster,
+            Encoding = Encoding.ASCII, FeedLines = 0, CutAfterPrint = false };
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "expanded-stacked-rows.json"));
+        var code = renderer.Render(template, data, options: options).Pages.Single().Data;
+        var loaded = renderer.Render(loader.LoadJson(json, options), data, options: options).Pages.Single().Data;
+        var restored = renderer.Render(loader.LoadJson(loader.SaveJson(template, options), options), data, options: options).Pages.Single().Data;
+        if (!code.SequenceEqual(loaded) || !code.SequenceEqual(restored))
+            throw new InvalidOperationException("普通 ExpandedStacked 最大行数 C#/JSON/往返输出不一致。");
+        File.WriteAllBytes(Path.Combine(output, "expanded-stacked-rows.escpos"), code);
+        Console.WriteLine("普通 ExpandedStacked 最大行数 Raster C#/JSON/往返输出一致。");
     }
 }

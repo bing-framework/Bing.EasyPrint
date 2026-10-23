@@ -1,0 +1,15 @@
+{
+  "Version": 3,
+  "Width": 600,
+  "Height": 300,
+  "Rows": [{ "Cells": [{ "Elements": [{
+    "Type": 11,
+    "LinearType": 31,
+    "ExpandedStackedRows": 2,
+    "Mode": 0,
+    "ModuleWidth": 2,
+    "LinearBarHeight": 40,
+    "Field": { "Name": "Primary" },
+    "SecondaryField": { "Name": "Secondary" }
+  }] }] }]
+}
