@@ -23,7 +23,8 @@ internal interface IPrintCanvas
         string deviceFontName = null, PrintFont font = null);
     void DrawBarcode1D(BarcodeType type, int x, int y, string text, int lineWidth, int height, int ratio,
         RotationAngle rotation, bool? humanReadable = null, int humanReadableReserveHeight = 0,
-        int reservedWidth = 0, int? narrowModuleWidth = null, int? wideModuleWidth = null, PrintQuietZone quietZone = null, int? expandedStackedColumns = null);
+        int reservedWidth = 0, int? narrowModuleWidth = null, int? wideModuleWidth = null, PrintQuietZone quietZone = null,
+        int? expandedStackedColumns = null, int? expandedStackedRows = null);
     void DrawQrCode(int x, int y, string text, int unitWidth, string errorLevel, int rotation,
         int reservedWidth = 0, int reservedHeight = 0, PrintQuietZone quietZone = null);
     void DrawImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None);
@@ -136,7 +137,8 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
 
     public void DrawBarcode1D(BarcodeType type, int x, int y, string text, int lineWidth, int height,
         int ratio, RotationAngle rotation, bool? humanReadable = null, int humanReadableReserveHeight = 0,
-        int reservedWidth = 0, int? narrowModuleWidth = null, int? wideModuleWidth = null, PrintQuietZone quietZone = null, int? expandedStackedColumns = null)
+        int reservedWidth = 0, int? narrowModuleWidth = null, int? wideModuleWidth = null, PrintQuietZone quietZone = null,
+        int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
         var narrow = narrowModuleWidth ?? checked(lineWidth + 1);
         var ratioTenths = ratio <= 4 ? 15 + ratio * 5 : ratio;
@@ -168,6 +170,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
             : new PrintBarcodeElement(x, y, type, text, height, quietZone, moduleWidth, wide, rotation,
                 cpclRatio, humanReadable, humanReadableReserveHeight, reservedWidth);
         if (expandedStackedColumns.HasValue) element = element.WithExpandedStackedColumns(expandedStackedColumns.Value);
+        if (expandedStackedRows.HasValue) element = element.WithExpandedStackedRows(expandedStackedRows.Value);
         if (_protocol == PrintProtocol.Cpcl && rotation == RotationAngle.Rotate90)
             element.MarkCpclTemplateRotation();
         Add(element);
@@ -209,6 +212,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
             element.SecondaryData, element.LinearBarHeight, element.ModuleWidth, element.Mode,
             element.Rotation, element.QuietZone);
         if (element.ExpandedStackedColumns.HasValue) copy = copy.WithExpandedStackedColumns(element.ExpandedStackedColumns.Value);
+        if (element.ExpandedStackedRows.HasValue) copy = copy.WithExpandedStackedRows(element.ExpandedStackedRows.Value);
         Add(copy);
     }
 

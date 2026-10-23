@@ -314,11 +314,13 @@ public sealed partial class EscPosRasterCanvas
 
     private void DrawBarcode(BarcodeType type, int x, int y, string data, int height, int moduleWidth,
         bool humanReadable, int humanReadableReserveHeight, string fontFamily,
-        int humanReadableFontSize, int rotation, bool _, int? expandedStackedColumns = null)
+        int humanReadableFontSize, int rotation, bool _, int? expandedStackedColumns = null,
+        int? expandedStackedRows = null)
     {
         if (!SupportsBarcodeType(type))
             throw new NotSupportedException($"ESC/POS Raster 不支持主机条码类型 {type}。");
         ValidateRotation(rotation);
+        ValidateExpandedStackedLayout(type, expandedStackedColumns, expandedStackedRows);
         if (humanReadableReserveHeight < 0) throw new ArgumentOutOfRangeException(nameof(humanReadableReserveHeight));
         if (!humanReadable && humanReadableReserveHeight > 0)
             throw new ArgumentException("未绘制可读文字时不能声明其预留高度。", nameof(humanReadableReserveHeight));
@@ -330,7 +332,8 @@ public sealed partial class EscPosRasterCanvas
             type == BarcodeType.Gs1DataBarExpandedStacked))
             readableData = readableData.Replace("\u001D", string.Empty);
         using var operation = PrintResourceScope.BeginTemporary();
-        var encoded = PrepareBarcode(type, x, y, data, height, moduleWidth, rotation == 0, expandedStackedColumns);
+        var encoded = PrepareBarcode(type, x, y, data, height, moduleWidth, rotation == 0, expandedStackedColumns,
+            expandedStackedRows);
         ExecuteDrawing(() =>
         {
             if (rotation != 0)
@@ -339,7 +342,8 @@ public sealed partial class EscPosRasterCanvas
                 var source = new EscPosRasterCanvas(encoded.SymbolWidth, sourceHeight, _fonts,
                     _cancellationToken);
                 source.DrawBarcode(type, 0, 0, data, height, moduleWidth, humanReadable,
-                    humanReadableReserveHeight, fontFamily, humanReadableFontSize, 0, true, expandedStackedColumns);
+                    humanReadableReserveHeight, fontFamily, humanReadableFontSize, 0, true, expandedStackedColumns,
+                    expandedStackedRows);
                 DrawRotatedCanvasCore(x, y, source, rotation);
                 return;
             }
@@ -376,7 +380,8 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private (BitMatrix Matrix, int First, int Last, int ModuleWidth, int SymbolWidth, int SymbolHeight) PrepareBarcode(
-        BarcodeType type, int x, int y, string data, int height, int moduleWidth, bool ensureFits = true, int? expandedStackedColumns = null)
+        BarcodeType type, int x, int y, string data, int height, int moduleWidth, bool ensureFits = true,
+        int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
         ThrowIfCancellationRequested();
         if (data == null) throw new ArgumentNullException(nameof(data));
@@ -386,7 +391,8 @@ public sealed partial class EscPosRasterCanvas
         ValidateOrigin(x, y);
         if (type == BarcodeType.Code49) ValidateCode49RowHeight(height, moduleWidth);
 
-        var (matrix, first, last) = EncodeBarcode(type, data, _cancellationToken, expandedStackedColumns);
+        var (matrix, first, last) = EncodeBarcode(type, data, _cancellationToken, expandedStackedColumns,
+            expandedStackedRows);
         var symbolWidth = CheckedSymbolSize(last - first + 1 +
             (type == BarcodeType.Code49
                 ? Code49LeadingQuietZoneModules + Code49TrailingQuietZoneModules
@@ -580,12 +586,13 @@ public sealed partial class EscPosRasterCanvas
         => MeasureBarcodeWidth(type, data, moduleWidth, cancellationToken, null);
 
     internal static int MeasureBarcodeWidth(BarcodeType type, string data, int moduleWidth,
-        CancellationToken cancellationToken, int? expandedStackedColumns)
+        CancellationToken cancellationToken, int? expandedStackedColumns, int? expandedStackedRows = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (moduleWidth <= 0) throw new ArgumentOutOfRangeException(nameof(moduleWidth));
         using var operation = PrintResourceScope.BeginTemporary();
-        var (_, first, last) = EncodeBarcode(type, data, cancellationToken, expandedStackedColumns);
+        var (_, first, last) = EncodeBarcode(type, data, cancellationToken, expandedStackedColumns,
+            expandedStackedRows);
         cancellationToken.ThrowIfCancellationRequested();
         return CheckedSymbolSize(last - first + 1 +
             (type == BarcodeType.Code49
@@ -599,10 +606,11 @@ public sealed partial class EscPosRasterCanvas
     /// ExpandedStacked/StackedOmnidirectional 的 height 为每条数据行高度，行间另加三个 1X 分隔行；其它制式沿用原有条高语义。
     /// </remarks>
     internal static int MeasureBarcodeHeight(BarcodeType type, string data, int height, int moduleWidth,
-        CancellationToken cancellationToken, int? expandedStackedColumns = null)
+        CancellationToken cancellationToken, int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
         if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
         if (moduleWidth <= 0) throw new ArgumentOutOfRangeException(nameof(moduleWidth));
+        ValidateExpandedStackedLayout(type, expandedStackedColumns, expandedStackedRows);
         if (type == BarcodeType.Gs1DataBarStacked && (long)height < 13L * moduleWidth)
             throw new ArgumentOutOfRangeException(nameof(height),
                 "GS1 DataBar Stacked 总条高至少为模块宽度的 13 倍。顶部行、分隔行和底部行按 5:1:7 排列。");
@@ -614,7 +622,8 @@ public sealed partial class EscPosRasterCanvas
         if (type == BarcodeType.Gs1DataBarExpandedStacked)
         {
             using var operation = PrintResourceScope.BeginTemporary();
-            var (matrix, _, _) = EncodeBarcode(type, data, cancellationToken, expandedStackedColumns);
+            var (matrix, _, _) = EncodeBarcode(type, data, cancellationToken, expandedStackedColumns,
+                expandedStackedRows);
             return ExpandedStackedHeight(matrix.Height, height, moduleWidth);
         }
         if (type != BarcodeType.Code49) return height;
@@ -640,9 +649,9 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private static (BitMatrix Matrix, int First, int Last) EncodeBarcode(BarcodeType type, string data,
-        CancellationToken cancellationToken, int? expandedStackedColumns = null)
+        CancellationToken cancellationToken, int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
-        ValidateExpandedStackedColumns(type, expandedStackedColumns);
+        ValidateExpandedStackedLayout(type, expandedStackedColumns, expandedStackedRows);
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrEmpty(data)) throw new ArgumentException("条码内容不能为空。", nameof(data));
         if (!SupportsBarcodeType(type))
@@ -675,7 +684,8 @@ public sealed partial class EscPosRasterCanvas
         if (type == BarcodeType.Gs1DataBarLimited)
             return EncodeGs1DataBarLimited(normalizedData, cancellationToken);
         if (type == BarcodeType.Gs1DataBarExpandedStacked)
-            return EncodeGs1DataBarExpandedStacked(normalizedData, cancellationToken, expandedStackedColumns ?? 2);
+            return EncodeGs1DataBarExpandedStacked(normalizedData, cancellationToken,
+                expandedStackedColumns ?? 2, expandedStackedRows);
         if (type == BarcodeType.Gs1DataBarExpanded)
             return EncodeGs1DataBarExpanded(normalizedData, cancellationToken);
         if (type == BarcodeType.Code49)
@@ -1290,7 +1300,8 @@ public sealed partial class EscPosRasterCanvas
     private static string EncodeGs1DataBarExpandedPattern(string normalizedData,
         CancellationToken cancellationToken, bool composite = false)
     {
-        var elements = EncodeExpandedElements(normalizedData, cancellationToken, composite, false);
+        var elements = EncodeExpandedElements(normalizedData, cancellationToken, composite, false, 2, null,
+            out _);
         elements[0] = elements[1] = elements[elements.Length - 2] = elements[elements.Length - 1] = 1;
         var pattern = new StringBuilder(elements.Length);
         var black = false;
@@ -1304,10 +1315,13 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private static int[] EncodeExpandedElements(string normalizedData,
-        CancellationToken cancellationToken, bool composite, bool stacked, int columns = 2)
+        CancellationToken cancellationToken, bool composite, bool stacked, int columns, int? maximumRows,
+        out int selectedColumns)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken, composite, stacked, columns);
+        var encoded = EncodeGs1DataBarExpandedBinary(normalizedData, cancellationToken, composite, stacked,
+            columns, maximumRows);
+        selectedColumns = encoded.Columns;
         var dataCharacters = encoded.DataCharacters;
         var symbolCharacters = encoded.SymbolCharacters;
         var binary = encoded.Bits;
@@ -1769,9 +1783,12 @@ public sealed partial class EscPosRasterCanvas
            value == ExpandedMethod13Marker || value == ExpandedMethod14Marker;
 
     private static ExpandedBinary EncodeGs1DataBarExpandedBinary(string normalizedData,
-        CancellationToken cancellationToken, bool composite = false, bool stacked = false, int columns = 2)
+        CancellationToken cancellationToken, bool composite = false, bool stacked = false, int columns = 2,
+        int? maximumRows = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (maximumRows.HasValue)
+            ValidateExpandedStackedRows(BarcodeType.Gs1DataBarExpandedStacked, maximumRows);
 
         // 保留旧输入规范化器的标记供 HRI 使用；实际编码重新按完整载荷选择标准方法。
         // 压缩方法要求 GTIN 前导 9，固定重量/日期方法必须消费全部数据。
@@ -1894,6 +1911,8 @@ public sealed partial class EscPosRasterCanvas
         var remainder = 12 - bitPosition % 12;
         if (remainder == 12) remainder = 0;
         var symbolCharacters = ((bitPosition + remainder) / 12) + 1;
+        if (maximumRows.HasValue)
+            columns = ResolveExpandedStackedColumns(symbolCharacters, maximumRows.Value, composite);
         if (stacked && symbolCharacters % (2 * columns) == 1) symbolCharacters++;
         if (symbolCharacters < 4) symbolCharacters = 4;
         remainder = 12 * (symbolCharacters - 1) - bitPosition;
@@ -1912,6 +1931,8 @@ public sealed partial class EscPosRasterCanvas
             remainder = 12 - bitPosition % 12;
             if (remainder == 12) remainder = 0;
             symbolCharacters = ((bitPosition + remainder) / 12) + 1;
+            if (maximumRows.HasValue)
+                columns = ResolveExpandedStackedColumns(symbolCharacters, maximumRows.Value, composite);
             if (stacked && symbolCharacters % (2 * columns) == 1) symbolCharacters++;
             if (symbolCharacters < 4) symbolCharacters = 4;
             remainder = 12 * (symbolCharacters - 1) - bitPosition;
@@ -1952,21 +1973,23 @@ public sealed partial class EscPosRasterCanvas
             binary[3] = symbolCharacters > 14 ? '1' : '0';
         }
         var dataCharacters = symbolCharacters - 1;
-        return new ExpandedBinary(binary.ToString(), dataCharacters, symbolCharacters);
+        return new ExpandedBinary(binary.ToString(), dataCharacters, symbolCharacters, columns);
     }
 
     private readonly struct ExpandedBinary
     {
-        internal ExpandedBinary(string bits, int dataCharacters, int symbolCharacters)
+        internal ExpandedBinary(string bits, int dataCharacters, int symbolCharacters, int columns)
         {
             Bits = bits;
             DataCharacters = dataCharacters;
             SymbolCharacters = symbolCharacters;
+            Columns = columns;
         }
 
         internal string Bits { get; }
         internal int DataCharacters { get; }
         internal int SymbolCharacters { get; }
+        internal int Columns { get; }
     }
 
     private static void Gs1DataBarExpandedWidths(int[,] destination, int character, int odd,

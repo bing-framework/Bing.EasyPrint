@@ -71,6 +71,9 @@ internal static partial class Gs1CompositeEncoder
     {
         if (element == null) throw new ArgumentNullException(nameof(element));
         cancellationToken.ThrowIfCancellationRequested();
+        if (element.LinearType == BarcodeType.Gs1DataBarExpandedStacked)
+            EscPosRasterCanvas.ValidateExpandedStackedLayout(element.LinearType,
+                element.ExpandedStackedColumns, element.ExpandedStackedRows, true);
         using var operation = PrintResourceScope.BeginTemporary();
         var gs1 = element.LinearType == BarcodeType.UccEan128;
         var retail = IsEanUpc(element.LinearType);
@@ -103,7 +106,8 @@ internal static partial class Gs1CompositeEncoder
         try
         {
             if (expandedStacked)
-                expandedRows = EscPosRasterCanvas.EncodeGs1DataBarExpandedStackedPattern(primary, cancellationToken, true, element.ExpandedStackedColumns ?? 2);
+                expandedRows = EscPosRasterCanvas.EncodeGs1DataBarExpandedStackedPattern(primary, cancellationToken,
+                    true, element.ExpandedStackedColumns ?? 2, element.ExpandedStackedRows);
             linear = retail ? EncodeEanUpcLinear(element.LinearType, primary, cancellationToken)
                 : expandedStacked ? expandedRows[0] : gs1 ? EncodeGs1Linear(primary, mode, cancellationToken)
                 : EscPosRasterCanvas.EncodeGs1CompositeLinearPattern(element.LinearType, primary, cancellationToken);

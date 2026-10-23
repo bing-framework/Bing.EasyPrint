@@ -16,22 +16,31 @@ public sealed partial class EscPosRasterCanvas
     /// <param name="cancellationToken">在字符、行和模块循环中观察的取消令牌。</param>
     /// <param name="composite">是否设置线性组件连接标志。</param>
     /// <param name="columns">每行字符对数上限，普通为 1–11，Composite 为 2–11，默认 2。</param>
+    /// <param name="maximumRows">允许的最大数据行数，范围 2–11；与显式列数互斥，分隔行不计入。</param>
     /// <returns>等宽的独立模块串，不含外围静区或 Composite 外部分隔行。</returns>
     internal static string[] EncodeGs1DataBarExpandedStackedPattern(string data,
-        CancellationToken cancellationToken = default, bool composite = false, int columns = 2)
+        CancellationToken cancellationToken = default, bool composite = false, int columns = 2,
+        int? maximumRows = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ValidateExpandedStackedColumns(BarcodeType.Gs1DataBarExpandedStacked, columns, composite);
+        ValidateExpandedStackedLayout(BarcodeType.Gs1DataBarExpandedStacked,
+            maximumRows.HasValue ? (int?)null : columns, maximumRows, composite);
         var normalized = composite ? data : NormalizeBarcodeData(BarcodeType.Gs1DataBarExpandedStacked, data);
-        return BuildExpandedStackedRows(normalized, cancellationToken, composite, columns);
+        return BuildExpandedStackedRows(normalized, cancellationToken, composite, columns, maximumRows);
     }
 
-    private static string[] BuildExpandedStackedRows(string normalized, CancellationToken cancellationToken, bool composite, int columnsPerRow)
+    private static string[] BuildExpandedStackedRows(string normalized, CancellationToken cancellationToken,
+        bool composite, int columnsPerRow, int? maximumRows)
     {
-        var elements = EncodeExpandedElements(normalized, cancellationToken, composite, true, columnsPerRow);
+        var elements = EncodeExpandedElements(normalized, cancellationToken, composite, true, columnsPerRow,
+            maximumRows, out var selectedColumns);
+        columnsPerRow = selectedColumns;
         var blocks = (elements.Length - 4 + 20) / 21;
         var characters = (elements.Length - 4 - blocks * 5) / 8;
         var rowCount = (blocks + columnsPerRow - 1) / columnsPerRow;
+        if (maximumRows.HasValue && rowCount > maximumRows.Value)
+            throw new ArgumentException(
+                $"无法在最多 {maximumRows.Value} 条数据行内编码当前 ExpandedStacked 数据：实际需要 {rowCount} 行。");
         var rows = new string[rowCount * 4 - 3];
         var block = 0;
         var versionTwo = false;
@@ -115,12 +124,12 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private static (BitMatrix Matrix, int First, int Last) EncodeGs1DataBarExpandedStacked(
-        string normalizedData, CancellationToken cancellationToken, int columns)
+        string normalizedData, CancellationToken cancellationToken, int columns, int? maximumRows)
     {
         // Includes the bounded width arrays, strings, checksum workspace and binary padding.
         using var workspace = PrintResourceScope.Reserve(16384, "ExpandedStacked.EncodingWorkspace");
         // Already normalized by EncodeBarcode; composite=true here would change the linkage bit.
-        var elements = BuildExpandedStackedRows(normalizedData, cancellationToken, false, columns);
+        var elements = BuildExpandedStackedRows(normalizedData, cancellationToken, false, columns, maximumRows);
         PrintResourceScope.Retain(checked((elements[0].Length + 31L) / 32 * elements.Length * sizeof(int)),
             "Matrix.Gs1DataBarExpandedStacked");
         var matrix = new BitMatrix(elements[0].Length, elements.Length);

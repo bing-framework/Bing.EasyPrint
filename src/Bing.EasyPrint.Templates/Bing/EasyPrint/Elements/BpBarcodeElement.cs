@@ -36,6 +36,8 @@
         public int? WideModuleWidth { get; set; }
         /// <summary>获取或设置 ExpandedStacked 每行字符对数上限，范围 1–11；null 默认两列，其他制式不允许设置。</summary>
         public int? ExpandedStackedColumns { get; set; }
+        /// <summary>获取或设置 ExpandedStacked 允许的最大数据行数，范围 2–11；分隔行不计入；与列数互斥，null 表示不限制。</summary>
+        public int? ExpandedStackedRows { get; set; }
         /// <summary>
         /// 获取或设置条码预留宽度，单位为打印点；零表示按条码内容和制式计算。
         /// </summary>

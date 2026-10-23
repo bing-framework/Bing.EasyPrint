@@ -240,6 +240,19 @@ public sealed class TemplateLoader
                     stackedColumns.Value<decimal>() < (type == 11 ? 2 : 1) || stackedColumns.Value<decimal>() > 11)
                     throw new JsonSerializationException("ExpandedStackedColumns 仅适用于 ExpandedStacked；普通条码为 1–11 的整数，Composite 为 2–11 的整数。");
             }
+            if (token.Properties().Count(property => string.Equals(property.Name, "ExpandedStackedRows", StringComparison.OrdinalIgnoreCase)) > 1)
+                throw new JsonSerializationException("ExpandedStackedRows 不允许重复声明。");
+            if (token.GetValue("ExpandedStackedRows", StringComparison.OrdinalIgnoreCase) is JToken stackedRows && stackedRows.Type != JTokenType.Null)
+            {
+                var type = token.Value<int>("Type");
+                if (stackedRows.Type != JTokenType.Integer || type != 4 && type != 11 ||
+                    stackedRows.Value<decimal>() < 2 || stackedRows.Value<decimal>() > 11)
+                    throw new JsonSerializationException("ExpandedStackedRows 仅适用于 ExpandedStacked；必须为 2–11 的整数数据行上限，分隔行不计入。");
+            }
+            var hasColumns = token.GetValue("ExpandedStackedColumns", StringComparison.OrdinalIgnoreCase) is JToken bothColumns && bothColumns.Type != JTokenType.Null;
+            var hasRows = token.GetValue("ExpandedStackedRows", StringComparison.OrdinalIgnoreCase) is JToken bothRows && bothRows.Type != JTokenType.Null;
+            if (hasColumns && hasRows)
+                throw new JsonSerializationException("ExpandedStackedColumns 与 ExpandedStackedRows 互斥，不能同时声明。");
             BpElement element;
             switch (token.Value<int>("Type"))
             {

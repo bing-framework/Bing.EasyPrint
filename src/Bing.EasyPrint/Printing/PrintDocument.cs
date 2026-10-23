@@ -417,14 +417,19 @@ public sealed class PrintBarcodeElement : PrintElement
     /// <summary>获取 ExpandedStacked 每行字符对数上限；null 沿用两列，仅适用于 ExpandedStacked。</summary>
     public int? ExpandedStackedColumns { get; private set; }
 
+    /// <summary>获取 ExpandedStacked 允许的最大数据行数；null 表示不限制，仅适用于 ExpandedStacked。</summary>
+    /// <remarks>分隔行不计入行数上限；与 <see cref="ExpandedStackedColumns"/> 互斥。</remarks>
+    public int? ExpandedStackedRows { get; private set; }
+
     /// <summary>创建指定 ExpandedStacked 列数的不可变副本；原元素不变，尺寸在编码时确定。</summary>
     /// <param name="columns">每行字符对数上限，范围 1–11；不是打印点宽或二维组件列数。</param>
     /// <returns>保留其余配置的新元素；不持有外部资源，元数据计入当前打印资源作用域。</returns>
     /// <exception cref="NotSupportedException">元素制式不是 ExpandedStacked。</exception>
     /// <exception cref="ArgumentOutOfRangeException">列数超出支持范围。</exception>
+    /// <exception cref="InvalidOperationException">元素已经配置最大数据行数。</exception>
     public PrintBarcodeElement WithExpandedStackedColumns(int columns)
     {
-        EscPosRasterCanvas.ValidateExpandedStackedColumns(Type, columns, false);
+        EscPosRasterCanvas.ValidateExpandedStackedLayout(Type, columns, ExpandedStackedRows);
         var copy = QuietZone == null
             ? new PrintBarcodeElement(X, Y, Type, Data, BarHeight, NarrowWidth, WideWidth, Rotation,
                 CpclRatioCode, HumanReadable, HumanReadableReserveHeight, Width)
@@ -433,6 +438,26 @@ public sealed class PrintBarcodeElement : PrintElement
         copy.IsCpclTemplateRotation = IsCpclTemplateRotation;
         copy.SourcePath = SourcePath;
         copy.ExpandedStackedColumns = columns;
+        return copy;
+    }
+
+    /// <summary>创建指定 ExpandedStacked 最大数据行数的不可变副本；原元素不变，尺寸在编码时确定。</summary>
+    /// <param name="maximumRows">允许的最大数据行数，范围 2–11；分隔行不计入上限，不是物理行总数。</param>
+    /// <returns>保留其余配置的新元素；不持有外部资源，元数据计入当前打印资源作用域。</returns>
+    /// <exception cref="NotSupportedException">元素制式不是 ExpandedStacked。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">最大行数超出支持范围。</exception>
+    /// <exception cref="InvalidOperationException">元素已经配置显式列数。</exception>
+    public PrintBarcodeElement WithExpandedStackedRows(int maximumRows)
+    {
+        EscPosRasterCanvas.ValidateExpandedStackedLayout(Type, ExpandedStackedColumns, maximumRows);
+        var copy = QuietZone == null
+            ? new PrintBarcodeElement(X, Y, Type, Data, BarHeight, NarrowWidth, WideWidth, Rotation,
+                CpclRatioCode, HumanReadable, HumanReadableReserveHeight, Width)
+            : new PrintBarcodeElement(X, Y, Type, Data, BarHeight, QuietZone, NarrowWidth, WideWidth, Rotation,
+                CpclRatioCode, HumanReadable, HumanReadableReserveHeight, Width);
+        copy.IsCpclTemplateRotation = IsCpclTemplateRotation;
+        copy.SourcePath = SourcePath;
+        copy.ExpandedStackedRows = maximumRows;
         return copy;
     }
 

@@ -207,7 +207,7 @@ internal static class PrintQuietZoneValidator
                 cancellationToken.ThrowIfCancellationRequested();
                 var width = protocol == PrintProtocol.EscPos
                     ? Math.Max(barcode.Width, EscPosRasterCanvas.MeasureBarcodeWidth(barcode.Type, barcode.Data,
-                        barcode.NarrowWidth, cancellationToken, barcode.ExpandedStackedColumns))
+                        barcode.NarrowWidth, cancellationToken, barcode.ExpandedStackedColumns, barcode.ExpandedStackedRows))
                     : PrintProtocolProviderBase.MeasureBarcodeWidth(barcode, protocol, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (width <= 0)
@@ -218,7 +218,7 @@ internal static class PrintQuietZoneValidator
                 var height = protocol == PrintProtocol.EscPos && (barcode.Type == BarcodeType.Code49 ||
                     barcode.Type == BarcodeType.Gs1DataBarExpandedStacked || barcode.Type == BarcodeType.Gs1DataBarStackedOmnidirectional)
                     ? checked(EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
-                        barcode.BarHeight, barcode.NarrowWidth, cancellationToken, barcode.ExpandedStackedColumns) +
+                        barcode.BarHeight, barcode.NarrowWidth, cancellationToken, barcode.ExpandedStackedColumns, barcode.ExpandedStackedRows) +
                         barcode.HumanReadableReserveHeight)
                     : barcode.Height;
                 return new[] { Body(barcode, width, height, protocol) };
