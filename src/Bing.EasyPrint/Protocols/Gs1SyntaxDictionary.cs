@@ -140,6 +140,9 @@ internal static class Gs1SyntaxDictionary
     private static readonly HashSet<string> PackageTypeSet = CreatePackageTypeSet();
 
     /// <summary>获取固定版本字典中的 AI 数量。</summary>
+    /// <summary>获取固定版本字典中的全部 AI 定义，用于关联规则盘点测试。</summary>
+    internal static IReadOnlyCollection<Gs1SyntaxAiDefinition> AllDefinitions => Definitions.Value.Values;
+
     internal static int Count => Definitions.Value.Count;
 
     /// <summary>判断 AI 是否在固定版本字典中定义。</summary>

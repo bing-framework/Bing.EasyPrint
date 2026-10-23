@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace Bing.EasyPrint.Protocols;
@@ -20,6 +21,55 @@ internal static class Gs1ApplicationIdentifierParser
 
     internal static bool IsBracketed(string data)
         => data != null && data.Length > 0 && (data[0] == '(' || data[0] == '[');
+
+    /// <summary>
+    /// 将括号式 AI 元素串解析为逐字段语法有效的元素，不执行跨 AI 关联检查。
+    /// </summary>
+    /// <param name="data">圆括号或方括号 AI 元素串。</param>
+    /// <param name="name">异常中的参数名称。</param>
+    /// <returns>按输入顺序排列的 AI 与字段值。</returns>
+    /// <exception cref="ArgumentException">括号、AI、字段值或转义不符合字典规则时抛出。</exception>
+    internal static IReadOnlyList<Gs1Element> ParseElements(string data, string name)
+    {
+        if (string.IsNullOrWhiteSpace(data))
+            throw new ArgumentException("GS1 AI 元素串不能为空。", name);
+        if (!IsBracketed(data))
+            throw new ArgumentException("GS1 括号 AI 元素串必须以 (AI) 或 [AI] 开头。", name);
+
+        var result = new List<Gs1Element>();
+        var index = 0;
+        char? bracketStyle = null;
+        while (index < data.Length)
+        {
+            var opening = data[index];
+            var closing = opening == '(' ? ')' : opening == '[' ? ']' : '\0';
+            if (closing == '\0')
+                throw new ArgumentException("GS1 AI 元素串中的 AI 必须使用匹配的圆括号或方括号。", name);
+            if (bracketStyle.HasValue && bracketStyle.Value != opening)
+                throw new ArgumentException("GS1 AI 元素串不能混用圆括号和方括号。", name);
+            bracketStyle = opening;
+
+            var aiEnd = data.IndexOf(closing, index + 1);
+            if (aiEnd < 0)
+                throw new ArgumentException("GS1 AI 元素串包含未闭合的 AI。", name);
+
+            var ai = data.Substring(index + 1, aiEnd - index - 1);
+            if (!TryGetDefinition(ai, out var definition))
+                throw new ArgumentException($"GS1 AI {ai} 不在固定版本 {Gs1SyntaxDictionary.DictionaryCommit} 的字典中。", name);
+
+            var valueStart = aiEnd + 1;
+            var nextElement = FindNextElement(data, valueStart);
+            var valueEnd = nextElement < 0 ? data.Length : nextElement;
+            var value = DecodeValue(ai, data.Substring(valueStart, valueEnd - valueStart), name);
+            ValidateValue(ai, value, definition, name);
+            result.Add(new Gs1Element(ai, value));
+            index = nextElement < 0 ? data.Length : nextElement;
+        }
+
+        if (result.Count == 0)
+            throw new ArgumentException("GS1 AI 元素串不能为空。", name);
+        return result;
+    }
 
     /// <summary>
     /// 判断输入是否需要严格解析而非沿用单元素括号兼容行为。

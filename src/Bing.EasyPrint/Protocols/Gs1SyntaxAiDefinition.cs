@@ -16,6 +16,8 @@ internal sealed class Gs1SyntaxAiDefinition
         PredefinedLength = predefinedLength;
         Components = components;
         Attributes = attributes;
+        RequirementRules = Gs1AssociationRuleParser.Parse(attributes, "req", ai);
+        ExclusionRules = Gs1AssociationRuleParser.Parse(attributes, "ex", ai);
         Title = title;
         Specification = specification;
         var minimum = 0;
@@ -53,6 +55,12 @@ internal sealed class Gs1SyntaxAiDefinition
 
     /// <summary>获取字典中的关联属性原文，如 req/ex/dlpkey。</summary>
     internal string Attributes { get; }
+
+    /// <summary>获取字典 req 属性的必需关联规则。</summary>
+    internal IReadOnlyList<Gs1AssociationRule> RequirementRules { get; }
+
+    /// <summary>获取字典 ex 属性的互斥关联规则。</summary>
+    internal IReadOnlyList<Gs1AssociationRule> ExclusionRules { get; }
 
     /// <summary>获取字典标题。</summary>
     internal string Title { get; }

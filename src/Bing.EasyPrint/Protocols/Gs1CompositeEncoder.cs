@@ -90,11 +90,13 @@ internal static partial class Gs1CompositeEncoder
         using var workspace = PrintResourceScope.Reserve(
             checked(16384L + 128L * (element.PrimaryData.Length + element.SecondaryData.Length)),
             "Composite.EncodingWorkspace");
-        var primary = NormalizePrimary(element.LinearType, element.PrimaryData);
+        var primary = NormalizePrimary(element.LinearType, element.PrimaryData, element.UseMergedAssociationScope);
         if (!Gs1ApplicationIdentifierParser.IsBracketed(element.SecondaryData))
             throw new ArgumentException("Composite 次数据必须为括号式 GS1 AI。", "secondaryData");
-        var secondary = Gs1ApplicationIdentifierParser.NormalizeForProtocol(element.SecondaryData,
-            "secondaryData", 2990);
+        var secondary = element.UseMergedAssociationScope
+            ? NormalizeCompositeSyntax(element.SecondaryData, "secondaryData", 2990)
+            : Gs1ApplicationIdentifierParser.NormalizeForProtocol(element.SecondaryData,
+                "secondaryData", 2990);
         cancellationToken.ThrowIfCancellationRequested();
         var columns = stacked || stackedOmni || element.LinearType == BarcodeType.UpcE ? 2
             : element.LinearType == BarcodeType.Gs1DataBarLimited || element.LinearType == BarcodeType.Ean8 ? 3 : 4;
@@ -237,16 +239,20 @@ internal static partial class Gs1CompositeEncoder
         return result;
     }
 
-    private static string NormalizePrimary(BarcodeType type, string data)
+    private static string NormalizePrimary(BarcodeType type, string data, bool mergedAssociationScope)
     {
         if (IsEanUpc(type)) return NormalizeEanUpc(type, data);
         if (type == BarcodeType.UccEan128)
-            return Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 48);
+            return mergedAssociationScope
+                ? NormalizeCompositeSyntax(data, "primaryData", 48)
+                : Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 48);
         if (type == BarcodeType.Gs1DataBarExpanded || type == BarcodeType.Gs1DataBarExpandedStacked)
         {
             if (!Gs1ApplicationIdentifierParser.IsBracketed(data))
                 throw new ArgumentException("Expanded Composite 主数据必须为括号式 GS1 AI。", "primaryData");
-            var normalized = Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 2990);
+            var normalized = mergedAssociationScope
+                ? NormalizeCompositeSyntax(data, "primaryData", 2990)
+                : Gs1ApplicationIdentifierParser.NormalizeForProtocol(data, "primaryData", 2990);
             if (normalized.StartsWith("01", StringComparison.Ordinal))
             {
                 var checksum = 0;
@@ -272,6 +278,15 @@ internal static partial class Gs1CompositeEncoder
         if (type == BarcodeType.Gs1DataBarLimited && data[0] > '1')
             throw new ArgumentException("DataBar Limited 主数据范围为 0 至 1999999999999。", "primaryData");
         return data.Length == 14 ? data.Substring(0, 13) : data;
+    }
+
+    private static string NormalizeCompositeSyntax(string data, string name, int maximumLength)
+    {
+        var normalized = Gs1ElementStringParser.Rebuild(Gs1ElementStringParser.Parse(data, name));
+        if (normalized.Length < 3 || normalized.Length > maximumLength)
+            throw new ArgumentException(
+                $"GS1 AI 规范化后长度必须为 3–{maximumLength} 个字符。", name);
+        return normalized;
     }
 
     private static string BuildBinary(string source, int columns, Gs1CompositeMode mode,

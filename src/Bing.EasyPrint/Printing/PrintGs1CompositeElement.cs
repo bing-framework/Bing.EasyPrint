@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Bing.EasyPrint.Protocols;
 
 namespace Bing.EasyPrint.Printing;
@@ -94,6 +94,9 @@ public sealed class PrintGs1CompositeElement : PrintElement
         QuietZone = quietZone;
     }
 
+    /// <summary>获取或设置是否由调用方先按合并后的显式数据集合执行关联校验。</summary>
+    internal bool UseMergedAssociationScope { get; set; }
+
     /// <summary>获取 ExpandedStacked 每行字符对数上限；null 沿用两列，仅适用于 ExpandedStacked。</summary>
     public int? ExpandedStackedColumns { get; private set; }
 
@@ -113,6 +116,7 @@ public sealed class PrintGs1CompositeElement : PrintElement
         var copy = new PrintGs1CompositeElement(X, Y, LinearType, PrimaryData, SecondaryData,
             LinearBarHeight, ModuleWidth, Mode, Rotation, QuietZone);
         copy.SourcePath = SourcePath;
+        copy.UseMergedAssociationScope = UseMergedAssociationScope;
         copy.ExpandedStackedColumns = columns;
         return copy;
     }
@@ -129,6 +133,7 @@ public sealed class PrintGs1CompositeElement : PrintElement
         var copy = new PrintGs1CompositeElement(X, Y, LinearType, PrimaryData, SecondaryData,
             LinearBarHeight, ModuleWidth, Mode, Rotation, QuietZone);
         copy.SourcePath = SourcePath;
+        copy.UseMergedAssociationScope = UseMergedAssociationScope;
         copy.ExpandedStackedRows = maximumRows;
         return copy;
     }
