@@ -37,8 +37,14 @@ npm run dev
 | POST | `/api/designer/capabilities` | 按协议、布局和 Profile 返回能力 |
 | POST | `/api/designer/preview` | 返回布局与诊断信息 |
 | POST | `/api/designer/render` | 返回实际协议输出 |
+| POST | `/api/designer/element-png` | 返回单个元素的真实软件位图 `image/png` |
+| POST | `/api/designer/page-png` | ESC/POS Raster 单页 PNG；多页 PNG ZIP |
 
 Host 通过 `X-EasyPrint-Contract-Version`、`X-EasyPrint-Features` 和 `X-EasyPrint-Required-Features` 协商契约。错误响应使用稳定的 HTTP 状态、`code`、`phase`、可选 `fieldPath` 和资源诊断。
+
+新增 `raster-element-png`、`raster-page-png` 特性。能力响应新增 `rasterPreview`：`softwareBitmap`、`elementPng`、`elementTypes`、`pagePng`、`pagePngReason`、`dpiX`、`dpiY`。`elementPng` 复用真实编码器与光栅路径；ESC/POS Raster 覆盖文本、1D、QR、DataMatrix/PDF417、GS1 Composite、图片、形状和边框，其他协议覆盖边框、QR、二维点阵、Composite、图片和基础形状，不宣称原生文字、Native HRI 或 1D 宽条/旋转语义。元素选择通过布局元素与绘制 primitive 的 ownership 映射取齐全部绘制指令，不按裸索引或仅 `sourcePath` 关联。`pagePng` 只对 ESC/POS Raster 为 `true`，其他协议返回 `false` 和明确原因，不输出 DOM 截图或假完整页。请求可带 `pageIndex`、`elementIndex`、`sourcePath`；`sourcePath` 必须匹配。PNG 按实际 DPI 写入 `pHYs`；raster 快照、RGBA、PNG、ZIP 均计入 Host 资源作用域，取消沿用现有请求中止语义。旧 Host 缺少特性时设计器保持旧几何预览并禁用下载。真机打印、设备字体和固件专属语义仍不在软件位图承诺内，详见[FNC1 与预览导出](fnc1-preview-png.md)。
+
+新增 `gs1-two-dimensional`、`gs1-association-validation` 特性。能力响应新增 `gs1TwoDimensional: { qr, dataMatrix, native, associationValidation }`；Host 请求新增可选 `validateGs1Associations`。Type 3 QR / Type 10 DataMatrix 的 `Gs1=true` 使用共享 GS1 编码并走图片协议，Native 和旧 Host 明确拒绝或禁用；普通模式不要求新特性。详见[GS1 关联与二维条码](gs1-associations-2d.md)。
 
 ExpandedStacked 的显式列数（包括显式 2）要求 `gs1-databar-expanded-stacked-columns`。能力响应仅在支持的普通 ESC/POS Raster Type 31 下提供顶层 `expandedStackedColumns: { minimum: 1, maximum: 11, default: 2 }`；Composite 通过 `gs1Composite.expandedStackedColumns: { minimum: 2, maximum: 11, default: 2 }` 声明。省略或 `null` 表示默认布局，不要求新特性；显式最大行数要求 `gs1-databar-expanded-stacked-rows`，对应顶层 `expandedStackedRows` / `gs1Composite.expandedStackedRows` 范围为 2–11，默认 `null`。旧 Host 的显式列数或行数会被设计器保留并明确拦截。模板属性名使用 `ExpandedStackedColumns` / `ExpandedStackedRows`；设计器拒绝其他大小写别名和重复声明，避免字段在旧 Host 请求中丢失。
 
@@ -48,7 +54,7 @@ GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。能力响应的 `gs1C
 
 Truncated 与 Stacked Omnidirectional 分别还要求 `gs1-composite-truncated`、`gs1-composite-stacked-omnidirectional`。基础 DataBar Composite 使用 `gs1-composite`；GS1-128 Auto/CC-C 还要求 `gs1-composite-cc-c`，显式 GS1-128 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab`，并且 `gs1Composite.linearTypes`、`modes` 必须分别包含 `UccEan128`、`CcA` 和 `CcB`；EAN/UPC 组合还要求 `gs1-composite-ean-upc`，以及 `Ean8/Ean13/UpcA/UpcE` 与 Auto/CcA/CcB 能力；EAN/UPC 附加码另要求 `gs1-composite-ean-upc-addons`；Expanded 和 Stacked 分别还要求 `gs1-composite-expanded` 和 `gs1-composite-stacked`。能力响应的 `modes` 可声明 `Auto`、`CcA`、`CcB`、`CcC`，但数组本身不表达组合支持，显式 GS1-128 A/B 还必须协商新增特性。新 Host 的 `gs1Composite.linearTypes` 在现有 Omnidirectional、Limited、UccEan128、Expanded、Stacked 项后追加 `Gs1DataBarExpandedStacked`，再追加 `Ean8`、`Ean13`、`UpcA`、`UpcE`，本阶段末尾追加 `Gs1DataBarTruncated`、`Gs1DataBarStackedOmnidirectional`，共 12 项；`modes` 和 `secondaryFormat` 保持不变，`primaryFormats` 在 `ean-upc-digits` 后追加 `ean-upc-digits-with-addon`。固定 `Field.Value` 附加码由设计器发送独立必需特性并校验 Host 响应；动态 `Field.Name` 在 Host 完成绑定后严格校验，设计器不提前推断数据值；旧 Host 的纯数字预检拒绝动态带加号的值，并保留纯数字输入。旧 Host 缺少对应特性或线性/模式能力时，设计器禁用相应选项并提示，服务端也会拒绝强制提交的请求；项目导入保留 A/B 模式，不静默改写，preview/render 请求携带必需特性并验证响应以防降级。旧能力响应中已声明的 Auto/CC-C、DataBar 和 Expanded 组合仍按原契约使用。完整示例见[GS1-128 CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[Expanded 使用说明](gs1-composite-expanded.md)、[Stacked 使用说明](gs1-composite-stacked.md)与[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。非法线性制式/模式配对在导入验证和服务端预检时拒绝。
 
-Stacked 使用两列 CC-A/CC-B；线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度。条高按上下数据行的总高计算，且至少为模块宽的 12 倍；它不是 ExpandedStacked。四协议 Raster 通过主机图形路径输出，ESC/POS Native 不支持；Composite 不内置 HRI。画布显示选择/布局占位，不绘制可扫描的编码位图，Host 在线预览返回实际编码尺寸。2026-10-22 的既有 DataBar 浏览器验收和完整 Chromium E2E 154/154 发生在 CC-C 集成前，后续 CC-C 的完整 Chromium 回归为 156/156，见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)；本轮 Stacked 验收见[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。这些软件结果不代表目标固件实机扫描已验收。命令见[开发与验证](development.md)和[修复验收报告](review-fixes-2026-10-22.md)。
+Stacked 使用两列 CC-A/CC-B；线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度。条高按上下数据行的总高计算，且至少为模块宽的 12 倍；它不是 ExpandedStacked。四协议 Raster 通过主机图形路径输出，ESC/POS Native 不支持；Composite 不内置 HRI。画布在新 Host 下显示 Host 返回的真实码图 PNG，旧 Host 保持选择/布局占位；元素 PNG 和 ESC/POS Raster 页面 PNG 可下载，其他协议不提供假完整页。2026-10-22 的既有 DataBar 浏览器验收和完整 Chromium E2E 154/154 发生在 CC-C 集成前，后续 CC-C 的完整 Chromium 回归为 156/156，见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)；本轮 Stacked 验收见[Stacked 阶段报告](gs1-stacked-verification-2026-10-22.md)。这些软件结果不代表目标固件实机扫描已验收。命令见[开发与验证](development.md)和[修复验收报告](review-fixes-2026-10-22.md)。
 
 ## 关键文件
 

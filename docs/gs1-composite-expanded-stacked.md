@@ -44,6 +44,6 @@ dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/
 
 Host 在原有 Composite 线性能力数组末尾追加 `Gs1DataBarExpandedStacked`，并声明 `gs1-composite-expanded-stacked`。显式配置列数还要求 `gs1-databar-expanded-stacked-columns`：普通 ESC/POS Raster 的顶层 `expandedStackedColumns` 范围为 1–11，Composite 的 `gs1Composite.expandedStackedColumns` 范围为 2–11，默认均为 2。显式配置最大行数要求 `gs1-databar-expanded-stacked-rows`，对应 `expandedStackedRows` / `gs1Composite.expandedStackedRows` 范围为 2–11，默认 `null`。设计器按 Host 返回的范围启用选项；省略或 `null` 可继续用于未声明新特性的旧 Host，显式配置会在能力缺失时保留并提示，阻止预览和导出。
 
-选择新制式后可以编辑列数、模块宽度、每行条高、主次数据、旋转和静区，并保存、重载或导出。切换制式保留非空原数据，不会将裸 GTIN 静默转换为括号 AI。在线预览使用 Host 返回的真实尺寸；当前画布仍显示不可扫描的布局占位，实际条码位图预览属于后续阶段。
+选择新制式后可以编辑列数、模块宽度、每行条高、主次数据、旋转和静区，并保存、重载或导出。切换制式保留非空原数据，不会将裸 GTIN 静默转换为括号 AI。在线预览使用 Host 返回的真实尺寸；画布在新 Host 下显示真实码图 PNG；旧 Host 仍显示不可扫描的布局占位。
 
 布局和固定矩阵来源为 [Zint 2.15.0 rss.c](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/rss.c)、[普通条码向量](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_rss.c)和 [Composite 向量](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_composite.c)。许可保留在源码与包中；本阶段按用户要求不执行实机验收。

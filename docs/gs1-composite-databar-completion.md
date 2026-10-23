@@ -40,7 +40,7 @@ Console.WriteLine(pages[0].Length);
 
 V2/V3 的 Type 11 保留原字段；`LinearType` 为 26 或 32，`LinearBarHeight` 遵循上表。普通 Type 4 的 `BarcodeType=32` 仅用于 ESC/POS Raster，`Height` 是每条数据行高度。模板布局使用完整编码高度，不能将总高度直接回填为条高。普通条码模板沿用左右各10X默认静区（例如X=2时完整宽140点）；显式 QuietZone 可覆盖。开启普通HRI须声明足以容纳实际文字墨迹的 HumanReadableReserveHeight，该高度另加到2H+3X之外。
 
-Host 在已有十个 `gs1Composite.linearTypes` 项后追加 `Gs1DataBarTruncated` 和 `Gs1DataBarStackedOmnidirectional`。两者分别要求基础 `gs1-composite` 加 `gs1-composite-truncated` 或 `gs1-composite-stacked-omnidirectional`，以及相应类型和 Auto/CcA/CcB 能力。设计器支持编辑、预览尺寸、导出及项目保存重载；切换制式会将过低条高提高到最小值。旧 Host 缺少对应特性时禁用并显示原因，强制请求也必须通过特性协商。画布仍是不可扫描的布局占位。
+Host 在已有十个 `gs1Composite.linearTypes` 项后追加 `Gs1DataBarTruncated` 和 `Gs1DataBarStackedOmnidirectional`。两者分别要求基础 `gs1-composite` 加 `gs1-composite-truncated` 或 `gs1-composite-stacked-omnidirectional`，以及相应类型和 Auto/CcA/CcB 能力。设计器支持编辑、预览尺寸、导出及项目保存重载；切换制式会将过低条高提高到最小值。旧 Host 缺少对应特性时禁用并显示原因，强制请求也必须通过特性协商。画布在新 Host 下显示真实码图 PNG；旧 Host 仍为不可扫描的布局占位。
 
 案例：[C# 驱动](../samples/Templates/Gs1CompositeSamples.cs)、[Truncated JSON](../samples/Templates/gs1-composite-truncated.json)、[Stacked Omnidirectional JSON](../samples/Templates/gs1-composite-stacked-omnidirectional.json)。执行 `dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/template-samples` 验证四协议 C#/JSON/往返一致。
 

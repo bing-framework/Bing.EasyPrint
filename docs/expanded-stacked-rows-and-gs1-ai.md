@@ -67,9 +67,13 @@ Host 新增 `gs1-databar-expanded-stacked-rows` 特性。普通 Raster 的顶层
 
 - 固定/变长、总长度与各组件长度；
 - `N` 数字、`X` CSET 82、`Y` CSET 39、`Z` base64url 字符集；
-- 固定长度 AI 不需要 FNC1；可变长度 AI 在后续元素前插入 FNC1（与既有规范化字节兼容）；
+- 字典 `*` 表示预定义长度且无需 FNC1；没有 `*` 的 AI 即使总长度固定，后续仍有元素时也插入 FNC1。可变长度 AI 同样在后续元素前插入 FNC1。该规则以固定字典第 41 行和官方 Syntax Engine 为准。
 - `csum`、`csumalpha`、`key`、`keyoff1`、`yymmd0`、`yymmdd`、`yyyymmd0`、`yyyymmdd`、`hh`、`mi`、`ss`、`hhmi`、`iso3166`、`iso3166999`、`iso3166alpha2`、`iso4217`、`iso5218`、`yesno`、`nonzero`、`zero`、`winding`、`pieceoftotal`、`posinseqslash`、`hyphen`、`mediatype`、`importeridx`、`latitude`、`longitude`、`pcenc`、`iban`、`nozeroprefix`、`hasnondigit`、`couponcode`、`couponposoffer`、`packagetype` 等字典 Linter；
 - 未知 AI、越界长度、非法字符、错误校验位和不完整字段在输出前失败，错误信息包含 AI 与具体字段原因。
+
+### 官方独立对照
+
+离线测试另固定 GS1 Syntax Engine 提交 `9ae7fae0d43a731b6e22005d482f81482e092499`（Apache-2.0），以其 `src/c-lib/aitable.inc` 的 `NO_FNC1` / `DO_FNC1` 生成 536 项 FNC1 夹具，并采用其 linter 单元测试和 JavaScript 测试向量验证校验位、日期时间、国家/货币、IBAN、件数、包装类型、优惠券、百分比编码、可选组件和括号元素规范化。该 Engine 提交内置字典为 Release `2025-01-30`，与固定字典仅注释行不同，AI 定义一致。测试还覆盖最后元素无分隔、多元素、非法字段以及 GS1-128、Expanded、Composite 可达输出；原始单元素括号兼容路径单独验证。全量 `req` / `ex` 跨 AI 业务关系仍不在本轮范围。来源、夹具生成方法和更新步骤见[FNC1 与预览导出](fnc1-preview-png.md)。
 
 仍然属于调用方或具体码制的边界：
 
@@ -83,8 +87,9 @@ Host 新增 `gs1-databar-expanded-stacked-rows` 特性。普通 Raster 的顶层
 
 1. 取得目标 GS1 Syntax Dictionary 提交的 `gs1-syntax-dictionary.txt`。
 2. 替换 `src/Bing.EasyPrint/Protocols/Data/gs1-syntax-dictionary-<commit>.txt`，更新 `Gs1SyntaxDictionary.DictionaryCommit`、`DictionarySha256` 和资源后缀。
-3. 如果新版本引入新 Linter，必须在 `Gs1SyntaxDictionary.KnownLinters` 与 `Gs1SyntaxAiDefinition.ValidateLinter` 中实现；加载时会拒绝未实现 Linter，不会静默接受。
-4. 运行 `Gs1SyntaxDictionaryTests`、全部核心测试和五框架 XML 门禁。
+3. 同步固定 GS1 Syntax Engine 提交，按 `aitable.inc` 的 `NO_FNC1` / `DO_FNC1` 重生成官方 FNC1 夹具，并核对 linter/Engine 向量与 ThirdPartyNotices。
+4. 如果新版本引入新 Linter，必须在 `Gs1SyntaxDictionary.KnownLinters` 与 `Gs1SyntaxAiDefinition.ValidateLinter` 中实现；加载时会拒绝未实现 Linter，不会静默接受。
+5. 运行 `Gs1SyntaxDictionaryTests`、全部核心测试和五框架 XML 门禁。
 
 ### 案例
 

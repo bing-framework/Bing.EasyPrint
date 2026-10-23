@@ -6,7 +6,11 @@ EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和
 
 ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列，Composite 可配置 2–11 列。也可按 2–11 条数据行上限布局；行数与列数互斥，分隔行不计入上限。显式配置需要 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows` 和 Host 声明的范围。完整契约与示例见 [列数配置指南](expanded-stacked-columns.md) 及[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)，基础编码范围见[ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
-GS1 括号 AI 输入已切换到固定版本 GS1 Barcode Syntax Dictionary（提交 `d1702ffb2fa5060f8460f7d581b01e377deaa1d6`）的完整 536 个已定义 AI，逐字段校验长度、字符集、固定/变长、分隔符和字典 Linter。具体码制容量、跨 AI 业务关联和实机扫描语义仍由编码器或调用方负责，见[AI 字典边界](expanded-stacked-rows-and-gs1-ai.md)。
+GS1 括号 AI 输入已切换到固定版本 GS1 Barcode Syntax Dictionary（提交 `d1702ffb2fa5060f8460f7d581b01e377deaa1d6`）的完整 536 个已定义 AI，逐字段校验长度、字符集、固定/变长、分隔符和字典 Linter。FNC1 已按官方 `*` 语义修正：没有 `*` 的固定长度 AI 后跟元素时也插入 FNC1。具体码制容量、跨 AI 业务关联和实机扫描语义仍由编码器或调用方负责，见[AI 字典边界](expanded-stacked-rows-and-gs1-ai.md)及[官方对照与预览导出](fnc1-preview-png.md)。
+
+设计器已接入真实软件码图预览和 PNG 下载：Host 新增 `/api/designer/element-png`、`/api/designer/page-png` 及 `raster-element-png` / `raster-page-png` 特性；ESC/POS Raster 支持单页 PNG 和多页 PNG ZIP，其他协议只支持可准确编码的边框、QR、矩阵、Composite、图片和形状，不宣称原生文字、Native HRI 或 1D 宽条/旋转。元素 PNG 按布局/primitive ownership 取齐全部绘制指令，raster 快照、RGBA、PNG 和 ZIP 计入资源预算。设备字体/固件专属完整页明确不可用，详见[预览与 PNG 指南](fnc1-preview-png.md)。
+
+固定字典的 `req`/`ex` 已提供显式核心校验入口，并接入 Composite 主次合并、EAN/UPC/DataBar 隐式 `(01)`、模板/Host 严格开关和设计器选项。现有 QR/DataMatrix 元素新增默认关闭的 `Gs1` 模式，使用共享 GS1 编码生成 GS1 QR（`]Q3`）和 GS1 DataMatrix（`]d2`），通过 CPCL、ESC/POS Raster、TSPL、ZPL 图片路径输出；Native 明确拒绝。普通模式、旧 Host 和默认行为保持兼容，详见[GS1 关联与二维条码](gs1-associations-2d.md)。
 
 当前 GS1-128 Composite 支持显式 CC-A/CC-B，Auto 仍选择 CC-C；旧 Host 缺少 `gs1-composite-gs1-128-ab` 时仍可使用已声明的 Auto/CC-C。接口和协商细节见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。下文各历史阶段的计数保留原日期与范围。
 
@@ -18,7 +22,7 @@ GS1 括号 AI 输入已切换到固定版本 GS1 Barcode Syntax Dictionary（提
 
 ### 后续软件能力
 
-EAN/UPC 的四种基本 Composite 组合及 2/5 位附加码、DataBar Composite、ExpandedStacked 自定义列数/最大行数和固定版本完整 GS1 AI 字典已接入。后续独立工作包括设计器真实条码位图预览和复杂字体排版，仍为 `DEFERRED`。目标打印机兼容性和扫码结果需要实际设备验收；软件向量及自动化测试不替代实机结果。
+EAN/UPC 的四种基本 Composite 组合及 2/5 位附加码、DataBar Composite、ExpandedStacked 自定义列数/最大行数、固定版本完整 GS1 AI 字典、真实软件码图预览和元素/ESC/POS Raster 页面 PNG 已接入。后续独立工作包括复杂字体排版和更多设备原生像素能力，仍为 `DEFERRED`。目标打印机兼容性和扫码结果需要实际设备验收；软件向量及自动化测试不替代实机结果。
 
 ### 打印传输与设备管理
 
@@ -59,6 +63,8 @@ Profile 会收窄能力并参与预检，但库不会自动发现设备，也不
 GS1-128 显式 CC-A/CC-B 的最新完整验收见[A/B 阶段报告](gs1-128-ab-verification-2026-10-22.md)。以下 CC-C 和较早修复阶段记录保留原范围，不代表 A/B 阶段验收结果。
 
 2026-10-22 后续 CC-C 阶段已完成本地验收：Core 两运行时各 3435 项、Host 148 项、Vitest 288 项、Chromium 156 项通过；五框架严格 XML 构建、四协议案例及候选包消费通过。新增能力与证据见[CC-C 阶段报告](gs1-composite-cc-c-verification-2026-10-22.md)。下段保留同日较早的修复阶段记录。
+
+2026-10-23 GS1 完整关联校验与二维条码阶段首轮为 4599/4599、Host 252/252、Chromium 191/191；主代理独立复核发现 R1—R6。第一次集成修复后 Core 各 4617/4617、Host 254/254、Chromium 192/192；第二次定向复核仅剩 R4 Composite 实际编码和 R5 GS1 QR 旋转占位，第二轮修复后 Core 各 4626/4626、Host 262/262、受影响 E2E 9/9（`--workers=1 --retries=0`）、五框架 XML 10/10、案例 132 文件和候选包 net6.0 Composite/二维新 API 消费通过；Vitest 412/412 与生产构建因应用代码未变复用首轮证据。2026-10-24 主代理从当前源码独立构建并原样重跑探针，确认剩余真实链路问题已修复，G1—G5 与 R1—R6 均 CLOSED，OPEN_ACTIONABLE=0；本阶段软件验收完成，实机验收按用户要求排除，未发布。实现范围、命令和证据见[GS1 关联与二维条码阶段报告](gs1-associations-2d-verification-2026-10-23.md)；README 与使用说明见[GS1 关联与二维条码](gs1-associations-2d.md)。
 
 截至 2026-10-22，本轮自动化验收已完成。Core 的 `net6.0` 与 `netcoreapp3.1` 完整测试各为 3397/3397 通过；Core 与 Templates 的严格 XML 门禁为 10/10 通过。Host 的 140 项测试、五模式能力加载、旧 Host Composite 降级及 Composite Host 预览/导出/项目往返断言已通过。前端生产构建与 Vitest 277 项通过；新增五模式能力及 Composite 定向 E2E 为 3/3 通过；ZPL、Code39 与复选框案例在完整回归中通过。完整 154 项 Chromium E2E 为 154 通过、0 失败、0 跳过、0 flaky，`retries=0`。命令和结果见[本轮修复验收报告](review-fixes-2026-10-22.md)。旧分轮证据见 `multi-protocol-verification.md`，不替代本轮结果。
 

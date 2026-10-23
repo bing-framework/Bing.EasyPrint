@@ -9,6 +9,8 @@
 - [EAN/UPC Composite 附加码阶段验收](ean-upc-addons-verification-2026-10-22.md)
 - [ExpandedStacked 列数配置与 Host 协商](expanded-stacked-columns.md)
 - [ExpandedStacked 最大行数与完整 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)
+- [FNC1 规则、官方对照、真实码图预览与 PNG 导出](fnc1-preview-png.md)
+- [GS1 完整关联校验与 GS1 QR / DataMatrix](gs1-associations-2d.md)
 - [ExpandedStacked 列数配置阶段验收](expanded-stacked-columns-verification-2026-10-23.md)
 
 本目录是项目当前功能的开发者入口。代码是最终依据；带 `Rxx` 标题的文档记录历史迭代与验证证据，不应替代当前模块说明。
@@ -59,6 +61,8 @@
 
 - [GS1-128 A/B 阶段验收](gs1-128-ab-verification-2026-10-22.md)：本阶段最新自动化验收记录。
 - [ExpandedStacked 最大行数与完整 AI 字典验收](expanded-stacked-rows-gs1-ai-verification-2026-10-23.md)：本轮能力、矩阵与原始证据。
+- [FNC1 修正、官方对照与 PNG 预览验收](fnc1-preview-png-verification-2026-10-23.md)
+- [GS1 完整关联校验与二维条码验收](gs1-associations-2d-verification-2026-10-23.md)：A/B/C/D 能力、原始命令与已知限制。
 - [多协议验证记录](multi-protocol-verification.md)：按迭代轮次保存的测试范围和已知环境问题。
 - [实现报告](implementation-report.md)：早期实现阶段的总结，不代表当前完整能力清单。
 - [组件校验基准](component-validation-benchmark.md)：特定提交与测试集的冻结基准。

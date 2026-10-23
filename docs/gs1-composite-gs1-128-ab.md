@@ -42,6 +42,6 @@ dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/
 
 基础 `gs1-composite` 与可选特性 `gs1-composite-gs1-128-ab`、`UccEan128` 线性能力及 `CcA`/`CcB` 模式能力共同启用此组合。HTTP 路由和能力响应 JSON 结构不变；已有类型/模式数组不能单独表达组合支持，调用方必须检查新增特性。
 
-旧 Host 缺少该特性时，A/B 选项不可用，并显示原因；已协商的 Auto/CC-C 仍可使用。项目导入保留 Mode，不静默替换。预览和导出请求要求新增特性，并校验响应特性，防止被旧 Host 当成其他模式处理。设计器画布仍显示布局占位，Host 返回编码后的实际尺寸。
+旧 Host 缺少该特性时，A/B 选项不可用，并显示原因；已协商的 Auto/CC-C 仍可使用。项目导入保留 Mode，不静默替换。预览和导出请求要求新增特性，并校验响应特性，防止被旧 Host 当成其他模式处理。设计器画布在新 Host 下显示真实码图 PNG；旧 Host 仍显示布局占位。Host 返回编码后的实际尺寸。
 
 本阶段自动化验收范围与结果见[GS1-128 A/B 阶段报告](gs1-128-ab-verification-2026-10-22.md)。后续已补齐 [ExpandedStacked](gs1-composite-expanded-stacked.md) 与 [EAN/UPC Composite](gs1-composite-ean-upc.md)，各阶段证据分别记录。

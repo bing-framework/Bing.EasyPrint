@@ -57,7 +57,7 @@ V2/V3 Type 11 的 `Field` 绑定 `主码+附加码`，`SecondaryField` 绑定 GS
 
 新 Host 公布 `gs1-composite-ean-upc-addons` 特性，并在 `gs1Composite.primaryFormats` 末尾追加 `ean-upc-digits-with-addon`；原有 `ean-upc-digits` 及 `linearTypes`（12 项）、`modes` 保持不变。固定 `Field.Value` 含附加码时，设计器会发送独立的必需特性并检查 Host 响应。`Field.Name` 动态绑定值在 Host 完成绑定后进行严格输入校验，浏览器不会提前推断其值并协商；旧 Host 的纯数字预检会明确拒绝带加号的动态值。缺少新特性的旧 Host 仍可处理不含附加码的 EAN/UPC Composite。
 
-设计器画布仍显示不可扫描的布局占位，Host 在线预览使用实际编码尺寸。示例 JSON：[EAN-8](../samples/Templates/gs1-composite-ean8-addon.json)、[EAN-13](../samples/Templates/gs1-composite-ean13-addon.json)、[UPC-A](../samples/Templates/gs1-composite-upca-addon.json)、[UPC-E](../samples/Templates/gs1-composite-upce-addon.json)；C# 四协议字节往返驱动见 [Gs1CompositeSamples.cs](../samples/Templates/Gs1CompositeSamples.cs)。运行 `dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/template-samples` 可比较 C#、JSON 与 JSON 往返输出。
+设计器画布在新 Host 下显示真实码图 PNG；旧 Host 仍显示不可扫描的布局占位。示例 JSON：[EAN-8](../samples/Templates/gs1-composite-ean8-addon.json)、[EAN-13](../samples/Templates/gs1-composite-ean13-addon.json)、[UPC-A](../samples/Templates/gs1-composite-upca-addon.json)、[UPC-E](../samples/Templates/gs1-composite-upce-addon.json)；C# 四协议字节往返驱动见 [Gs1CompositeSamples.cs](../samples/Templates/Gs1CompositeSamples.cs)。运行 `dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/template-samples` 可比较 C#、JSON 与 JSON 往返输出。
 
 ## 独立向量
 

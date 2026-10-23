@@ -42,7 +42,7 @@ Console.WriteLine(pages[0].Length);
 
 Type 11 的 `Field` 绑定上述数字主数据，`SecondaryField` 绑定 AI 次数据。保留现有模板字段、枚举和 HTTP 路由。设计器可以选择四个零售组件、编辑条高/模块宽度/次数据、预览实际尺寸、导出指令并保存重载项目；非空主数据不会因切换制式而自动改写。
 
-除基础 `gs1-composite` 外，EAN/UPC 需要 `gs1-composite-ean-upc` 特性和相应 `linearTypes`、Auto/CcA/CcB 能力；附加码另需 `gs1-composite-ean-upc-addons`，新 Host 的 `primaryFormats` 在 `ean-upc-digits` 后追加 `ean-upc-digits-with-addon`。`linearTypes` 共 12 项且 `modes` 不变。固定 `Field.Value` 附加码由设计器发送独立必需特性并校验响应；动态 `Field.Name` 值在 Host 完成绑定后严格校验，浏览器不会提前推断其值并协商；旧 Host 的纯数字预检会明确拒绝带加号的动态值。画布目前仍为不可扫描的布局占位，Host 返回编码尺寸，并非实际码图预览。
+除基础 `gs1-composite` 外，EAN/UPC 需要 `gs1-composite-ean-upc` 特性和相应 `linearTypes`、Auto/CcA/CcB 能力；附加码另需 `gs1-composite-ean-upc-addons`，新 Host 的 `primaryFormats` 在 `ean-upc-digits` 后追加 `ean-upc-digits-with-addon`。`linearTypes` 共 12 项且 `modes` 不变。固定 `Field.Value` 附加码由设计器发送独立必需特性并校验响应；动态 `Field.Name` 值在 Host 完成绑定后严格校验，浏览器不会提前推断其值并协商；旧 Host 的纯数字预检会明确拒绝带加号的动态值。画布在新 Host 下显示真实码图 PNG；旧 Host 仍为不可扫描的布局占位。
 
 独立案例：[C# 驱动](../samples/Templates/Gs1CompositeSamples.cs)、[EAN-8 JSON](../samples/Templates/gs1-composite-ean8.json)、[EAN-13 JSON](../samples/Templates/gs1-composite-ean13.json)、[UPC-A JSON](../samples/Templates/gs1-composite-upca.json)、[UPC-E JSON](../samples/Templates/gs1-composite-upce.json)；附加码四制式 JSON 见[附加码使用说明](gs1-composite-ean-upc-addons.md#模板与-host-协商)。运行 `dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/template-samples` 会验证四协议 C#/JSON/往返字节一致。
 

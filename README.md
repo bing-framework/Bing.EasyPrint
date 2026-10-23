@@ -1,4 +1,4 @@
-﻿# Bing.EasyPrint
+# Bing.EasyPrint
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://mit-license.org/)
 
@@ -17,6 +17,8 @@ Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打�
 - [ExpandedStacked 普通条码与 Composite 使用说明](docs/gs1-composite-expanded-stacked.md)
 - [ExpandedStacked 列数配置与 Host 协商](docs/expanded-stacked-columns.md)
 - [ExpandedStacked 最大行数与完整 GS1 AI 字典](docs/expanded-stacked-rows-and-gs1-ai.md)
+- [FNC1 规则、官方对照、真实码图预览与 PNG 导出](docs/fnc1-preview-png.md)
+- [GS1 完整关联校验与 GS1 QR / DataMatrix](docs/gs1-associations-2d.md)
 - [GS1-128 + CC-A/CC-B Composite 使用说明](docs/gs1-composite-gs1-128-ab.md)
 - [GS1-128 + CC-A/CC-B Composite 验收记录](docs/gs1-128-ab-verification-2026-10-22.md)
 - [GS1-128 + CC-C Composite 使用说明](docs/gs1-composite-cc-c.md)
