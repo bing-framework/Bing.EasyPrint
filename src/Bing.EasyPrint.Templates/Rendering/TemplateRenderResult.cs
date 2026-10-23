@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Bing.EasyPrint.Core;
+using Bing.EasyPrint.Printing;
 
 namespace Bing.EasyPrint.Templates;
 
@@ -181,6 +182,8 @@ public sealed class TemplatePage
     /// 保存无布局轨迹时复用的空节点集合。
     /// </summary>
     private static readonly IReadOnlyList<TemplateLayoutElement> EmptyElements = Array.AsReadOnly(Array.Empty<TemplateLayoutElement>());
+    private static readonly IReadOnlyList<TemplateLayoutElement> EmptyRenderElementOwnership = Array.AsReadOnly(Array.Empty<TemplateLayoutElement>());
+    private IDisposable _renderElementLease;
 
     /// <summary>
     /// 获取以打印点表示的页宽。
@@ -214,6 +217,10 @@ public sealed class TemplatePage
     /// 获取当前页的布局节点；普通渲染返回空集合。
     /// </summary>
     public IReadOnlyList<TemplateLayoutElement> Elements { get; }
+    /// <summary>获取本页实际参与协议渲染的打印元素；仅供 Host 同源光栅预览使用。</summary>
+    internal IReadOnlyList<PrintElement> RenderElements { get; }
+    /// <summary>获取与 <see cref="RenderElements"/> 平行对应的布局归属；仅供 Host 映射 primitive。</summary>
+    internal IReadOnlyList<TemplateLayoutElement> RenderElementOwnership { get; }
     /// <summary>
     /// 初始化一个 <see cref="TemplatePage"/> 类型的实例。
     /// </summary>
@@ -226,15 +233,20 @@ public sealed class TemplatePage
     /// <param name="copyIndex">显式任务对应的份数序号。</param>
     /// <param name="feedAfterPrint">显式任务是否在本页后额外进纸。</param>
     /// <param name="cutAfterPrint">显式任务是否在本页后切纸。</param>
+    /// <param name="renderElements">本页实际参与协议渲染的打印元素，仅供 Host 同源位图预览复用。</param>
+    /// <param name="renderElementOwnership">与渲染元素平行对应的布局归属；仅 Host 捕获时提供。</param>
     internal TemplatePage(int width, int height, byte[] data, IEnumerable<TemplateLayoutElement> elements = null,
         PrintProtocol protocol = PrintProtocol.Cpcl, int? sourcePageIndex = null, int? copyIndex = null,
-        bool? feedAfterPrint = null, bool? cutAfterPrint = null)
+        bool? feedAfterPrint = null, bool? cutAfterPrint = null, IEnumerable<PrintElement> renderElements = null,
+        IEnumerable<TemplateLayoutElement> renderElementOwnership = null)
         : this(width, height, new Printing.PrintPageOutput(new[] { new Printing.PrintOutputSegment(data) }),
-            elements, protocol, sourcePageIndex, copyIndex, feedAfterPrint, cutAfterPrint) { }
+            elements, protocol, sourcePageIndex, copyIndex, feedAfterPrint, cutAfterPrint, renderElements,
+            renderElementOwnership) { }
 
     internal TemplatePage(int width, int height, Printing.PrintPageOutput output, IEnumerable<TemplateLayoutElement> elements = null,
         PrintProtocol protocol = PrintProtocol.Cpcl, int? sourcePageIndex = null, int? copyIndex = null,
-        bool? feedAfterPrint = null, bool? cutAfterPrint = null)
+        bool? feedAfterPrint = null, bool? cutAfterPrint = null, IEnumerable<PrintElement> renderElements = null,
+        IEnumerable<TemplateLayoutElement> renderElementOwnership = null)
     {
         Printing.PrintResourceScope.Retain(64, "Template.PageResult");
         Width = width;
@@ -251,6 +263,37 @@ public sealed class TemplatePage
             copy.AddRange(elements);
             Elements = copy.AsReadOnly();
         }
+        if (renderElements == null)
+        {
+            RenderElements = Array.AsReadOnly(Array.Empty<PrintElement>());
+            RenderElementOwnership = EmptyRenderElementOwnership;
+        }
+        else
+        {
+            var primitiveCopy = new List<PrintElement>(renderElements).ToArray();
+            var ownershipCopy = renderElementOwnership == null
+                ? Array.Empty<TemplateLayoutElement>()
+                : new List<TemplateLayoutElement>(renderElementOwnership).ToArray();
+            if (ownershipCopy.Length != primitiveCopy.Length)
+                throw new ArgumentException("渲染元素归属数量必须与渲染元素数量一致。", nameof(renderElementOwnership));
+            RenderElements = Array.AsReadOnly(primitiveCopy);
+            RenderElementOwnership = Array.AsReadOnly(ownershipCopy);
+            long retainedBytes = 0;
+            foreach (var primitive in primitiveCopy)
+            {
+                retainedBytes = checked(retainedBytes + 64L + primitive.GetRetainedBytes(primitive.SourcePath));
+                if (primitive is PrintImageElement image)
+                    retainedBytes = checked(retainedBytes + image.RasterData.LongLength);
+            }
+            _renderElementLease = Printing.PrintResourceScope.Reserve(retainedBytes, "Template.RenderElementSnapshot");
+        }
+    }
+
+    /// <summary>释放 Host 专用渲染元素快照的预算租约；重复调用安全。</summary>
+    internal void ReleaseRenderElements()
+    {
+        var lease = System.Threading.Interlocked.Exchange(ref _renderElementLease, null);
+        lease?.Dispose();
     }
 }
 
@@ -393,5 +436,11 @@ public sealed class TemplateRenderResult
         copy.AddRange(pages);
         Pages = copy.AsReadOnly();
         Protocol = protocol;
+    }
+
+    /// <summary>释放 Host 专用 primitive 快照；普通渲染没有快照，调用为空操作。</summary>
+    internal void ReleaseRenderElements()
+    {
+        foreach (var page in Pages) page.ReleaseRenderElements();
     }
 }

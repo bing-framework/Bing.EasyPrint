@@ -43,7 +43,7 @@ public sealed class TemplateRenderer
     /// <returns>包含所有目标协议页面的渲染结果。</returns>
     public TemplateRenderResult Render(BpTemplate template, object data, ITemplateResourceProvider resources = null,
         TemplateRenderOptions options = null, CancellationToken cancellationToken = default)
-        => RenderCore(template, data, resources, options, cancellationToken, false);
+        => RenderCore(template, data, resources, options, cancellationToken, false, false);
 
     /// <summary>
     /// 渲染模板并生成逐页打印数据与布局轨迹。
@@ -56,20 +56,14 @@ public sealed class TemplateRenderer
     /// <returns>包含目标协议页面及可定位布局节点的渲染结果。</returns>
     public TemplateRenderResult RenderWithLayout(BpTemplate template, object data, ITemplateResourceProvider resources = null,
         TemplateRenderOptions options = null, CancellationToken cancellationToken = default)
-        => RenderCore(template, data, resources, options, cancellationToken, true);
+        => RenderCore(template, data, resources, options, cancellationToken, true, false);
 
-    /// <summary>
-    /// 按指定模式完成模板渲染。
-    /// </summary>
-    /// <param name="template">待渲染的模板。</param>
-    /// <param name="data">字段绑定的根业务数据。</param>
-    /// <param name="resources">可选的图片资源提供器。</param>
-    /// <param name="options">本次渲染的可选配置。</param>
-    /// <param name="cancellationToken">取消渲染的令牌。</param>
-    /// <param name="captureLayout">是否同时记录布局轨迹。</param>
-    /// <returns>完整的逐页渲染结果。</returns>
+    internal TemplateRenderResult RenderWithLayoutAndPrimitives(BpTemplate template, object data,
+        ITemplateResourceProvider resources, TemplateRenderOptions options, CancellationToken cancellationToken)
+        => RenderCore(template, data, resources, options, cancellationToken, true, true);
+
     private static TemplateRenderResult RenderCore(BpTemplate template, object data, ITemplateResourceProvider resources,
-        TemplateRenderOptions options, CancellationToken cancellationToken, bool captureLayout)
+        TemplateRenderOptions options, CancellationToken cancellationToken, bool captureLayout, bool capturePrimitives)
     {
         options = options ?? new TemplateRenderOptions();
         cancellationToken.ThrowIfCancellationRequested();
@@ -108,7 +102,7 @@ public sealed class TemplateRenderer
         try
         {
             TemplateRenderResult result;
-            using (var session = new Session(template, options, resources, cancellationToken, captureLayout))
+            using (var session = new Session(template, options, resources, cancellationToken, captureLayout, capturePrimitives))
                 result = session.Render(session.BindRoot(data));
             resourceScope?.CommitReservations();
             return result;
@@ -291,6 +285,8 @@ public sealed class TemplateRenderer
         /// 指示是否记录可供设计器定位的布局轨迹。
         /// </summary>
         private readonly bool captureLayout;
+        /// <summary>是否为 Host PNG 捕获与布局元素一一关联的 primitive 快照。</summary>
+        private readonly bool capturePrimitives;
         /// <summary>
         /// 保存用于输出文字和计算字节预算的编码。
         /// </summary>
@@ -349,7 +345,8 @@ public sealed class TemplateRenderer
         /// <param name="resources">可选的图片资源提供器。</param>
         /// <param name="cancellation">取消渲染的令牌。</param>
         /// <param name="captureLayout">是否记录布局轨迹。</param>
-        internal Session(BpTemplate template, TemplateRenderOptions options, ITemplateResourceProvider resources, CancellationToken cancellation, bool captureLayout)
+        /// <param name="capturePrimitives">是否为 Host PNG 捕获 primitive 快照。</param>
+        internal Session(BpTemplate template, TemplateRenderOptions options, ITemplateResourceProvider resources, CancellationToken cancellation, bool captureLayout, bool capturePrimitives)
         {
             resourceBytes = new BudgetedDictionary<string, byte[]>("Template.ResourceIndex", storage,
                 StringComparer.Ordinal, (key, _) => PrintStorageBudget.TextBytes(key));
@@ -362,6 +359,7 @@ public sealed class TemplateRenderer
             ownershipLayouts = new BudgetedList<IReadOnlyList<TemplateLayoutElement>>("Template.OwnershipPages", owner: storage);
             this.template = template; this.options = options; this.resources = resources; this.cancellation = cancellation;
             this.captureLayout = captureLayout;
+            this.capturePrimitives = capturePrimitives;
             encoding = ResolveEncoding(options);
             pageHeight = template.Height == 0 ? options.MaxPageHeight : template.Height;
         }
@@ -529,7 +527,9 @@ public sealed class TemplateRenderer
                             outputBytes = checked(outputBytes + output.ByteLength);
                             jobPages.Add(new TemplatePage(source.Width, source.Height, output.Output,
                                 captureLayout ? pages[output.SourcePageIndex].Elements : null, options.Protocol,
-                                output.SourcePageIndex, output.CopyIndex, output.FeedAfterPrint, output.CutAfterPrint));
+                                output.SourcePageIndex, output.CopyIndex, output.FeedAfterPrint, output.CutAfterPrint,
+                                capturePrimitives ? source.Elements : null,
+                                capturePrimitives ? ownershipLayouts[output.SourcePageIndex] : null));
                         }
                         return new TemplateRenderResult(jobPages, options.Protocol);
                     }
@@ -550,7 +550,9 @@ public sealed class TemplateRenderer
                         outputBytes = checked(outputBytes + output.ByteLength);
                         if (outputBytes > options.MaxOutputBytes) throw new ArgumentException("输出超过字节上限。");
                         rendered.Add(new TemplatePage(logicalPage.Width, logicalPage.Height, output,
-                            captureLayout ? pages[index].Elements : null, options.Protocol));
+                            captureLayout ? pages[index].Elements : null, options.Protocol,
+                            renderElements: capturePrimitives ? logicalPage.Elements : null,
+                            renderElementOwnership: capturePrimitives ? ownershipLayouts[index] : null));
                     }
                     return new TemplateRenderResult(rendered, options.Protocol);
                 }
@@ -2341,12 +2343,13 @@ public sealed class TemplateRenderer
                     Width = frame.Width, Height = frame.Height, Border = frame.Border, SourcePath = frame.SourcePath,
                     Kind = frame.Kind, InstanceIndices = frame.InstanceIndices,
                     DefinitionPath = frame.DefinitionPath, ComponentInstancePath = frame.ComponentInstancePath };
+                var frameOwnership = new TemplateLayoutElement(frame.SourcePath, frame.Kind, 0,
+                    frame.InstanceIndices, frame.X, checked(Math.Max(frame.Y, start) - start + destination),
+                    frame.Width, Math.Max(0, Math.Min(checked(frame.Y + frame.Height), end) - Math.Max(frame.Y, start)),
+                    null, null, frame.DefinitionPath, frame.ComponentInstancePath, pageIndex);
                 try
                 {
-                    command.SetSourceOwnership(new TemplateLayoutElement(frame.SourcePath, frame.Kind, 0,
-                        frame.InstanceIndices, frame.X, checked(Math.Max(frame.Y, start) - start + destination),
-                        frame.Width, Math.Max(0, Math.Min(checked(frame.Y + frame.Height), end) - Math.Max(frame.Y, start)),
-                        null, null, frame.DefinitionPath, frame.ComponentInstancePath, pageIndex));
+                    command.SetSourceOwnership(frameOwnership);
                     DrawBorder(command, frame, start, end, destination);
                 }
                 catch (NotSupportedException error)
@@ -2356,13 +2359,7 @@ public sealed class TemplateRenderer
                         frame.DefinitionPath, frame.ComponentInstancePath, frame.InstanceIndices);
                 }
                 if (captureLayout && frame.Y < end && checked(frame.Y + frame.Height) > start)
-                {
-                    var top = Math.Max(frame.Y, start);
-                    var bottom = Math.Min(checked(frame.Y + frame.Height), end);
-                    pageLayout.Add(new TemplateLayoutElement(frame.SourcePath, frame.Kind, 0, frame.InstanceIndices,
-                        frame.X, checked(top - start + destination), frame.Width, bottom - top, null, null,
-                        frame.DefinitionPath, frame.ComponentInstancePath, pageIndex));
-                }
+                    pageLayout.Add(frameOwnership);
             }
         }
         /// <summary>
