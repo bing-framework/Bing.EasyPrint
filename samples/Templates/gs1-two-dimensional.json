@@ -1,0 +1,30 @@
+{
+  "Version": 2,
+  "Width": 400,
+  "Height": 400,
+  "Rows": [
+    {
+      "Cells": [
+        {
+          "Elements": [
+            {
+              "Type": 3,
+              "UnitWidth": 4,
+              "ErrorLevel": "M",
+              "Gs1": true,
+              "Field": { "Value": "(01)12345678901231(10)LOT%20A" }
+            },
+            {
+              "Type": 10,
+              "Format": "DataMatrix",
+              "Width": 96,
+              "Height": 96,
+              "Gs1": true,
+              "Field": { "Value": "(01)12345678901231(10)LOT%20A" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

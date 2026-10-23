@@ -47,6 +47,7 @@ internal static class Program
             VerifyExpandedStackedColumns();
             VerifyExpandedStackedRows();
             VerifyCompleteGs1DictionaryEntryPoints();
+            VerifyGs1TwoDimensionalAndAssociation();
             VerifyEanUpcCompositeOutputs();
             VerifyDataBarCompletionOutputs();
             VerifyStackedOutputs();
@@ -207,6 +208,162 @@ internal static class Program
             "(01)12345678901231(7030)840ABC(242)123(710)PZN-A", 40, humanReadable: false));
         var provider = PrintProtocolProviderFactory.Create(PrintProtocol.EscPos, Encoding.ASCII, EscPosLayoutMode.Raster);
         Require(Single(provider.Render(document), "完整 AI 字典入口").Length > 0, "完整 AI 字典入口输出");
+    }
+
+    private static void VerifyGs1TwoDimensionalAndAssociation()
+    {
+        Gs1AssociationValidator.Validate("(01)12345678901231(10)LOT");
+        RequireThrows<ArgumentException>(() => Gs1AssociationValidator.Validate("(02)12345678901231"),
+            "新关联入口拒绝缺失 37");
+        RequireThrows<ArgumentException>(() => Gs1AssociationValidator.Validate("4261240112345678901231"),
+            "新关联入口拒绝缺失 FNC1");
+        Gs1AssociationValidator.ValidateCarriers(new[] { "(00)123456789012345675", "(4300)ACME" });
+        Gs1AssociationValidator.ValidateCarriers(new[] { "(414)1234567890128", "(254)EXT" });
+
+        var template = new BpTemplate
+        {
+            Version = 2,
+            Width = 500,
+            Height = 500,
+            Rows = new List<BpRow>
+            {
+                new BpRow
+                {
+                    Cells = new List<BpCell>
+                    {
+                        new BpCell
+                        {
+                            Elements = new List<BpElement>
+                            {
+                                new BpQrCodeElement
+                                {
+                                    UnitWidth = 4, ErrorLevel = "M", Gs1 = true,
+                                    Field = new BgField { Value = "(01)12345678901231(10)LOT" }
+                                },
+                                new BpQrCodeElement
+                                {
+                                    UnitWidth = 4, ErrorLevel = "M", Gs1 = true,
+                                    Field = new BgField { Value = "(01)12345678901231(10)LOT" }
+                                },
+                                new BpMatrixCodeElement
+                                {
+                                    Format = "DataMatrix", Width = 96, Height = 96, Gs1 = true,
+                                    Field = new BgField { Value = "(01)12345678901231(10)LOT" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var options = new TemplateRenderOptions
+        {
+            Protocol = PrintProtocol.EscPos,
+            EscPosLayout = EscPosLayoutMode.Raster,
+            Encoding = Encoding.ASCII,
+            ValidateGs1Associations = true
+        };
+        var rendered = new TemplateRenderer().Render(template, null, options: options);
+        Require(rendered.PageCount == 1 && rendered.Pages[0].Data.Length > 0, "候选包 GS1 二维严格关联输出");
+
+        var compositeTemplate = new BpTemplate
+        {
+            Version = 2,
+            Width = 400,
+            Height = 500,
+            Rows = new List<BpRow>
+            {
+                new BpRow
+                {
+                    Cells = new List<BpCell>
+                    {
+                        new BpCell
+                        {
+                            Elements = new List<BpElement>
+                            {
+                                new BpGs1CompositeElement
+                                {
+                                    LinearType = BarcodeType.UccEan128,
+                                    Mode = Gs1CompositeMode.CcC,
+                                    ModuleWidth = 1,
+                                    LinearBarHeight = 40,
+                                    Field = new BgField { Value = "(00)123456789012345675" },
+                                    SecondaryField = new BgField { Value = "(4300)ACME" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var composite = new TemplateRenderer().Render(compositeTemplate, null, options: options);
+        Require(composite.PageCount == 1 && composite.Pages[0].Data.Length > 0,
+            "候选包分散 Composite 主次数据严格关联输出");
+        Console.WriteLine("GS1 Composite split-carrier strict association PASS");
+
+        var invalidDataMatrix = new BpTemplate
+        {
+            Version = 2,
+            Width = 400,
+            Height = 300,
+            Rows = new List<BpRow>
+            {
+                new BpRow
+                {
+                    Cells = new List<BpCell>
+                    {
+                        new BpCell
+                        {
+                            Elements = new List<BpElement>
+                            {
+                                new BpMatrixCodeElement
+                                {
+                                    Format = "DataMatrix", Width = 96, Height = 96, Gs1 = true,
+                                    Field = new BgField { Value = "(02)12345678901231" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        RequireThrows<TemplateRenderException>(() => new TemplateRenderer().Render(invalidDataMatrix, null,
+            options: options), "候选包 DataMatrix 严格关联拒绝");
+
+        var invalidUnit = new BpTemplate
+        {
+            Version = 2,
+            Width = 200,
+            Height = 200,
+            Rows = new List<BpRow>
+            {
+                new BpRow
+                {
+                    Cells = new List<BpCell>
+                    {
+                        new BpCell
+                        {
+                            Elements = new List<BpElement>
+                            {
+                                new BpQrCodeElement
+                                {
+                                    UnitWidth = 0, Width = 100, Height = 100, Gs1 = true,
+                                    Field = new BgField { Value = "(01)12345678901231" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        RequireThrows<TemplateRenderException>(() => new TemplateRenderer().Render(invalidUnit, null,
+            options: new TemplateRenderOptions
+            {
+                Protocol = PrintProtocol.EscPos,
+                EscPosLayout = EscPosLayoutMode.Raster,
+                Encoding = Encoding.ASCII
+            }), "候选包 GS1 QR UnitWidth=0 拒绝");
+        Console.WriteLine("GS1 two-dimensional strict association and validation PASS");
     }
 
     private static void VerifyEanUpcCompositeOutputs()

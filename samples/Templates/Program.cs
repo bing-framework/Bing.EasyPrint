@@ -44,6 +44,7 @@ PrintJobSamples.WriteTo(output, renderer);
 TsplCutterSamples.WriteTo(output, renderer);
 ZplCutterSamples.WriteTo(output, renderer);
 Gs1CompositeSamples.WriteTo(output, loader, renderer);
+Gs1TwoDimensionalSamples.WriteTo(output, loader, renderer);
 if (args.Length > 1) FixedFontSamples.WriteTo(output, renderer, args[1], args.Length > 2 ? args[2] : null);
 var nativeTemplate = loader.LoadJson(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "native-mixed-receipt.json")));
 var nativeReceipt = renderer.Render(nativeTemplate, new
