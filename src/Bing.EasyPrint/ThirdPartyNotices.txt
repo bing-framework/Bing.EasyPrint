@@ -1,7 +1,7 @@
 GS1 Composite encoding, DataBar Expanded linkage/separator and PDF417/Code128 tables
 Sources: https://github.com/zint/zint/tree/2.15.0/backend
 
-Managed port of Zint 2.15.0 backend/composite.c (CC-A/CC-B/CC-C) and backend/rss.c (DataBar Composite, Expanded Stacked and Stacked Omnidirectional layout/separators), and backend/upcean.c (EAN/UPC Composite separators and zero-suppression validation).
+Managed port of Zint 2.15.0 backend/composite.c (CC-A/CC-B/CC-C) and backend/rss.c (DataBar Composite, Expanded Stacked and Stacked Omnidirectional layout/separators), and backend/upcean.c (EAN/UPC Composite separators, zero-suppression validation, and 2/5-digit add-on parity/layout).
 Commit: 4896136bdbebb1a0908a5cc419513efa5bf4bf70.
 Copyright (C) 2008-2025 Robin Stuart <rstuart114@gmail.com>
 

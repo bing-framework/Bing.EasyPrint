@@ -78,7 +78,7 @@ internal static partial class Gs1CompositeEncoder
         var stackedOmni = element.LinearType == BarcodeType.Gs1DataBarStackedOmnidirectional;
         var expandedStacked = element.LinearType == BarcodeType.Gs1DataBarExpandedStacked;
         var expanded = element.LinearType == BarcodeType.Gs1DataBarExpanded || expandedStacked;
-        if (element.PrimaryData.Length > (expanded ? 2990 : gs1 ? 192 : 18))
+        if (element.PrimaryData.Length > (expanded ? 2990 : gs1 ? 192 : retail ? 19 : 18))
             throw new ArgumentException("Composite 主数据超过线性组件输入长度限制。", "primaryData");
         if (element.SecondaryData.Length > 2990)
             throw new ArgumentException("Composite 次数据超过编码容量。", "secondaryData");
@@ -127,7 +127,7 @@ internal static partial class Gs1CompositeEncoder
             ? EscPosRasterCanvas.BuildGs1DataBarStackedOmnidirectionalRows(linear, cancellationToken) : stacked
             ? EscPosRasterCanvas.BuildGs1DataBarStackedRows(linear, cancellationToken) : new[] { linear });
         linear = linearRows[0];
-        var separators = retail ? BuildEanUpcSeparators(linear.Length)
+        var separators = retail ? BuildEanUpcSeparators(EanUpcSeparatorWidth(element.LinearType))
             : new[] { BuildSeparator(element.LinearType, linear, cancellationToken) };
         var topShift = stacked || stackedOmni || element.LinearType == BarcodeType.Gs1DataBarLimited && mode == Gs1CompositeMode.CcA ? 1 : 0;
         if (expanded)

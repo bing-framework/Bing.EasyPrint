@@ -11,7 +11,25 @@ namespace Bing.EasyPrint.Tests;
 
 public sealed class Gs1CompositeEanUpcTests
 {
-    public static IEnumerable<object[]> Vectors() => Gs1CompositeEanUpcVectors.All();
+    public static IEnumerable<object[]> Vectors() => Gs1CompositeEanUpcVectors.All().Concat(Gs1CompositeEanUpcAddonVectors.All());
+
+    [Fact]
+    public void Independent_decoder_recovers_all_two_digit_values_and_all_five_digit_parities()
+    {
+        var addons = Enumerable.Range(0, 100).Select(value => value.ToString("D2"))
+            .Concat(Enumerable.Range(0, 10).Select(value => value.ToString("D5")));
+        foreach (var addon in addons)
+        {
+            var symbol = Gs1CompositeEncoder.Encode(Element(BarcodeType.Ean13, "1234567890128+" + addon));
+            var row = new ZXing.Common.BitArray(symbol.Matrix.Width + 40);
+            for (var x = 0; x < symbol.Matrix.Width; x++) row[x + 20] = symbol.Matrix[x, symbol.Matrix.Height - 1];
+            var decoded = new ZXing.OneD.EAN13Reader().decodeRow(0, row,
+                new Dictionary<ZXing.DecodeHintType, object> { [ZXing.DecodeHintType.ALLOWED_EAN_EXTENSIONS] = new[] { addon.Length } });
+            Assert.NotNull(decoded);
+            Assert.Equal("1234567890128", decoded.Text);
+            Assert.Equal(addon, decoded.ResultMetadata[ZXing.ResultMetadataType.UPC_EAN_EXTENSION]);
+        }
+    }
 
     [Theory]
     [MemberData(nameof(Vectors))]
@@ -42,15 +60,75 @@ public sealed class Gs1CompositeEanUpcTests
     [InlineData(BarcodeType.UpcE, "123454", "01234543")]
     [InlineData(BarcodeType.UpcE, "123455", "01234558")]
     public void Missing_check_digit_is_completed_without_changing_symbol(BarcodeType type, string shortInput, string fullInput)
-        => Assert.Equal(Gs1CompositeEncoder.Rasterize(Element(type, fullInput)).Raster.ToArray(),
-            Gs1CompositeEncoder.Rasterize(Element(type, shortInput)).Raster.ToArray());
+    {
+        foreach (var suffix in new[] { "", "+12", "+51234" })
+            Assert.Equal(Gs1CompositeEncoder.Rasterize(Element(type, fullInput + suffix)).Raster.ToArray(),
+                Gs1CompositeEncoder.Rasterize(Element(type, shortInput + suffix)).Raster.ToArray());
+    }
+
+    [Theory]
+    [InlineData(BarcodeType.Ean8, "12345670", 98, 125, 108, 135)]
+    [InlineData(BarcodeType.Ean13, "1234567890128", 125, 152, 125, 152)]
+    [InlineData(BarcodeType.UpcA, "012345678905", 127, 154, 127, 154)]
+    [InlineData(BarcodeType.UpcE, "01234565", 81, 108, 81, 108)]
+    public void Addons_keep_component_rows_and_height_and_use_exact_width(BarcodeType type, string primary,
+        int a2, int a5, int b2, int b5)
+    {
+        foreach (var mode in new[] { Gs1CompositeMode.CcA, Gs1CompositeMode.CcB })
+        foreach (var addon in new[] { "+12", "+51234" })
+        {
+            var original = Gs1CompositeEncoder.Encode(Element(type, primary, mode: mode));
+            var symbol = Gs1CompositeEncoder.Encode(Element(type, primary + addon, mode: mode));
+            Assert.Equal(original.ComponentRows, symbol.ComponentRows);
+            Assert.Equal(original.Matrix.Height, symbol.Matrix.Height);
+            var width = mode == Gs1CompositeMode.CcA ? (addon.Length == 3 ? a2 : a5) : (addon.Length == 3 ? b2 : b5);
+            Assert.Equal(width, symbol.Matrix.Width);
+            Assert.Equal(Gs1CompositeEncoder.Measure(Element(type, primary, mode: mode)).Height,
+                Gs1CompositeEncoder.Measure(Element(type, primary + addon, mode: mode)).Height);
+        }
+    }
+
+    [Theory]
+    [InlineData(BarcodeType.Ean8, "12345670")]
+    [InlineData(BarcodeType.Ean13, "1234567890128")]
+    [InlineData(BarcodeType.UpcA, "012345678905")]
+    [InlineData(BarcodeType.UpcE, "01234565")]
+    public void Malformed_addons_and_main_codes_fail_without_poisoning_provider(BarcodeType type, string primary)
+    {
+        using var scope = PrintResourceScope.Begin(128 * 1024);
+        foreach (var invalid in new[] { primary + "+", primary + "+1", primary + "+123", primary + "+1234",
+            primary + "+123456", primary + "+１２", primary + "+ 1", primary + "+12 ", primary + "+1+",
+            primary + "+12+12", primary + " +12", "+12", primary.Substring(0, primary.Length - 1) + "9+12" })
+        {
+            Assert.Equal("primaryData", Assert.Throws<ArgumentException>(() =>
+                Gs1CompositeEncoder.Encode(Element(type, invalid))).ParamName);
+            Assert.Equal(0, scope.CurrentBytes);
+        }
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.EscPos, PrintProtocol.Tspl, PrintProtocol.Zpl })
+        {
+            using (var request = PrintResourceScope.Begin(128 * 1024))
+            {
+                var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+                var bad = new PrintDocument();
+                bad.AddPage(400, 200).Add(Element(type, primary + "+12"));
+                bad.Pages[0].Add(Element(type, primary + "+123"));
+                var documentBytes = request.CurrentBytes;
+                Assert.Throws<PrintElementValidationException>(() => provider.Render(bad));
+                Assert.Equal(documentBytes, request.CurrentBytes);
+                var good = new PrintDocument();
+                good.AddPage(400, 200).Add(Element(type, primary + "+12"));
+                Assert.NotEmpty(Assert.Single(provider.Render(good)));
+            }
+            Assert.Equal(0, scope.CurrentBytes);
+        }
+    }
 
     [Theory]
     [InlineData(BarcodeType.Ean8, "12345671")]
     [InlineData(BarcodeType.Ean8, "123456")]
     [InlineData(BarcodeType.Ean8, "123456789")]
     [InlineData(BarcodeType.Ean8, "１２３４５６７")]
-    [InlineData(BarcodeType.Ean8, "1234567+12")]
+    [InlineData(BarcodeType.Ean8, "1234567+1")]
     [InlineData(BarcodeType.Ean13, "(01)12345678901231")]
     [InlineData(BarcodeType.Ean13, "1234567890129")]
     [InlineData(BarcodeType.UpcA, "012345678906")]
@@ -75,6 +153,10 @@ public sealed class Gs1CompositeEanUpcTests
     [InlineData(BarcodeType.Ean13, "123456789012")]
     [InlineData(BarcodeType.UpcA, "01234567890")]
     [InlineData(BarcodeType.UpcE, "123456")]
+    [InlineData(BarcodeType.Ean8, "1234567+12")]
+    [InlineData(BarcodeType.Ean13, "1234567890128+51234")]
+    [InlineData(BarcodeType.UpcA, "01234567890+12")]
+    [InlineData(BarcodeType.UpcE, "123456+51234")]
     public void Auto_fallback_capacity_cancellation_and_budget_recovery(BarcodeType type, string primary)
     {
         using var scope = PrintResourceScope.Begin(128 * 1024);
@@ -102,7 +184,7 @@ public sealed class Gs1CompositeEanUpcTests
     [InlineData(RotationAngle.Rotate270)]
     public void Reference_pixels_keep_three_2X_separators_quiet_zones_and_rotation(RotationAngle rotation)
     {
-        foreach (var vector in Vectors().Where(value => new[] { "zint-retail-8", "zint-retail-9", "zint-retail-28", "zint-retail-50" }.Contains(value[0])))
+        foreach (var vector in Vectors().Where(value => new[] { "zint-retail-8", "zint-retail-9", "zint-retail-28", "zint-retail-50" }.Contains(value[0]) || ((string)value[0]).StartsWith("zint-retail-addon-")))
         {
             var rows = (string[])vector[5];
             var element = new PrintGs1CompositeElement(0, 0, (BarcodeType)vector[1], (string)vector[3],

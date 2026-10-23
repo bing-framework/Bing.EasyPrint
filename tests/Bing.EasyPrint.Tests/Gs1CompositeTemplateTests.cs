@@ -52,6 +52,22 @@ public sealed class Gs1CompositeTemplateTests
     [InlineData(3, BarcodeType.UpcA, "012345678905")]
     [InlineData(2, BarcodeType.UpcE, "01234565")]
     [InlineData(3, BarcodeType.UpcE, "01234565")]
+    [InlineData(2, BarcodeType.Ean8, "12345670+12")]
+    [InlineData(2, BarcodeType.Ean8, "12345670+51234")]
+    [InlineData(2, BarcodeType.Ean13, "1234567890128+12")]
+    [InlineData(2, BarcodeType.Ean13, "1234567890128+51234")]
+    [InlineData(2, BarcodeType.UpcA, "012345678905+12")]
+    [InlineData(2, BarcodeType.UpcA, "012345678905+51234")]
+    [InlineData(2, BarcodeType.UpcE, "01234565+12")]
+    [InlineData(2, BarcodeType.UpcE, "01234565+51234")]
+    [InlineData(3, BarcodeType.Ean8, "12345670+12")]
+    [InlineData(3, BarcodeType.Ean8, "12345670+51234")]
+    [InlineData(3, BarcodeType.Ean13, "1234567890128+12")]
+    [InlineData(3, BarcodeType.Ean13, "1234567890128+51234")]
+    [InlineData(3, BarcodeType.UpcA, "012345678905+12")]
+    [InlineData(3, BarcodeType.UpcA, "012345678905+51234")]
+    [InlineData(3, BarcodeType.UpcE, "01234565+12")]
+    [InlineData(3, BarcodeType.UpcE, "01234565+51234")]
     public void Ean_upc_roundtrip_keeps_actual_dimensions_and_output(int version, BarcodeType type, string primary)
     {
         foreach (var mode in new[] { Gs1CompositeMode.Auto, Gs1CompositeMode.CcA, Gs1CompositeMode.CcB })

@@ -13,7 +13,7 @@ public sealed class BpGs1CompositeElement : BpElement
     /// </summary>
     public BpGs1CompositeElement() { Type = 11; }
     /// <summary>
-    /// 获取或设置绑定次数据的字段；继承的 Field 绑定主数据。
+    /// 获取或设置绑定次数据的字段；继承的 Field 绑定主数据；EAN/UPC 主码可追加一个加号和恰好 2/5 位 ASCII 数字附加码，不补零、不修剪。
     /// </summary>
     public BgField SecondaryField { get; set; }
     /// <summary>

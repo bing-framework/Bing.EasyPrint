@@ -18,7 +18,7 @@ public sealed class PrintGs1CompositeElement : PrintElement
     /// </summary>
     public BarcodeType LinearType { get; }
     /// <summary>
-    /// 获取主数据：EAN/UPC 使用纯数字（含或不含校验位），UPC-E 支持 6/7/8 位且号码系统仅 0/1；Omnidirectional/Truncated/Limited/Stacked/StackedOmnidirectional 使用 GTIN；Expanded/ExpandedStacked 使用括号式 AI；GS1-128 使用规范化后最多 48 字符的括号式 AI。
+    /// 获取主数据：EAN/UPC 使用数字主码（含或不含校验位），可追加 + 及 2/5 位数字附加码，UPC-E 支持 6/7/8 位且号码系统仅 0/1；Omnidirectional/Truncated/Limited/Stacked/StackedOmnidirectional 使用 GTIN；Expanded/ExpandedStacked 使用括号式 AI；GS1-128 使用规范化后最多 48 字符的括号式 AI。
     /// </summary>
     public string PrimaryData { get; }
     /// <summary>
@@ -48,7 +48,7 @@ public sealed class PrintGs1CompositeElement : PrintElement
     /// <param name="x">含静区符号左上角的水平坐标，单位为点。</param>
     /// <param name="y">含静区符号左上角的垂直坐标，单位为点。</param>
     /// <param name="linearType">EAN-8/EAN-13/UPC-A/UPC-E、DataBar Omnidirectional、Truncated、Limited、Stacked/StackedOmnidirectional、Expanded/ExpandedStacked 或 GS1-128。</param>
-    /// <param name="primaryData">EAN/UPC 使用纯数字，可省略校验位（EAN-8 为 7/8 位、EAN-13 为 12/13 位、UPC-A 为 11/12 位、UPC-E 为 6/7/8 位），不支持附加码；Omnidirectional/Truncated/Limited/Stacked/StackedOmnidirectional 的 GTIN，或 Expanded/ExpandedStacked/GS1-128 的括号 AI 主数据；不可为 null，格式和容量在编码时校验。</param>
+    /// <param name="primaryData">EAN/UPC 使用纯数字，可省略校验位（EAN-8 为 7/8 位、EAN-13 为 12/13 位、UPC-A 为 11/12 位、UPC-E 为 6/7/8 位），可追加一个加号及恰好 2/5 位 ASCII 数字附加码，不补零、不修剪；Omnidirectional/Truncated/Limited/Stacked/StackedOmnidirectional 的 GTIN，或 Expanded/ExpandedStacked/GS1-128 的括号 AI 主数据；不可为 null，格式和容量在编码时校验。</param>
     /// <param name="secondaryData">括号 AI 次数据；不可为 null，格式及容量在编码时校验。</param>
     /// <param name="linearBarHeight">线性组件条高，单位为点，必须大于零；Truncated 至少 13X；StackedOmnidirectional 为每行高度，至少 33X，中间另加三个 1X 分隔行；Stacked 至少为模块宽度的 12 倍，上行取总高的 5/12 向下取整，下行取余量；ExpandedStacked 为每条数据行高度，至少 1X，建议 34X，行间另加三个 1X 分隔行。</param>
     /// <param name="moduleWidth">模块宽度，单位为点，默认 2，必须大于零。</param>
