@@ -11,7 +11,8 @@ import { bindImageResource } from '../binding'
 import { defaultGroupPagination } from '../componentsModel'
 import {
   barcodeModuleWidthSupported, barcodeTypeSupported, capabilityFeatureReason, currentFontSource, elementTypeSupported, filledRectangleSupported,
-  deviceFontCapability, fontSizeRule, fontSourceSupported, hostFontFamilySupported, legacyDeviceFontSupported,
+  deviceFontCapability, expandedStackedColumnsIssue, expandedStackedColumnsRange, expandedStackedColumnsSupported,
+  fontSizeRule, fontSourceSupported, hostFontFamilySupported, legacyDeviceFontSupported,
   qrModuleSizeSupported, rotationSupported, textSizeSupported, valueInRange, wideModuleWidthSupported,
   type CapabilitiesState, type DesignerCapabilities,
 } from '../capabilities'
@@ -22,8 +23,8 @@ import {
   GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE,
   gs1CompositeModeChoices, minimumGs1DataBarExpandedStackedLinearHeight, minimumGs1DataBarStackedLinearHeight,
   minimumGs1DataBarTruncatedLinearHeight, minimumGs1DataBarStackedOmnidirectionalLinearHeight,
-  isGs1CompositeRetailLinearType, setGs1CompositeLinearType, setGs1CompositeMode,
-  supportsGs1CompositeCcC, supportsGs1CompositeEanUpc, supportsGs1CompositeExpanded,
+  isGs1CompositeRetailLinearType, gs1CompositeRetailHasAddon, setGs1CompositeLinearType, setGs1CompositeMode,
+  supportsGs1CompositeCcC, supportsGs1CompositeEanUpc, supportsGs1CompositeEanUpcAddons, supportsGs1CompositeExpanded,
   supportsGs1CompositeExpandedStacked, supportsGs1CompositeGs1128, supportsGs1CompositeGs1128CcAb,
   supportsGs1CompositeStacked, supportsGs1CompositeTruncated, supportsGs1CompositeStackedOmnidirectional,
   type Gs1CompositeLinearType, type Gs1CompositeMode,
@@ -61,6 +62,8 @@ const title = computed(() => isPage.value ? '页面属性' : props.definition ? 
 const capabilitiesReady = computed(() => props.capabilitiesState === 'ready' && Boolean(props.capabilities))
 const gs1CompositeModeOptions = computed(() => gs1CompositeModeChoices(
   props.element?.Type === 11 ? props.element.LinearType : undefined, props.capabilities))
+const ordinaryExpandedStackedColumnOptions = Array.from({ length: 11 }, (_, index) => index + 1)
+const compositeExpandedStackedColumnOptions = Array.from({ length: 10 }, (_, index) => index + 2)
 const capabilityNotice = computed(() => props.capabilitiesState === 'error'
   ? '当前协议能力不可用，保留现有值，待能力恢复后再调整。'
   : props.capabilitiesState === 'loading' ? '正在读取当前协议能力，暂不能确认支持情况。' : '')
@@ -642,6 +645,7 @@ function syncFixedBarcodeWideWidth(element: Extract<TemplateElement, { Type: 4 }
 function setBarcodeType(element: Extract<TemplateElement, { Type: 4 }>, event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)
   if (!Number.isInteger(value) || !barcodeTypeSupported(props.capabilities, value)) return
+  if (value !== DATABAR_EXPANDED_STACKED_LINEAR_TYPE) delete element.ExpandedStackedColumns
   element.BarcodeType = value
   if (value === DATABAR_EXPANDED_STACKED_LINEAR_TYPE || value === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE)
     delete element.EndCoordinate
@@ -652,6 +656,29 @@ function setBarcodeType(element: Extract<TemplateElement, { Type: 4 }>, event: E
   syncTsplVariableBarcodeRatio(element)
   syncFixedBarcodeWideWidth(element)
   updateBarcodeEndCoordinate(element)
+}
+
+function expandedStackedColumnsDisabled(kind: 'ordinary' | 'composite', value: number): boolean {
+  const range = expandedStackedColumnsRange(props.capabilities, kind)
+  return !expandedStackedColumnsSupported(props.capabilities, kind) || !range || value < range.minimum || value > range.maximum
+}
+
+function expandedStackedColumnsWarning(kind: 'ordinary' | 'composite', value: number | null | undefined): string | undefined {
+  return expandedStackedColumnsIssue(props.capabilities, kind, value)
+}
+
+function setExpandedStackedColumns(element: BarcodeElement | Gs1CompositeElement,
+  kind: 'ordinary' | 'composite', event: Event) {
+  const rawValue = (event.target as HTMLSelectElement).value
+  if (rawValue === 'default') {
+    delete element.ExpandedStackedColumns
+    return
+  }
+  const value = Number(rawValue)
+  const range = expandedStackedColumnsRange(props.capabilities, kind)
+  if (Number.isInteger(value) && range && expandedStackedColumnsSupported(props.capabilities, kind) &&
+    value >= range.minimum && value <= range.maximum)
+    element.ExpandedStackedColumns = value
 }
 
 function clearUnsupportedHumanReadable(element: Extract<TemplateElement, { Type: 4 }>) {
@@ -920,7 +947,8 @@ function setCompositeLinearType(element: Gs1CompositeElement, event: Event) {
     value === DATABAR_TRUNCATED_LINEAR_TYPE || value === DATABAR_EXPANDED_LINEAR_TYPE ||
     value === DATABAR_STACKED_LINEAR_TYPE || value === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ||
     value === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE)
-    setGs1CompositeLinearType(element, value as Gs1CompositeLinearType, props.capabilities)
+    if (setGs1CompositeLinearType(element, value as Gs1CompositeLinearType, props.capabilities) && value !== DATABAR_EXPANDED_STACKED_LINEAR_TYPE)
+      delete element.ExpandedStackedColumns
 }
 
 function setCompositeMode(element: Gs1CompositeElement, event: Event) {
@@ -1110,7 +1138,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
             <label v-if="element.Type !== 5 && element.Type !== 11" class="field-label">宽度<input class="field-input" type="number" min="1" :value="elementDimensionValue(element, 'X')" @input="setElementDimension(element, 'X', $event)" /></label>
             <label v-if="element.Type !== 5 && element.Type !== 11" class="field-label">高度 <span v-if="element.Type === 4 && capabilities?.barcodeHeight">{{ barcodeHeightRangeLabel(element as BarcodeElement) }}</span><input class="field-input" type="number" :min="element.Type === 4 ? barcodeHeightLimitInputValue(barcodeHeightMinimum(element as BarcodeElement)) : 1" :max="element.Type === 4 ? barcodeHeightLimitInputValue(capabilities?.barcodeHeight?.maximum) : undefined" :step="unit === 'mm' ? 'any' : 1" :value="elementDimensionValue(element, 'Y')" :disabled="element.Type === 4 && !capabilitiesReady" @input="setElementDimension(element, 'Y', $event)" /></label>
             <p v-if="element.Type === 4 && capabilitiesReady && !barcodeHeightSupported(element.Height)" class="field-note capability-warning">当前条码高度超出协议范围，请改为支持的值。</p>
-            <p v-if="element.Type === 4 && element.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-note">Expanded Stacked 的 Height 表示每条数据行高度（底层单位为打印点）；符号有 1–6 行，相邻数据行之间增加三个 1X 分隔行。每行至少为模块宽度，34X 是推荐扫码高度，输入范围不强制该推荐值。</p>
+            <p v-if="element.Type === 4 && element.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-note">Expanded Stacked 的 Height 表示每条数据行高度（打印点）；默认每行 2 个字符对，可按列数配置分行，最大为 11 行。相邻数据行之间增加三个 1X 分隔行；每行至少为模块宽度，34X 是推荐扫码高度。</p>
             <p v-if="element.Type === 4 && element.BarcodeType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE" class="field-note">Stacked Omnidirectional 的 Height 表示每条数据行高度（打印点），至少为窄模块宽度的 33 倍；两行之间增加三个 1X 分隔行，总高度为 2H+3X。HRI 为 (01)+GTIN，仅支持 ESC/POS Raster。</p>
             <template v-if="element.Type === 5">
               <label class="field-label">终点 X<input class="field-input" type="number" :value="dimensionValue(element.LineEndCoordinate?.X ?? element.EndCoordinate?.X)" @input="element.LineEndCoordinate ??= { X: 0, Y: 0 }; setDimension(element.LineEndCoordinate as unknown as Record<string, unknown>, 'X', $event)" /></label>
@@ -1201,6 +1229,8 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <div class="section-title"><span>条码参数</span></div>
           <label class="field-label">制式<select class="field-input" :value="element.BarcodeType ?? 0" :disabled="!capabilitiesReady" @change="setBarcodeType(element, $event)"><option v-for="option in barcodeOptions" :key="option[1]" :value="option[1]" :disabled="barcodeTypeDisabled(option[1])" :title="barcodeTypeDisabled(option[1]) ? capabilityReason('该条码制式') : ''">{{ option[0] }}</option></select></label>
           <p v-if="capabilitiesReady && !barcodeTypeSupported(capabilities, element.BarcodeType ?? 0)" class="field-note capability-warning">当前条码制式在此协议中不受支持，请改选可用制式。</p>
+          <label v-if="element.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-label">Expanded Stacked 每行列数<select class="field-input" aria-label="Expanded Stacked 每行列数" :value="element.ExpandedStackedColumns ?? 'default'" :disabled="!capabilitiesReady" @change="setExpandedStackedColumns(element, 'ordinary', $event)"><option value="default">默认（2 列）</option><option v-for="columns in ordinaryExpandedStackedColumnOptions" :key="columns" :value="columns" :disabled="expandedStackedColumnsDisabled('ordinary', columns)">{{ columns }} 列</option></select></label>
+          <p v-if="element.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE && element.ExpandedStackedColumns != null && expandedStackedColumnsWarning('ordinary', element.ExpandedStackedColumns)" class="field-note capability-warning">{{ expandedStackedColumnsWarning('ordinary', element.ExpandedStackedColumns) }}</p>
           <label class="field-label">可读文字<select class="field-input" aria-label="条码可读文字模式" :value="barcodeHumanReadableMode(element.HumanReadable)" :disabled="!capabilitiesReady" @change="setBarcodeHumanReadable(element, $event)"><option value="default">协议默认</option><option value="on" :disabled="capabilitiesReady && !capabilities?.supportsBarcodeHumanReadable" :title="capabilitiesReady && !capabilities?.supportsBarcodeHumanReadable ? capabilityReason('启用条码可读文字') : ''">开启</option><option value="off">关闭</option></select></label>
           <button v-if="capabilitiesReady && !capabilities?.supportsBarcodeHumanReadable && element.HumanReadable === true" class="field-clear-action" type="button" @click="clearUnsupportedHumanReadable(element)">清除不支持的可读文字设置</button>
           <p v-if="capabilitiesReady && !capabilities?.supportsBarcodeHumanReadable && element.HumanReadable === true" class="field-note capability-warning">当前协议不支持启用条码可读文字；保留现值，清除后可继续预览。</p>
@@ -1303,16 +1333,19 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
           <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
           <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
-          <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : isGs1CompositeRetailLinearType(element.LinearType) ? 'EAN/UPC 主数据只接受 ASCII 数字，不支持 AI 括号或补充码；请按所选制式提供不含或含校验位的规定长度。UPC-E 支持 6、7 或 8 位，6 位输入默认号码系统 0。' : element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE || element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ? 'Expanded 主数据使用括号式 GS1 AI，例如 (01)09506000134352(10)LOT-A；上方默认值可按业务数据修改。' : element.LinearType === DATABAR_TRUNCATED_LINEAR_TYPE || element.LinearType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE ? '主数据与 Omnidirectional 相同：13 位 payload，或有效 14 位 GTIN/括号式 (01) AI。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 GS1 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
+          <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : isGs1CompositeRetailLinearType(element.LinearType) ? 'EAN/UPC 主码只接受 ASCII 数字，可选用单个 + 添加 2 或 5 位 ASCII 数字，例如 12345670+12、1234567890128+51234；附加码不补零、不修剪。UPC-E 支持 6、7 或 8 位，6 位输入默认号码系统 0。' : element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE || element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ? 'Expanded 主数据使用括号式 GS1 AI，例如 (01)09506000134352(10)LOT-A；上方默认值可按业务数据修改。' : element.LinearType === DATABAR_TRUNCATED_LINEAR_TYPE || element.LinearType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE ? '主数据与 Omnidirectional 相同：13 位 payload，或有效 14 位 GTIN/括号式 (01) AI。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 GS1 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
           <p v-if="isGs1CompositeRetailLinearType(element.LinearType) && !supportsGs1CompositeEanUpc(capabilities)" class="field-note capability-warning">当前 Host 未协商 EAN/UPC Composite；请更新 Host 后再预览或输出。</p>
+          <p v-if="isGs1CompositeRetailLinearType(element.LinearType) && element.Field !== undefined && element.Field.Name === undefined && gs1CompositeRetailHasAddon(element.Field.Value) && !supportsGs1CompositeEanUpcAddons(capabilities)" class="field-note capability-warning">当前 Host 未协商 EAN/UPC Composite 附加码；原输入会保留，但带附加码的预览与输出不可用。</p>
           <p v-if="element.LinearType === GS1_128_LINEAR_TYPE && (element.Mode === 1 || element.Mode === 2) && !supportsGs1CompositeGs1128CcAb(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1-128 + CC-A/CC-B Composite；导入的模式值会保留，但预览与输出不可用。</p>
           <p v-if="element.LinearType === GS1_128_LINEAR_TYPE && element.Mode !== 1 && element.Mode !== 2 && !supportsGs1CompositeGs1128CcAb(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1-128 + CC-A/CC-B Composite；CC-A 与 CC-B 选项已禁用。</p>
           <p v-if="element.LinearType === GS1_128_LINEAR_TYPE && (element.Mode === undefined || element.Mode === 0 || element.Mode === GS1_COMPOSITE_CC_C_MODE) && !supportsGs1CompositeCcC(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1-128 + CC-C；此组合的预览与输出不可用。</p>
           <p v-if="element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE && !supportsGs1CompositeExpanded(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1 DataBar Expanded Composite；请更新 Host 后再预览或输出。</p>
           <p v-if="element.LinearType === DATABAR_STACKED_LINEAR_TYPE" class="field-note">Stacked 线性条高表示两行数据条总高，不含中间 1 模块分隔行；两行按 5:7 比例取整分配，总高至少为模块宽度的 12 倍。</p>
           <p v-if="element.LinearType === DATABAR_STACKED_LINEAR_TYPE && !supportsGs1CompositeStacked(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1 DataBar Stacked Composite；请更新 Host 后再预览或输出。</p>
-          <p v-if="element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-note">Expanded Stacked 线性条高表示每条数据行高度（打印点），固定每行 2 个字符对，最多 6 行；相邻数据行之间增加三个 1X 分隔行。每行至少为模块宽度，34X 为推荐扫码高度，不强制校验。</p>
+          <p v-if="element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-note">Expanded Stacked 线性条高表示每条数据行高度（打印点），默认每行 2 个字符对，可配置为 2–11 对、最多 6 行；相邻数据行之间增加三个 1X 分隔行。每行至少为模块宽度，34X 为推荐扫码高度。</p>
           <p v-if="element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE && !supportsGs1CompositeExpandedStacked(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1 DataBar Expanded Stacked Composite；请更新 Host 后再预览或输出。</p>
+          <label v-if="element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE" class="field-label">Expanded Stacked 每行列数<select class="field-input" aria-label="Composite Expanded Stacked 每行列数" :value="element.ExpandedStackedColumns ?? 'default'" :disabled="!capabilitiesReady" @change="setExpandedStackedColumns(element, 'composite', $event)"><option value="default">默认（2 列）</option><option v-for="columns in compositeExpandedStackedColumnOptions" :key="columns" :value="columns" :disabled="expandedStackedColumnsDisabled('composite', columns)">{{ columns }} 列</option></select></label>
+          <p v-if="element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE && element.ExpandedStackedColumns != null && expandedStackedColumnsWarning('composite', element.ExpandedStackedColumns)" class="field-note capability-warning">{{ expandedStackedColumnsWarning('composite', element.ExpandedStackedColumns) }}</p>
           <p v-if="element.LinearType === DATABAR_TRUNCATED_LINEAR_TYPE" class="field-note">Truncated 条高至少为模块宽度的 13 倍；固定宽度为 100X，总高度为 H+(2R+1)X。</p>
           <p v-if="element.LinearType === DATABAR_TRUNCATED_LINEAR_TYPE && !supportsGs1CompositeTruncated(capabilities)" class="field-note capability-warning">当前 Host 未协商 GS1 DataBar Truncated Composite；请更新 Host 后再预览或输出。</p>
           <p v-if="element.LinearType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE" class="field-note">Stacked Omnidirectional 每条数据行高度至少为 33X；两行之间三个 1X 分隔，Composite 外再加一条 1X 分隔。宽度为 56X，总高度为 2H+(2R+4)X。</p>

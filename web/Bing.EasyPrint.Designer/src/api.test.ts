@@ -705,4 +705,100 @@ describe('designer preview errors', () => {
     expect(previewBody.cutOptions).toEqual(rootCutOptions)
     expect(renderBody.job).toEqual(job)
   })
+
+  it.each([
+    ['ordinary', 1], ['composite', 2],
+  ] as const)('requires the Expanded Stacked columns feature for explicit %s column configuration', async (kind, columns) => {
+    const feature = 'gs1-databar-expanded-stacked-columns'
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += `,${feature}`
+    if (kind === 'composite') headers['X-EasyPrint-Features'] += ',gs1-composite,gs1-composite-expanded-stacked'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const template = createBlankSample()
+    template.Version = 3
+    template.Rows[0]!.Cells![0]!.Elements!.push(kind === 'ordinary'
+      ? { Type: 4, BarcodeType: 31, ExpandedStackedColumns: columns, Height: 34,
+          Field: { Value: '(01)09506000134352' } }
+      : { Type: 11, LinearType: 31, ExpandedStackedColumns: columns, Mode: 2, ModuleWidth: 2,
+          LinearBarHeight: 34, Field: { Value: '(01)09506000134352' }, SecondaryField: { Value: '(10)LOT-A' } })
+    await previewTemplate(template, {}, [], undefined, 'EscPos', 'Raster')
+
+    const requestHeaders = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(requestHeaders['X-EasyPrint-Required-Features']).toContain(feature)
+    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { template: typeof template }
+    expect(body.template.Rows[0]!.Cells![0]!.Elements![0]!).toMatchObject({ ExpandedStackedColumns: columns })
+  })
+
+  it('keeps default Expanded Stacked output compatible with Hosts that do not negotiate configurable columns', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), {
+      headers: validContractHeaders(),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const template = createBlankSample()
+    template.Rows[0]!.Cells![0]!.Elements!.push({ Type: 4, BarcodeType: 31, Height: 34,
+      Field: { Value: '(01)09506000134352' } })
+    await previewTemplate(template, {}, [], undefined, 'EscPos', 'Raster')
+
+    const requestHeaders = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(requestHeaders['X-EasyPrint-Required-Features']).not.toContain('gs1-databar-expanded-stacked-columns')
+  })
+
+  it.each(['ordinary', 'composite'] as const)('rejects explicit %s column settings when the Host omits the feature', async (kind) => {
+    const headers = validContractHeaders()
+    if (kind === 'composite') headers['X-EasyPrint-Features'] += ',gs1-composite,gs1-composite-expanded-stacked'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const template = createBlankSample()
+    template.Version = 3
+    template.Rows[0]!.Cells![0]!.Elements!.push(kind === 'ordinary'
+      ? { Type: 4, BarcodeType: 31, ExpandedStackedColumns: 3, Height: 34,
+          Field: { Value: '(01)09506000134352' } }
+      : { Type: 11, LinearType: 31, ExpandedStackedColumns: 3, Mode: 2, ModuleWidth: 2,
+          LinearBarHeight: 34, Field: { Value: '(01)09506000134352' }, SecondaryField: { Value: '(10)LOT-A' } })
+
+    await expect(previewTemplate(template, {}, [], undefined, 'EscPos', 'Raster')).rejects.toMatchObject({
+      message: '打印服务缺少 GS1 DataBar Expanded Stacked 自定义列数功能，请更新 Host。',
+      diagnostics: [expect.objectContaining({ code: 'ContractFeatureUnavailable' })],
+    })
+    const requiredFeatures = (fetchMock.mock.calls[0]![1]!.headers as Record<string, string>)['X-EasyPrint-Required-Features']
+    expect(requiredFeatures).toContain('gs1-databar-expanded-stacked-columns')
+  })
+
+  it('rejects invalid explicit Expanded Stacked columns before sending the request', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const template = createBlankSample()
+    template.Rows[0]!.Cells![0]!.Elements!.push({ Type: 4, BarcodeType: 31,
+      ExpandedStackedColumns: 1.5, Height: 34, Field: { Value: '(01)09506000134352' } })
+    await expect(previewTemplate(template, {}, [], undefined, 'EscPos', 'Raster'))
+      .rejects.toMatchObject({ diagnostics: [expect.objectContaining({ code: 'InvalidExpandedStackedColumns' })] })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects noncanonical Expanded Stacked column property casing before sending the request', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const template = createBlankSample()
+    template.Rows[0]!.Cells![0]!.Elements!.push({ Type: 4, BarcodeType: 31,
+      expandedStackedColumns: 3, Height: 34, Field: { Value: '(01)09506000134352' } } as never)
+    await expect(previewTemplate(template, {}, [], undefined, 'EscPos', 'Raster')).rejects.toMatchObject({
+      diagnostics: [expect.objectContaining({ code: 'InvalidExpandedStackedColumns' })],
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('maps the negotiated Expanded Stacked columns feature from Host capabilities', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',gs1-databar-expanded-stacked-columns'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(validEscPosCapabilitiesResponse({
+      escPosLayoutMode: 'Raster', nativeFlow: null, barcodeTypes: [31],
+      expandedStackedColumns: { minimum: 1, maximum: 11, default: 2 },
+    })), { headers })))
+
+    const result = await loadDesignerCapabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster' })
+    expect(result.expandedStackedColumns).toEqual({ minimum: 1, maximum: 11, default: 2 })
+    expect(result.expandedStackedColumnsFeature).toBe(true)
+  })
 })

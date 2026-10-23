@@ -16,7 +16,9 @@ export const DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE = 32 as const
 export const GS1_COMPOSITE_CC_C_MODE = 3 as const
 export const GS1_COMPOSITE_GS1_128_CC_AB_FEATURE = 'gs1-composite-gs1-128-ab' as const
 export const GS1_COMPOSITE_EXPANDED_STACKED_FEATURE = 'gs1-composite-expanded-stacked' as const
+export const GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE = 'gs1-databar-expanded-stacked-columns' as const
 export const GS1_COMPOSITE_EAN_UPC_FEATURE = 'gs1-composite-ean-upc' as const
+export const GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE = 'gs1-composite-ean-upc-addons' as const
 export const GS1_COMPOSITE_TRUNCATED_FEATURE = 'gs1-composite-truncated' as const
 export const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE = 'gs1-composite-stacked-omnidirectional' as const
 export const DATABAR_STACKED_MIN_HEIGHT_MODULES = 12 as const
@@ -87,6 +89,15 @@ export function supportsGs1CompositeEanUpc(capabilities?: DesignerCapabilities):
     requiredTypes.every((type) => capabilities.gs1Composite?.linearTypes.includes(type)))
 }
 
+export function supportsGs1CompositeEanUpcAddons(capabilities?: DesignerCapabilities): boolean {
+  return Boolean(supportsGs1CompositeEanUpc(capabilities) && capabilities?.gs1CompositeEanUpcAddonsFeature &&
+    capabilities.gs1Composite?.primaryFormats?.includes('ean-upc-digits-with-addon'))
+}
+
+export function gs1CompositeRetailHasAddon(value: string | undefined): boolean {
+  return value?.includes('+') ?? false
+}
+
 function expectedRetailPrimaryLength(linearType: Gs1CompositeRetailLinearType): string {
   switch (linearType) {
     case EAN_8_LINEAR_TYPE: return '7 或 8 位'
@@ -117,15 +128,22 @@ function expandUpcE(system: string, payload: string): string {
 /** 返回 EAN/UPC 主数据的输入错误；动态字段由 Host 在解析后校验。 */
 export function gs1CompositeRetailPrimaryError(linearType: number | undefined, value: string): string | undefined {
   if (!isGs1CompositeRetailLinearType(linearType)) return undefined
-  if (!/^[0-9]+$/.test(value)) return 'EAN/UPC Composite 主数据只接受 ASCII 数字，不支持 AI 括号或补充码。'
-  const validLength = linearType === EAN_8_LINEAR_TYPE ? value.length === 7 || value.length === 8
-    : linearType === EAN_13_LINEAR_TYPE ? value.length === 12 || value.length === 13
-      : linearType === UPC_A_LINEAR_TYPE ? value.length === 11 || value.length === 12
-        : value.length === 6 || value.length === 7 || value.length === 8
+  const separator = value.indexOf('+')
+  const primary = separator < 0 ? value : value.slice(0, separator)
+  const addon = value.slice(separator + 1)
+  if (separator >= 0 && (separator !== value.lastIndexOf('+') ||
+    (addon.length !== 2 && addon.length !== 5) || /[^0-9]/.test(addon))) {
+    return 'EAN/UPC Composite 附加码必须是单个 + 后的 2 或 5 位 ASCII 数字。'
+  }
+  if (!primary || /[^0-9]/.test(primary)) return 'EAN/UPC Composite 主数据只接受 ASCII 数字，不支持 AI 括号。'
+  const validLength = linearType === EAN_8_LINEAR_TYPE ? primary.length === 7 || primary.length === 8
+    : linearType === EAN_13_LINEAR_TYPE ? primary.length === 12 || primary.length === 13
+      : linearType === UPC_A_LINEAR_TYPE ? primary.length === 11 || primary.length === 12
+        : primary.length === 6 || primary.length === 7 || primary.length === 8
   if (!validLength) return `${linearType === EAN_8_LINEAR_TYPE ? 'EAN-8' : linearType === EAN_13_LINEAR_TYPE ? 'EAN-13' : linearType === UPC_A_LINEAR_TYPE ? 'UPC-A' : 'UPC-E'} 主数据长度必须为${expectedRetailPrimaryLength(linearType)}。`
 
   if (linearType === UPC_E_LINEAR_TYPE) {
-    const normalized = value.length === 6 ? `0${value}` : value
+    const normalized = primary.length === 6 ? `0${primary}` : primary
     const system = normalized[0]!
     const payload = normalized.slice(1, 7)
     if (system !== '0' && system !== '1') return 'UPC-E 号码系统只支持 0 或 1。'
@@ -142,8 +160,8 @@ export function gs1CompositeRetailPrimaryError(linearType: number | undefined, v
     return undefined
   }
 
-  if (value.length === (linearType === EAN_8_LINEAR_TYPE ? 8 : linearType === EAN_13_LINEAR_TYPE ? 13 : 12)) {
-    if (value[value.length - 1] !== checkDigit(value.slice(0, -1))) return 'EAN/UPC 校验位不匹配。'
+  if (primary.length === (linearType === EAN_8_LINEAR_TYPE ? 8 : linearType === EAN_13_LINEAR_TYPE ? 13 : 12)) {
+    if (primary[primary.length - 1] !== checkDigit(primary.slice(0, -1))) return 'EAN/UPC 校验位不匹配。'
   }
   return undefined
 }

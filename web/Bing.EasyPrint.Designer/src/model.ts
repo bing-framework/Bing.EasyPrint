@@ -93,6 +93,7 @@ export type QrElement = BaseElement & {
 export type BarcodeElement = BaseElement & {
   Type: 4
   BarcodeType?: number
+  ExpandedStackedColumns?: number | null
   LineWidth?: number
   Ratio?: number
   NarrowModuleWidth?: number
@@ -128,6 +129,7 @@ export type Gs1CompositeElement = BaseElement & {
   Type: 11
   SecondaryField: Field
   LinearType?: 4 | 5 | 6 | 7 | 11 | 25 | 26 | 27 | 28 | 30 | 31 | 32
+  ExpandedStackedColumns?: number | null
   Mode?: 0 | 1 | 2 | 3
   ModuleWidth?: number
   LinearBarHeight?: number
@@ -376,6 +378,24 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
     if (template.Version === 1 && element.Type === 11) throw new Error('Version: 1 使用 Composite 前需要升级至 Version: 2 或 3。')
     if (template.Version === 1 && element.Type > 5) throw new Error('Version: 1 不支持此元素类型。')
     const rawElement = element as unknown as Record<string, unknown>
+    const columnAliases = Object.keys(rawElement).filter((key) =>
+      key.toLowerCase() === 'expandedstackedcolumns' && key !== 'ExpandedStackedColumns')
+    if (columnAliases.length) {
+      const duplicate = own(rawElement, 'ExpandedStackedColumns')
+      throw new Error(`${context.path}.ExpandedStackedColumns 属性名必须为 ExpandedStackedColumns${
+        duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`)
+    }
+    const expandedStackedColumns = rawElement.ExpandedStackedColumns
+    if (expandedStackedColumns !== undefined && expandedStackedColumns !== null) {
+      const minimum = element.Type === 4 && rawElement.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE
+        ? 1
+        : element.Type === 11 && rawElement.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ? 2 : undefined
+      if (minimum === undefined)
+        throw new Error(`${context.path}.ExpandedStackedColumns 仅支持 Expanded Stacked 条码或 Composite。`)
+      if (!Number.isInteger(expandedStackedColumns) || (expandedStackedColumns as number) < minimum ||
+        (expandedStackedColumns as number) > 11)
+        throw new Error(`${context.path}.ExpandedStackedColumns 必须为 ${minimum}–11 的整数列数。`)
+    }
     if (own(rawElement, 'Filled')) {
       if (typeof rawElement.Filled !== 'boolean') throw new Error(`${context.path}.Filled 必须为布尔值。`)
       if (element.Type !== 7 && rawElement.Filled === true) throw new Error(`${context.path}.Filled 仅支持矩形元素。`)

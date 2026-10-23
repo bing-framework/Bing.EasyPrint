@@ -59,6 +59,8 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal(new[] { 0, 90, 180, 270 },
             composite.GetProperty("rotations").EnumerateArray().Select(value => value.GetInt32()));
         Assert.Equal("GTIN-13-data", composite.GetProperty("primaryFormats")[0].GetString());
+        Assert.Contains("ean-upc-digits-with-addon", composite.GetProperty("primaryFormats").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("gs1-composite-ean-upc-addons", context.Response.Headers[FeaturesHeader].ToString());
         Assert.Equal("bracketed-gs1-ai", composite.GetProperty("secondaryFormat").GetString());
         Assert.False(composite.GetProperty("includesHumanReadable").GetBoolean());
         Assert.True(composite.GetProperty("dimensionsFromEncoding").GetBoolean());
@@ -105,12 +107,13 @@ public sealed class Gs1CompositeHostTests
     public async Task Ean_upc_negotiates_previews_and_exports_across_protocols(string protocol, string layout)
     {
         foreach (var pair in new[] { (4, "12345670"), (5, "1234567890128"), (6, "012345678905"), (7, "01234565") })
+        foreach (var suffix in new[] { "", "+12", "+51234" })
         foreach (var mode in new[] { 0, 1, 2 })
         {
             var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", $"\"LinearType\":{pair.Item1},\"Mode\":{mode}").Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":31");
-            var data = ValidData.Replace("1234567890123", pair.Item2);
+            var data = ValidData.Replace("1234567890123", pair.Item2 + suffix);
             using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
-            var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc");
+            var preview = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc,gs1-composite-ean-upc-addons");
             await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
             Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
             Assert.Contains("gs1-composite-ean-upc", preview.Response.Headers[FeaturesHeader].ToString());
@@ -119,7 +122,7 @@ public sealed class Gs1CompositeHostTests
                 .Where(value => value.GetProperty("type").GetInt32() == 11));
             Assert.True(element.GetProperty("width").GetInt32() > 0);
             Assert.True(element.GetProperty("height").GetInt32() > 0);
-            var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc");
+            var render = CreateContext(BuildRequest(protocol, layout, template, data), "gs1-composite,gs1-composite-ean-upc,gs1-composite-ean-upc-addons");
             await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
             Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
             using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
@@ -304,7 +307,13 @@ public sealed class Gs1CompositeHostTests
 
     [Theory]
     [InlineData("12345671")]
-    [InlineData("1234567+12")]
+    [InlineData("1234567+123")]
+    [InlineData("1234567+1")]
+    [InlineData("1234567+123456")]
+    [InlineData("1234567+１２")]
+    [InlineData("1234567+12+12")]
+    [InlineData("12345671+12")]
+    [InlineData("1234567+12 ")]
     public async Task Ean_upc_primary_errors_keep_bound_field_path(string primary)
     {
         var template = CompositeTemplate.Replace("\"LinearType\":25,\"Mode\":1", "\"LinearType\":4,\"Mode\":0");
@@ -474,6 +483,78 @@ public sealed class Gs1CompositeHostTests
         var page = Assert.Single(archive.Entries, entry => entry.FullName == expectedFile);
         Assert.True(page.Length > 0);
         Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "", false, true)]
+    [InlineData("EscPos", "Native", false, false)]
+    [InlineData("EscPos", "Raster", true, true)]
+    [InlineData("Tspl", "", false, true)]
+    [InlineData("Zpl", "", false, true)]
+    public async Task Expanded_stacked_column_ranges_match_all_five_modes(string protocol, string layout,
+        bool ordinary, bool composite)
+    {
+        var context = CreateContext(BuildRequest(protocol, layout), "gs1-databar-expanded-stacked-columns");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Capabilities);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Contains("gs1-databar-expanded-stacked-columns", context.Response.Headers[FeaturesHeader].ToString());
+        using var response = ReadJson(context);
+        var range = response.RootElement.GetProperty("expandedStackedColumns");
+        Assert.Equal(ordinary, range.ValueKind != JsonValueKind.Null);
+        if (ordinary)
+        {
+            Assert.Equal(1, range.GetProperty("minimum").GetInt32());
+            Assert.Equal(11, range.GetProperty("maximum").GetInt32());
+            Assert.Equal(2, range.GetProperty("default").GetInt32());
+        }
+        var gs1 = response.RootElement.GetProperty("gs1Composite");
+        Assert.Equal(composite, gs1.ValueKind != JsonValueKind.Null);
+        if (composite)
+        {
+            range = gs1.GetProperty("expandedStackedColumns");
+            Assert.Equal(2, range.GetProperty("minimum").GetInt32());
+            Assert.Equal(11, range.GetProperty("maximum").GetInt32());
+            Assert.Equal(2, range.GetProperty("default").GetInt32());
+        }
+    }
+
+    [Theory]
+    [InlineData(2, 204, 131)]
+    [InlineData(3, 302, 90)]
+    [InlineData(4, 400, 90)]
+    [InlineData(11, 596, 49)]
+    public async Task Expanded_stacked_columns_preview_uses_actual_encoded_dimensions(int columns, int width, int height)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25", "\"LinearType\":31,\"ExpandedStackedColumns\":" + columns)
+            .Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":35").Replace("\"Rotation\":90", "\"Rotation\":0")
+            .Replace("\"Width\":500", "\"Width\":1200");
+        var context = CreateContext(BuildRequest("EscPos", "Raster", template,
+            "{\"Primary\":\"[91]1234567890123456789012345678901234\",\"Secondary\":\"[20]12\"}"),
+            "gs1-databar-expanded-stacked-columns");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var element = response.RootElement.GetProperty("pages")[0].GetProperty("elements")[0];
+        Assert.Equal(11, element.GetProperty("type").GetInt32());
+        Assert.Equal(width, element.GetProperty("width").GetInt32());
+        Assert.Equal(height, element.GetProperty("height").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("12")]
+    [InlineData("2.5")]
+    [InlineData("\"3\"")]
+    public async Task Invalid_composite_column_requests_are_structured_errors(string columns)
+    {
+        using var budget = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var template = CompositeTemplate.Replace("\"LinearType\":25", "\"LinearType\":31,\"ExpandedStackedColumns\":" + columns);
+        var context = CreateContext(BuildRequest("Cpcl", "", template));
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        Assert.True(response.RootElement.GetProperty("errors").GetArrayLength() > 0);
+        Assert.Equal(0, budget.CurrentBytes);
     }
 
     private static string RepeatedCompositeTemplate()

@@ -7,13 +7,14 @@ import {
   DEFAULT_GS1_EAN_UPC_COMPOSITE_PRIMARY, EAN_8_LINEAR_TYPE, EAN_13_LINEAR_TYPE,
   DATABAR_TRUNCATED_LINEAR_TYPE, DATABAR_EXPANDED_LINEAR_TYPE, DATABAR_STACKED_LINEAR_TYPE,
   DATABAR_EXPANDED_STACKED_LINEAR_TYPE, DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE,
-  GS1_COMPOSITE_EAN_UPC_FEATURE,
+  GS1_COMPOSITE_EAN_UPC_FEATURE, GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE,
   DEFAULT_GS1_128_COMPOSITE_PRIMARY,
   DEFAULT_GS1_EXPANDED_COMPOSITE_PRIMARY, GS1_128_LINEAR_TYPE, GS1_COMPOSITE_CC_C_MODE,
   UPC_A_LINEAR_TYPE, UPC_E_LINEAR_TYPE,
   GS1_COMPOSITE_GS1_128_CC_AB_FEATURE,
   GS1_COMPOSITE_TRUNCATED_FEATURE, GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE,
   gs1CompositeModeChoices, gs1CompositeRetailPrimaryError, isValidGs1CompositeCombination,
+  supportsGs1CompositeEanUpcAddons,
   minimumGs1DataBarTruncatedLinearHeight, minimumGs1DataBarStackedOmnidirectionalLinearHeight,
   setGs1CompositeLinearType, setGs1CompositeMode,
   supportsGs1CompositeCcC, supportsGs1CompositeExpanded, supportsGs1CompositeGs1128CcAb,
@@ -22,9 +23,15 @@ import {
 } from './gs1Composite'
 import { buildLocalLayout } from './layout'
 import { assertTemplate, cloneTemplate, type BpTemplate, type Gs1CompositeElement } from './model'
+import { createBlankSample } from './samples'
 import { elementLabel } from './tree'
 
 afterEach(() => vi.unstubAllGlobals())
+
+it.each(['12345670+12\n', '12345670+12345\n', '123456\n+12', '123456\n'])(
+  'rejects final newlines without JavaScript end-anchor leniency: %s', (value) => {
+    expect(gs1CompositeRetailPrimaryError(EAN_8_LINEAR_TYPE, value)).toBeDefined()
+  })
 
 function template(linearType = 27, mode = 2): BpTemplate {
   return { Version: 3, Width: 400, Height: 300, Rows: [{ Cells: [{ Elements: [{
@@ -34,7 +41,7 @@ function template(linearType = 27, mode = 2): BpTemplate {
 }
 
 function caps(ccC = false, expanded = false, stacked = false, expandedStacked = false,
-  eanUpc = false, truncatedStackedOmnidirectional = false): Record<string, unknown> {
+  eanUpc = false, truncatedStackedOmnidirectional = false, eanUpcAddons = false): Record<string, unknown> {
   return {
     protocol: 'Cpcl', escPosLayoutMode: null, nativeFlow: null, jobFeedUnits: [], dpi: 200,
     elementTypes: [1, 2, 11], fontKinds: [0], deviceFonts: [], textSizes: null, textSize: { minimum: 1, maximum: null },
@@ -58,14 +65,17 @@ function caps(ccC = false, expanded = false, stacked = false, expandedStacked = 
           ? ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128', 'Gs1DataBarExpanded']
         : ccC ? ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128'] : ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited'],
       modes: ccC || expanded || stacked || expandedStacked ? ['Auto', 'CcA', 'CcB', 'CcC'] : ['Auto', 'CcA', 'CcB'],
-      rotations: [0, 90, 180, 270], includesHumanReadable: false, dimensionsFromEncoding: true },
+      rotations: [0, 90, 180, 270], primaryFormats: ['GTIN-13-data', 'GTIN-14', 'GS1-AI-01',
+        'bracketed-gs1-ai', 'ean-upc-digits', ...(eanUpcAddons ? ['ean-upc-digits-with-addon'] : [])],
+      includesHumanReadable: false, dimensionsFromEncoding: true },
   }
 }
 
 function headers(composite = true, ccC = false, expanded = false, stacked = false, gs1128CcAb = false,
-  expandedStacked = false, eanUpc = false, truncated = false, stackedOmnidirectional = false): Record<string, string> {
+  expandedStacked = false, eanUpc = false, truncated = false, stackedOmnidirectional = false,
+  eanUpcAddons = false): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-EasyPrint-Contract-Version': '1',
-    'X-EasyPrint-Features': `structured-errors,strict-options,binding-diagnostics${composite ? ',gs1-composite' : ''}${ccC ? ',gs1-composite-cc-c' : ''}${expanded ? ',gs1-composite-expanded' : ''}${stacked ? ',gs1-composite-stacked' : ''}${gs1128CcAb ? `,${GS1_COMPOSITE_GS1_128_CC_AB_FEATURE}` : ''}${expandedStacked ? ',gs1-composite-expanded-stacked' : ''}${eanUpc ? `,${GS1_COMPOSITE_EAN_UPC_FEATURE}` : ''}${truncated ? `,${GS1_COMPOSITE_TRUNCATED_FEATURE}` : ''}${stackedOmnidirectional ? `,${GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE}` : ''}` }
+    'X-EasyPrint-Features': `structured-errors,strict-options,binding-diagnostics${composite ? ',gs1-composite' : ''}${ccC ? ',gs1-composite-cc-c' : ''}${expanded ? ',gs1-composite-expanded' : ''}${stacked ? ',gs1-composite-stacked' : ''}${gs1128CcAb ? `,${GS1_COMPOSITE_GS1_128_CC_AB_FEATURE}` : ''}${expandedStacked ? ',gs1-composite-expanded-stacked' : ''}${eanUpc ? `,${GS1_COMPOSITE_EAN_UPC_FEATURE}` : ''}${truncated ? `,${GS1_COMPOSITE_TRUNCATED_FEATURE}` : ''}${stackedOmnidirectional ? `,${GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE}` : ''}${eanUpcAddons ? `,${GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE}` : ''}` }
 }
 
 async function loadWithCompositeShape(body: Record<string, unknown>, responseHeaders: Record<string, string>) {
@@ -261,6 +271,32 @@ describe('GS1 Composite designer contract', () => {
     expect(() => normalizeDesignerCapabilities(reordered)).toThrow('gs1Composite 无效')
   })
 
+  it('accepts the old EAN/UPC primary format list and the one appended addon format', () => {
+    const legacy = normalizeDesignerCapabilities(caps(true, true, true, true, true, true))
+    expect(legacy.gs1Composite?.primaryFormats).toEqual([
+      'GTIN-13-data', 'GTIN-14', 'GS1-AI-01', 'bracketed-gs1-ai', 'ean-upc-digits',
+    ])
+    const withAddon = normalizeDesignerCapabilities(caps(true, true, true, true, true, true, true))
+    expect(withAddon.gs1Composite?.primaryFormats).toEqual([
+      'GTIN-13-data', 'GTIN-14', 'GS1-AI-01', 'bracketed-gs1-ai', 'ean-upc-digits',
+      'ean-upc-digits-with-addon',
+    ])
+    const invalid = caps(true, true, true, true, true, true, true)
+    ;(invalid.gs1Composite as Record<string, unknown>).primaryFormats = [
+      'GTIN-13-data', 'GTIN-14', 'GS1-AI-01', 'bracketed-gs1-ai', 'ean-upc-digits-with-addon', 'ean-upc-digits',
+    ]
+    expect(() => normalizeDesignerCapabilities(invalid)).toThrow('gs1Composite 无效')
+  })
+
+  it.each([
+    ['GTIN-13-data', 'GTIN-14', 'GS1-AI-01'],
+    ['GTIN-13-data', 'GTIN-14', 'GS1-AI-01', 'bracketed-gs1-ai'],
+  ])('preserves pre-retail Host primary formats: %s', (...formats) => {
+    const legacy = caps(formats.length === 4)
+    ;(legacy.gs1Composite as Record<string, unknown>).primaryFormats = formats
+    expect(normalizeDesignerCapabilities(legacy).gs1Composite?.primaryFormats).toEqual(formats)
+  })
+
   it('negotiates Truncated and Stacked Omnidirectional independently with their row-height limits', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       JSON.stringify(caps(true, true, true, true, true, true)),
@@ -361,6 +397,21 @@ describe('GS1 Composite designer contract', () => {
     }
   })
 
+  it('gates EAN/UPC addons on all three features and the appended primary format', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(caps(true, true, true, true, true, true, true)), {
+      headers: headers(true, true, true, true, false, true, true, true, true, true),
+    })))
+    const result = await loadDesignerCapabilities({ protocol: 'Cpcl' })
+    expect(result.gs1CompositeEanUpcAddonsFeature).toBe(true)
+    expect(supportsGs1CompositeEanUpcAddons(result)).toBe(true)
+    expect(supportsGs1CompositeEanUpcAddons({ ...result, gs1CompositeFeature: false })).toBe(false)
+    expect(supportsGs1CompositeEanUpcAddons({ ...result, gs1CompositeEanUpcFeature: false })).toBe(false)
+    expect(supportsGs1CompositeEanUpcAddons({ ...result, gs1CompositeEanUpcAddonsFeature: false })).toBe(false)
+    expect(supportsGs1CompositeEanUpcAddons({ ...result, gs1Composite: {
+      ...result.gs1Composite!, primaryFormats: ['GTIN-13-data', 'GTIN-14', 'GS1-AI-01', 'bracketed-gs1-ai', 'ean-upc-digits'],
+    } })).toBe(false)
+  })
+
   it.each([
     [EAN_8_LINEAR_TYPE, '1234567'], [EAN_8_LINEAR_TYPE, '12345670'], [EAN_8_LINEAR_TYPE, '96385074'],
     [EAN_13_LINEAR_TYPE, '123456789012'], [EAN_13_LINEAR_TYPE, '1234567890128'], [EAN_13_LINEAR_TYPE, '4006381333931'],
@@ -375,9 +426,22 @@ describe('GS1 Composite designer contract', () => {
     [EAN_8_LINEAR_TYPE, '１２３４５６７０'], [EAN_8_LINEAR_TYPE, '(01)12345670'], [EAN_8_LINEAR_TYPE, '12345671'],
     [EAN_13_LINEAR_TYPE, '4006381333932'], [UPC_A_LINEAR_TYPE, '036000291453'],
     [UPC_E_LINEAR_TYPE, '2123456'], [UPC_E_LINEAR_TYPE, '0121453'], [UPC_E_LINEAR_TYPE, '0123014'],
-    [UPC_E_LINEAR_TYPE, '0123405'], [UPC_E_LINEAR_TYPE, '01234564'], [UPC_E_LINEAR_TYPE, '01234565+51234'],
+    [UPC_E_LINEAR_TYPE, '0123405'], [UPC_E_LINEAR_TYPE, '01234564'],
+    [UPC_E_LINEAR_TYPE, '01234565+1'], [UPC_E_LINEAR_TYPE, '01234565+123'],
+    [UPC_E_LINEAR_TYPE, '01234565+1234'], [UPC_E_LINEAR_TYPE, '01234565+123456'],
+    [UPC_E_LINEAR_TYPE, '01234565++12'], [UPC_E_LINEAR_TYPE, '01234565+１２'],
+    [EAN_8_LINEAR_TYPE, '12345671+12'], [EAN_8_LINEAR_TYPE, '12345670+12 '],
   ] as const)('rejects malformed EAN/UPC %s primary %s', (linearType, value) => {
     expect(gs1CompositeRetailPrimaryError(linearType, value)).toBeDefined()
+  })
+
+  it.each([
+    [EAN_8_LINEAR_TYPE, '1234567+12'], [EAN_8_LINEAR_TYPE, '12345670+51234'],
+    [EAN_13_LINEAR_TYPE, '123456789012+12'], [EAN_13_LINEAR_TYPE, '1234567890128+51234'],
+    [UPC_A_LINEAR_TYPE, '01234567890+12'], [UPC_A_LINEAR_TYPE, '012345678905+51234'],
+    [UPC_E_LINEAR_TYPE, '0123456+12'], [UPC_E_LINEAR_TYPE, '01234565+51234'],
+  ] as const)('accepts EAN/UPC %s primary with addon %s', (linearType, value) => {
+    expect(gs1CompositeRetailPrimaryError(linearType, value)).toBeUndefined()
   })
 
   it('enables Expanded only after its feature and capability are negotiated and supplies a bracketed primary default', async () => {
@@ -663,6 +727,24 @@ describe('GS1 Composite designer contract', () => {
     const requiredFeatures = (fetchMock.mock.calls[0]![1] as RequestInit).headers as Record<string, string>
     expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain(GS1_COMPOSITE_EAN_UPC_FEATURE)
     expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain('gs1-composite')
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).not.toContain(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE)
+  })
+
+  it.each([
+    [EAN_8_LINEAR_TYPE, '12345670+12'], [EAN_13_LINEAR_TYPE, '1234567890128+51234'],
+    [UPC_A_LINEAR_TYPE, '012345678905+12'], [UPC_E_LINEAR_TYPE, '01234565+51234'],
+  ] as const)('requires the addon feature only for EAN/UPC Composite addon values of type %s', async (linearType, primary) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), {
+      headers: headers(true, true, true, true, false, true, true, true, true, true),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const value = template(linearType, 2)
+    ;(value.Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement).Field = { Value: primary }
+    await previewTemplate(value, {}, [])
+    const requiredFeatures = (fetchMock.mock.calls[0]![1] as RequestInit).headers as Record<string, string>
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain('gs1-composite')
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain(GS1_COMPOSITE_EAN_UPC_FEATURE)
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE)
   })
 
   it.each([EAN_8_LINEAR_TYPE, EAN_13_LINEAR_TYPE, UPC_A_LINEAR_TYPE, UPC_E_LINEAR_TYPE] as const)(
@@ -685,6 +767,51 @@ describe('GS1 Composite designer contract', () => {
     await expect(previewTemplate(value, {}, [])).rejects.toMatchObject({
       message: '打印服务缺少 EAN/UPC Composite 功能，请更新 Host。',
     })
+  })
+
+  it('rejects an addon request when the response lacks its independent feature', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), {
+      headers: headers(true, true, true, true, false, true, true, true, true),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const value = template(EAN_8_LINEAR_TYPE, 1)
+    ;(value.Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement).Field = { Value: '12345670+12' }
+    await expect(previewTemplate(value, {}, [])).rejects.toMatchObject({
+      message: '打印服务缺少 EAN/UPC Composite 附加码功能，请更新 Host。',
+    })
+    const requiredFeatures = (fetchMock.mock.calls[0]![1] as RequestInit).headers as Record<string, string>
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).toContain(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE)
+  })
+
+  it('rejects addon output when the response lacks its independent feature', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), {
+      headers: headers(true, true, true, true, false, true, true, true, true),
+    })))
+    const value = template(EAN_13_LINEAR_TYPE, 2)
+    ;(value.Rows[0]!.Cells![0]!.Elements![0]! as Gs1CompositeElement).Field = { Value: '1234567890128+51234' }
+    await expect(renderTemplate(value, {}, [])).rejects.toMatchObject({
+      message: '打印服务缺少 EAN/UPC Composite 附加码功能，请更新 Host。',
+    })
+  })
+
+  it('does not apply the Composite addon feature gate to ordinary Type 4 barcodes', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), {
+      headers: headers(true, true, true, true, false, true, true),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const value = createBlankSample()
+    value.Rows[0]!.Cells![0]!.Elements!.push({
+      Type: 4, BarcodeType: EAN_13_LINEAR_TYPE, Width: 200, Height: 40,
+      Field: { Value: '1234567890128+12' },
+      StartCoordinate: { X: 10, Y: 10 }, EndCoordinate: { X: 210, Y: 50 },
+    })
+    await previewTemplate(value, {}, [])
+    const request = fetchMock.mock.calls[0]![1] as RequestInit
+    const requiredFeatures = request.headers as Record<string, string>
+    const body = JSON.parse(String(request.body)) as { template: BpTemplate }
+    expect(body.template.Rows[0]!.Cells![0]!.Elements![0]!.Field?.Value).toBe('1234567890128+12')
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).not.toContain(GS1_COMPOSITE_EAN_UPC_FEATURE)
+    expect(requiredFeatures['X-EasyPrint-Required-Features']).not.toContain(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE)
   })
 
   it('rejects Stacked with CC-C before sending a request', async () => {

@@ -80,15 +80,19 @@ test('GS1 Composite 在旧 Host 缺少协商特性时禁用并说明原因', asy
   await page.route('**/api/designer/capabilities', async (route) => {
     const response = await route.fetch()
     const body = await response.json()
+    delete body.expandedStackedColumns
+    if (body.gs1Composite) delete body.gs1Composite.expandedStackedColumns
     expect(body.elementTypes).toContain(11)
     const headers = response.headers()
     headers['x-easyprint-features'] = headers['x-easyprint-features']!.split(',')
-      .filter((feature) => !['gs1-composite', 'gs1-composite-cc-c', 'gs1-composite-expanded',
+      .filter((feature) => !['gs1-databar-expanded-stacked-columns', 'gs1-composite', 'gs1-composite-cc-c', 'gs1-composite-expanded',
         'gs1-composite-stacked', 'gs1-composite-expanded-stacked', 'gs1-composite-ean-upc',
-        'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
+        'gs1-composite-ean-upc-addons', 'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
     if (body.gs1Composite) {
       body.gs1Composite.modes = ['Auto', 'CcA', 'CcB']
       body.gs1Composite.linearTypes = ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited']
+      if (body.gs1Composite.primaryFormats) body.gs1Composite.primaryFormats = body.gs1Composite.primaryFormats
+        .filter((format: string) => format !== 'ean-upc-digits-with-addon')
     }
     body.barcodeTypes = Array.isArray(body.barcodeTypes)
       ? body.barcodeTypes.filter((type: number) => type !== 32)

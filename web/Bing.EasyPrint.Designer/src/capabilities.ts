@@ -7,8 +7,10 @@ import type {
   RotationAngleName,
 } from './api'
 import { BARCODE_TYPE_NAMES, ESC_POS_BARCODE_TEXT_POSITION_NAMES, ROTATION_ANGLE_NAMES } from './api'
+import { supportsGs1CompositeExpandedStacked } from './gs1Composite'
 
 export type CapabilityRange = { minimum: number; maximum: number | null }
+export type ExpandedStackedColumnsCapability = { minimum: number; maximum: number; default: number }
 
 export type DeviceFontCapability = {
   name: string
@@ -86,7 +88,9 @@ export type DesignerCapabilities = {
   supportsCoordinates: boolean
   supportsExplicitQuietZone: boolean
   supportsGs1Composite?: boolean
-  gs1Composite?: { rotations: number[]; modes: string[]; linearTypes: string[] } | null
+  expandedStackedColumns?: ExpandedStackedColumnsCapability | null
+  gs1Composite?: { rotations: number[]; modes: string[]; linearTypes: string[]; primaryFormats?: string[];
+    expandedStackedColumns?: ExpandedStackedColumnsCapability | null } | null
   /** 来自协商响应头；旧 Host 或未查询时不视为支持。 */
   gs1CompositeFeature?: boolean
   /** 来自独立协商响应头；旧 Host 可继续提供基础 DataBar Composite。 */
@@ -101,10 +105,14 @@ export type DesignerCapabilities = {
   gs1CompositeGs1128CcAbFeature?: boolean
   /** 来自独立协商响应头；旧 Host 不视为支持 EAN/UPC Composite。 */
   gs1CompositeEanUpcFeature?: boolean
+  /** 来自独立协商响应头；旧 Host 不视为支持 EAN/UPC Composite 附加码。 */
+  gs1CompositeEanUpcAddonsFeature?: boolean
   /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Truncated Composite。 */
   gs1CompositeTruncatedFeature?: boolean
   /** 来自独立协商响应头；旧 Host 不视为支持 GS1 DataBar Stacked Omnidirectional Composite。 */
   gs1CompositeStackedOmnidirectionalFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持自定义 Expanded Stacked 列数。 */
+  expandedStackedColumnsFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -143,6 +151,21 @@ function parseRange(value: unknown, path: string): CapabilityRange {
     throw new Error(`能力响应的 ${path} 无效。`)
   }
   return { minimum: range.minimum, maximum: range.maximum as number | null }
+}
+
+function parseExpandedStackedColumnsCapability(value: unknown, path: string,
+  minimumAllowed: number): ExpandedStackedColumnsCapability | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`能力响应的 ${path} 无效。`)
+  const capability = value as Record<string, unknown>
+  const { minimum, maximum, default: defaultValue } = capability
+  if (!Number.isInteger(minimum) || (minimum as number) < minimumAllowed || (minimum as number) > 11 ||
+    !Number.isInteger(maximum) || (maximum as number) < (minimum as number) || (maximum as number) > 11 ||
+    !Number.isInteger(defaultValue) || defaultValue !== 2 || (minimum as number) > 2 || (maximum as number) < 2) {
+    throw new Error(`能力响应的 ${path} 必须声明包含默认值 2 的 ${minimumAllowed}–11 整数范围。`)
+  }
+  return { minimum: minimum as number, maximum: maximum as number, default: defaultValue as number }
 }
 
 function parseNumberArray(value: unknown, path: string): number[] {
@@ -603,11 +626,18 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     throw new Error('能力响应的 ESC/POS Native 图片旋转只能包含 0 度。')
   }
   const qrCodeRotations = parseRotationArray(input.qrCodeRotations, 'qrCodeRotations')
+  const barcodeTypes = parseNumberArray(input.barcodeTypes, 'barcodeTypes')
+  const expandedStackedColumns = parseExpandedStackedColumnsCapability(
+    input.expandedStackedColumns, 'expandedStackedColumns', 1)
+  if (expandedStackedColumns && (protocol !== 'EscPos' || escPosLayoutMode !== 'Raster' || !barcodeTypes.includes(31)))
+    throw new Error('能力响应的 expandedStackedColumns 仅能用于支持 Expanded Stacked 的 ESC/POS Raster。')
   let gs1Composite: DesignerCapabilities['gs1Composite'] = null
   if (input.gs1Composite !== undefined && input.gs1Composite !== null) {
     const composite = input.gs1Composite as Record<string, unknown>
     const validModes = Array.isArray(composite.modes) && composite.modes.every((mode) => typeof mode === 'string')
     const validLinearTypes = Array.isArray(composite.linearTypes) && composite.linearTypes.every((type) => typeof type === 'string')
+    const validPrimaryFormats = composite.primaryFormats === undefined ||
+      (Array.isArray(composite.primaryFormats) && composite.primaryFormats.every((format) => typeof format === 'string'))
     const modes = validModes ? (composite.modes as string[]).join(',') : ''
     const linearTypes = validLinearTypes ? (composite.linearTypes as string[]).join(',') : ''
     const legacyComposite = modes === 'Auto,CcA,CcB' &&
@@ -624,13 +654,26 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked,Gs1DataBarExpandedStacked,Ean8,Ean13,UpcA,UpcE'
     const truncatedStackedOmnidirectionalComposite = modes === 'Auto,CcA,CcB,CcC' &&
       linearTypes === 'Gs1DataBarOmnidirectional,Gs1DataBarLimited,UccEan128,Gs1DataBarExpanded,Gs1DataBarStacked,Gs1DataBarExpandedStacked,Ean8,Ean13,UpcA,UpcE,Gs1DataBarTruncated,Gs1DataBarStackedOmnidirectional'
+    const previousPrimaryFormats = 'GTIN-13-data,GTIN-14,GS1-AI-01,bracketed-gs1-ai,ean-upc-digits'
+    const addonPrimaryFormats = `${previousPrimaryFormats},ean-upc-digits-with-addon`
+    const knownPrimaryFormats = ['GTIN-13-data,GTIN-14,GS1-AI-01',
+      'GTIN-13-data,GTIN-14,GS1-AI-01,bracketed-gs1-ai', previousPrimaryFormats, addonPrimaryFormats]
+    const primaryFormats = validPrimaryFormats && Array.isArray(composite.primaryFormats)
+      ? (composite.primaryFormats as string[]).join(',') : undefined
+    const expandedStackedCompositeColumns = parseExpandedStackedColumnsCapability(
+      composite.expandedStackedColumns, 'gs1Composite.expandedStackedColumns', 2)
     if (typeof composite !== 'object' || Array.isArray(composite) || composite.elementType !== 11 ||
       composite.dimensionsFromEncoding !== true || composite.includesHumanReadable !== false ||
+      !validPrimaryFormats || (primaryFormats !== undefined && !knownPrimaryFormats.includes(primaryFormats)) ||
       (!legacyComposite && !ccCComposite && !expandedComposite && !stackedComposite && !expandedStackedComposite &&
         !eanUpcComposite && !truncatedStackedOmnidirectionalComposite))
       throw new Error('能力响应的 gs1Composite 无效。')
+    if (expandedStackedCompositeColumns && !linearTypes.split(',').includes('Gs1DataBarExpandedStacked'))
+      throw new Error('能力响应的 gs1Composite.expandedStackedColumns 需要 Expanded Stacked 线性组件。')
     gs1Composite = { rotations: parseRotationArray(composite.rotations, 'gs1Composite.rotations'),
-      modes: composite.modes as string[], linearTypes: composite.linearTypes as string[] }
+      modes: composite.modes as string[], linearTypes: composite.linearTypes as string[],
+      ...(Array.isArray(composite.primaryFormats) ? { primaryFormats: composite.primaryFormats as string[] } : {}),
+      ...(expandedStackedCompositeColumns === undefined ? {} : { expandedStackedColumns: expandedStackedCompositeColumns }) }
   }
   const result: DesignerCapabilities = {
     protocol,
@@ -658,7 +701,7 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     textSize: input.textSize === null ? null : parseRange(input.textSize, 'textSize'),
     textRotations: parseNumberArray(input.textRotations, 'textRotations'),
     imageRotations,
-    barcodeTypes: parseNumberArray(input.barcodeTypes, 'barcodeTypes'),
+    barcodeTypes,
     barcodeRotations: parseNumberArray(input.barcodeRotations, 'barcodeRotations'),
     qrCodeRotations,
     qrModuleSize: input.qrModuleSize === null ? null : parseRange(input.qrModuleSize, 'qrModuleSize'),
@@ -679,12 +722,14 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsCoordinates: parseBoolean(input.supportsCoordinates, 'supportsCoordinates'),
     supportsExplicitQuietZone: parseBoolean(input.supportsExplicitQuietZone, 'supportsExplicitQuietZone'),
     supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
+    ...(expandedStackedColumns === undefined ? {} : { expandedStackedColumns }),
     gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
     gs1CompositeExpandedFeature: input.gs1CompositeExpandedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedFeature, 'gs1CompositeExpandedFeature'),
     gs1CompositeStackedFeature: input.gs1CompositeStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedFeature, 'gs1CompositeStackedFeature'),
     gs1CompositeExpandedStackedFeature: input.gs1CompositeExpandedStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedStackedFeature, 'gs1CompositeExpandedStackedFeature'),
     gs1CompositeGs1128CcAbFeature: input.gs1CompositeGs1128CcAbFeature === undefined ? false : parseBoolean(input.gs1CompositeGs1128CcAbFeature, 'gs1CompositeGs1128CcAbFeature'),
     gs1CompositeEanUpcFeature: input.gs1CompositeEanUpcFeature === undefined ? false : parseBoolean(input.gs1CompositeEanUpcFeature, 'gs1CompositeEanUpcFeature'),
+    gs1CompositeEanUpcAddonsFeature: input.gs1CompositeEanUpcAddonsFeature === undefined ? false : parseBoolean(input.gs1CompositeEanUpcAddonsFeature, 'gs1CompositeEanUpcAddonsFeature'),
     gs1CompositeTruncatedFeature: input.gs1CompositeTruncatedFeature === undefined ? false : parseBoolean(input.gs1CompositeTruncatedFeature, 'gs1CompositeTruncatedFeature'),
     gs1CompositeStackedOmnidirectionalFeature: input.gs1CompositeStackedOmnidirectionalFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedOmnidirectionalFeature, 'gs1CompositeStackedOmnidirectionalFeature'),
     gs1Composite,
@@ -747,6 +792,37 @@ export function elementTypeReason(caps: DesignerCapabilities | undefined, type: 
 export function valueInRange(value: number | undefined, range: CapabilityRange | null | undefined): boolean {
   if (value === undefined || !range || !Number.isInteger(value)) return false
   return value >= range.minimum && (range.maximum === null || value <= range.maximum)
+}
+
+export type ExpandedStackedColumnsKind = 'ordinary' | 'composite'
+
+export function expandedStackedColumnsRange(caps: DesignerCapabilities | undefined,
+  kind: ExpandedStackedColumnsKind): ExpandedStackedColumnsCapability | null | undefined {
+  return kind === 'ordinary' ? caps?.expandedStackedColumns : caps?.gs1Composite?.expandedStackedColumns
+}
+
+export function expandedStackedColumnsSupported(caps: DesignerCapabilities | undefined,
+  kind: ExpandedStackedColumnsKind): boolean {
+  if (!caps?.expandedStackedColumnsFeature || !expandedStackedColumnsRange(caps, kind)) return false
+  return kind === 'ordinary'
+    ? caps.protocol === 'EscPos' && caps.escPosLayoutMode === 'Raster' && caps.barcodeTypes.includes(31)
+    : supportsGs1CompositeExpandedStacked(caps)
+}
+
+export function expandedStackedColumnsIssue(caps: DesignerCapabilities | undefined,
+  kind: ExpandedStackedColumnsKind, value: number | null | undefined): string | undefined {
+  if (value === undefined || value === null) return undefined
+  const label = kind === 'composite' ? 'Composite ' : ''
+  if (!caps?.expandedStackedColumnsFeature)
+    return `当前 Host 未协商 Expanded Stacked 自定义列数功能；${label}配置已保留，请更新 Host 后再预览或输出。`
+  const range = expandedStackedColumnsRange(caps, kind)
+  if (!range)
+    return `当前 Host 未声明 Expanded Stacked ${label}列数范围；配置已保留，请更新 Host 后再预览或输出。`
+  if (!valueInRange(value, range))
+    return `Expanded Stacked ${label}列数必须在 Host 声明的 ${range.minimum}–${range.maximum} 范围内。`
+  if (!expandedStackedColumnsSupported(caps, kind))
+    return `当前 Host 不支持 Expanded Stacked ${label}自定义列数；配置已保留，请更新 Host 后再预览或输出。`
+  return undefined
 }
 
 export function rotationSupported(caps: DesignerCapabilities | undefined, type: 1 | 2 | 3 | 4 | 11, value: number | undefined): boolean {

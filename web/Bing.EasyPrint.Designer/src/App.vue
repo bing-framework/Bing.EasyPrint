@@ -22,6 +22,7 @@ import { DesignerValidationError, loadDesignerSamples, previewTemplate, renderTe
   type EscPosRasterFontResource, type EscPosRasterFontsRequest,
   defaultEscPosPrinterProfile } from './api'
 import { canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, elementTypeReason,
+  expandedStackedColumnsIssue,
   type CapabilitiesState, type CapabilityQuery, type DesignerCapabilities } from './capabilities'
 import { collectResourceKeys, createComponentTemplate, exportTemplateBundle, importTemplateBundle, MAX_TEMPLATE_JSON_BYTES, resourceForImage } from './archive'
 import { buildLocalLayout } from './layout'
@@ -35,6 +36,7 @@ import { barcodeOccupiedSize, barcodeRawSizeFromOccupied, dotsToMm, getNudgeDelt
 import { addNestedRow as appendNestedRow } from './structure'
 import { appendComponent, appendDataTable, appendStaticTable, componentLibraryTargetVersion, detachComponent, enableV2, groupCellElements, removeComponent, renameComponent, saveGroupComponent, ungroupElement, type ElementBounds } from './componentsModel'
 import { parseTextTable } from './textTable'
+import { walkTemplateNodes } from './templateTraversal'
 import { duplicateElement, groupRowsAtPaths, offsetFlowGroup, reorderFlowGroup, setFlowGroupPosition } from './editorOperations'
 import { defaultDesignerOutputSettings, parseDesignerProject, serializeDesignerProject, type DesignerOutputSettings } from './designerProject'
 
@@ -499,12 +501,12 @@ async function refreshCapabilities() {
   if (result.status === 'error') {
     capabilitiesState.value = 'error'
     capabilitiesError.value = result.error instanceof Error ? result.error.message : '能力服务暂不可用。'
-    if (customCutOptionsConfigured.value) schedulePreview()
+    if (customCutOptionsConfigured.value || expandedStackedColumnsConfigurationIssue()) schedulePreview()
     return
   }
   capabilities.value = result.value
   capabilitiesState.value = 'ready'
-  if (customCutOptionsConfigured.value) schedulePreview()
+  if (customCutOptionsConfigured.value || expandedStackedColumnsConfigurationIssue()) schedulePreview()
 }
 
 function canAddElement(type: TemplateElement['Type']): boolean {
@@ -1456,6 +1458,18 @@ function schedulePreview() {
   previewTimer = setTimeout(() => { void refreshPreview() }, 400)
 }
 
+function expandedStackedColumnsConfigurationIssue(): string | undefined {
+  let issue: string | undefined
+  walkTemplateNodes(template.value, (node, context) => {
+    if (issue || context.kind !== 'element' || !('Type' in node)) return
+    if (node.Type === 4 && node.BarcodeType === 31 && node.ExpandedStackedColumns != null)
+      issue = expandedStackedColumnsIssue(capabilities.value, 'ordinary', node.ExpandedStackedColumns)
+    else if (node.Type === 11 && node.LinearType === 31 && node.ExpandedStackedColumns != null)
+      issue = expandedStackedColumnsIssue(capabilities.value, 'composite', node.ExpandedStackedColumns)
+  })
+  return issue
+}
+
 watch(labelProfileError, () => { void refreshPreview() })
 
 async function refreshPreview() {
@@ -1483,6 +1497,16 @@ async function refreshPreview() {
     previewDiagnostics.value = []
     previewPages.value = []
     statusMessage.value = loading ? '正在读取裁切能力' : '裁切能力不可用'
+    statusTone.value = loading ? 'warning' : 'error'
+    return
+  }
+  const expandedStackedColumnsIssueMessage = expandedStackedColumnsConfigurationIssue()
+  if (expandedStackedColumnsIssueMessage) {
+    const loading = capabilitiesState.value === 'loading' || capabilitiesState.value === 'idle'
+    previewError.value = loading ? '' : expandedStackedColumnsIssueMessage
+    previewDiagnostics.value = []
+    previewPages.value = []
+    statusMessage.value = loading ? '正在读取 Expanded Stacked 列数能力' : 'Expanded Stacked 列数不可用'
     statusTone.value = loading ? 'warning' : 'error'
     return
   }
@@ -2150,6 +2174,8 @@ async function exportPrintData() {
   if (labelProfileError.value) { showToast(labelProfileError.value, 'error'); return }
   if (parsedData.value.error) { showToast('请先修正业务数据 JSON。', 'error'); return }
   if (customCutCapabilitiesUnknown.value) { showToast('当前 Host 未声明所需裁切能力，请更新 Host 后再导出。', 'error'); return }
+  const expandedStackedColumnsIssueMessage = expandedStackedColumnsConfigurationIssue()
+  if (expandedStackedColumnsIssueMessage) { showToast(expandedStackedColumnsIssueMessage, 'error'); return }
   try {
     const blob = await renderTemplate(template.value, parsedData.value.value, resources.value,
       printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,

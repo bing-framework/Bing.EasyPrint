@@ -2,13 +2,14 @@ import type { BpTemplate, DesignerDiagnostic, Gs1CompositeElement, PreviewRespon
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
 import {
-  GS1_COMPOSITE_GS1_128_CC_AB_FEATURE, isGs1CompositeCcCCombination,
+  GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE, GS1_COMPOSITE_GS1_128_CC_AB_FEATURE, isGs1CompositeCcCCombination,
   isGs1CompositeExpandedCombination, isGs1CompositeExpandedStackedCombination, isGs1CompositeGs1128CcAbCombination,
   isGs1CompositeEanUpcCombination, isGs1CompositeRetailLinearType, isGs1CompositeStackedCombination,
+  GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE,
   DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE,
   GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE, GS1_COMPOSITE_TRUNCATED_FEATURE,
   isGs1CompositeStackedOmnidirectionalCombination, isGs1CompositeTruncatedCombination,
-  isValidGs1CompositeCombination, gs1CompositeRetailPrimaryError,
+  isValidGs1CompositeCombination, gs1CompositeRetailHasAddon, gs1CompositeRetailPrimaryError,
 } from './gs1Composite'
 import { walkTemplateNodes } from './templateTraversal'
 
@@ -303,6 +304,7 @@ const GS1_COMPOSITE_EXPANDED_FEATURE = 'gs1-composite-expanded'
 const GS1_COMPOSITE_STACKED_FEATURE = 'gs1-composite-stacked'
 const GS1_COMPOSITE_EXPANDED_STACKED_FEATURE = 'gs1-composite-expanded-stacked'
 const GS1_COMPOSITE_EAN_UPC_FEATURE = 'gs1-composite-ean-upc'
+const GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME = GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE
 const GS1_COMPOSITE_TRUNCATED_FEATURE_NAME = GS1_COMPOSITE_TRUNCATED_FEATURE
 const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME = GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
@@ -352,6 +354,10 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
       const message = '打印服务缺少 GS1 DataBar Expanded Stacked Composite 功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
+    if (missingFeatures.includes(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME)) {
+      const message = '打印服务缺少 EAN/UPC Composite 附加码功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
     if (missingFeatures.includes(GS1_COMPOSITE_EAN_UPC_FEATURE)) {
       const message = '打印服务缺少 EAN/UPC Composite 功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
@@ -362,6 +368,10 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
     }
     if (missingFeatures.includes(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)) {
       const message = '打印服务缺少 GS1 DataBar Stacked Omnidirectional Composite 功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)) {
+      const message = '打印服务缺少 GS1 DataBar Expanded Stacked 自定义列数功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
@@ -375,6 +385,33 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   if (template) walkTemplateNodes(template, (node, context) => {
     if (context.kind !== 'element' || !('Type' in node)) return
     const requestContract = body as { protocol?: PrintProtocol; escPosLayoutMode?: EscPosLayoutMode }
+    const rawNode = node as Record<string, unknown>
+    const columnAliases = Object.keys(rawNode).filter((key) =>
+      key.toLowerCase() === 'expandedstackedcolumns' && key !== 'ExpandedStackedColumns')
+    if (columnAliases.length) {
+      const duplicate = Object.hasOwn(rawNode, 'ExpandedStackedColumns')
+      const message = `${context.path}.ExpandedStackedColumns 属性名必须为 ExpandedStackedColumns${
+        duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`
+      throw clientValidationError(message, 'InvalidExpandedStackedColumns', 'Validation')
+    }
+    if (node.Type === 4 || node.Type === 11) {
+      const element = node as { Type: number; BarcodeType?: number; LinearType?: number; ExpandedStackedColumns?: number | null }
+      if (element.ExpandedStackedColumns !== undefined && element.ExpandedStackedColumns !== null) {
+        const minimum = element.Type === 4 && element.BarcodeType === 31 ? 1
+          : element.Type === 11 && element.LinearType === 31 ? 2 : undefined
+        if (minimum === undefined || !Number.isInteger(element.ExpandedStackedColumns) ||
+          element.ExpandedStackedColumns < minimum || element.ExpandedStackedColumns > 11) {
+          const message = `${context.path}.ExpandedStackedColumns 必须用于 Expanded Stacked 且为 ${minimum ?? 1}–11 的整数列数。`
+          throw clientValidationError(message, 'InvalidExpandedStackedColumns', 'Validation')
+        }
+        if (element.Type === 4 && (requestContract.protocol !== 'EscPos' || requestContract.escPosLayoutMode !== 'Raster')) {
+          const message = 'Expanded Stacked 普通条码列数配置仅支持 ESC/POS Raster。'
+          throw clientValidationError(message, 'UnsupportedBarcodeType', 'Validation')
+        }
+        if (!requiredFeatures.includes(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE))
+          requiredFeatures.push(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)
+      }
+    }
     if (node.Type === 4 && (node as { BarcodeType?: number }).BarcodeType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE &&
       (requestContract.protocol !== 'EscPos' || requestContract.escPosLayoutMode !== 'Raster')) {
       const message = 'GS1 DataBar Stacked Omnidirectional 普通条码仅支持 ESC/POS Raster。'
@@ -415,6 +452,11 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
     if (isGs1CompositeEanUpcCombination(composite.LinearType, composite.Mode) &&
       !requiredFeatures.includes(GS1_COMPOSITE_EAN_UPC_FEATURE)) {
       requiredFeatures.push(GS1_COMPOSITE_EAN_UPC_FEATURE)
+    }
+    if (isGs1CompositeEanUpcCombination(composite.LinearType, composite.Mode) &&
+      !composite.Field?.Name && gs1CompositeRetailHasAddon(composite.Field?.Value) &&
+      !requiredFeatures.includes(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME)) {
+      requiredFeatures.push(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME)
     }
     if (isGs1CompositeTruncatedCombination(composite.LinearType, composite.Mode) &&
       !requiredFeatures.includes(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)) {
@@ -522,8 +564,10 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   capabilities.gs1CompositeExpandedStackedFeature = features.has(GS1_COMPOSITE_EXPANDED_STACKED_FEATURE)
   capabilities.gs1CompositeGs1128CcAbFeature = features.has(GS1_COMPOSITE_GS1_128_AB_FEATURE)
   capabilities.gs1CompositeEanUpcFeature = features.has(GS1_COMPOSITE_EAN_UPC_FEATURE)
+  capabilities.gs1CompositeEanUpcAddonsFeature = features.has(GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME)
   capabilities.gs1CompositeTruncatedFeature = features.has(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)
   capabilities.gs1CompositeStackedOmnidirectionalFeature = features.has(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
+  capabilities.expandedStackedColumnsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)
   return capabilities
 }
 

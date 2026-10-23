@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import {
   barcodeTypeSupported, canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, filledRectangleSupported, legacyDeviceFontSupported, normalizeDesignerCapabilities,
-  rotationSupported, textSizeSupported, valueInRange, type DesignerCapabilities,
+  expandedStackedColumnsIssue, expandedStackedColumnsSupported, rotationSupported, textSizeSupported,
+  valueInRange, type DesignerCapabilities,
 } from './capabilities'
 import type { FontElement } from './model'
 
@@ -69,6 +70,62 @@ describe('designer capabilities rules', () => {
     expect(barcodeTypeSupported(raster, 31)).toBe(true)
     expect(barcodeTypeSupported({ ...raster, barcodeTypes: [] }, 31)).toBe(false)
     expect(barcodeTypeSupported(capabilities({ protocol: 'Cpcl', barcodeTypes: [] }), 31)).toBe(false)
+  })
+
+  it('validates ordinary and Composite Expanded Stacked column capability ranges and defaults', () => {
+    const ordinaryRange = { minimum: 1, maximum: 11, default: 2 }
+    const raster = normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',
+      barcodeTypes: [31], expandedStackedColumns: ordinaryRange }))
+    raster.expandedStackedColumnsFeature = true
+    expect(raster.expandedStackedColumns).toEqual(ordinaryRange)
+    expect(expandedStackedColumnsSupported(raster, 'ordinary')).toBe(true)
+    expect(expandedStackedColumnsIssue(raster, 'ordinary', 11)).toBeUndefined()
+    expect(expandedStackedColumnsIssue(raster, 'ordinary', 12)).toContain('Host 声明的 1–11')
+
+    const legacy = normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31] }))
+    expect(legacy.expandedStackedColumns).toBeUndefined()
+    expect(expandedStackedColumnsIssue(legacy, 'ordinary', 2)).toContain('未协商')
+    expect(expandedStackedColumnsIssue(legacy, 'ordinary', null)).toBeUndefined()
+    expect(normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',
+      barcodeTypes: [31], expandedStackedColumns: null })).expandedStackedColumns).toBeNull()
+
+    const compositeRange = { minimum: 2, maximum: 11, default: 2 }
+    const compositeResponse = capabilities({ elementTypes: [1, 2, 3, 4, 5, 7, 8, 9, 10, 11],
+      supportsGs1Composite: true }) as unknown as Record<string, unknown>
+    compositeResponse.gs1Composite = { elementType: 11, dimensionsFromEncoding: true,
+      includesHumanReadable: false, rotations: [0, 90, 180, 270], modes: ['Auto', 'CcA', 'CcB', 'CcC'],
+      linearTypes: ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128', 'Gs1DataBarExpanded',
+        'Gs1DataBarStacked', 'Gs1DataBarExpandedStacked'], expandedStackedColumns: compositeRange }
+    const composite = normalizeDesignerCapabilities(compositeResponse)
+    composite.expandedStackedColumnsFeature = true
+    composite.gs1CompositeFeature = true
+    composite.gs1CompositeExpandedStackedFeature = true
+    expect(composite.gs1Composite?.expandedStackedColumns).toEqual(compositeRange)
+    expect(expandedStackedColumnsSupported(composite, 'composite')).toBe(true)
+    expect(expandedStackedColumnsIssue(composite, 'composite', 1)).toContain('Host 声明的 2–11')
+    expect(expandedStackedColumnsIssue(composite, 'composite', 2)).toBeUndefined()
+
+    for (const invalid of [
+      { minimum: 0, maximum: 11, default: 2 }, { minimum: 1, maximum: 12, default: 2 },
+      { minimum: 1, maximum: 11, default: 0 }, { minimum: 1, maximum: 11, default: 2.5 },
+      { minimum: 1, maximum: 11, default: 3 }, { minimum: 3, maximum: 11, default: 2 },
+      { minimum: 1, maximum: 11 },
+    ]) {
+      const invalidResponse = capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31] }) as unknown as Record<string, unknown>
+      invalidResponse.expandedStackedColumns = invalid
+      expect(() => normalizeDesignerCapabilities(invalidResponse)).toThrow('expandedStackedColumns')
+    }
+    expect(() => normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Native',
+      nativeFlow: 'Rows', imageRotations: [0], barcodeTypes: [31], expandedStackedColumns: ordinaryRange })))
+      .toThrow('仅能用于支持 Expanded Stacked 的 ESC/POS Raster')
+    const invalidCompositeResponse = capabilities({ supportsGs1Composite: true }) as unknown as Record<string, unknown>
+    invalidCompositeResponse.gs1Composite = { elementType: 11, dimensionsFromEncoding: true,
+      includesHumanReadable: false, rotations: [0], modes: ['Auto', 'CcA', 'CcB', 'CcC'],
+      linearTypes: ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited', 'UccEan128', 'Gs1DataBarExpanded',
+        'Gs1DataBarStacked', 'Gs1DataBarExpandedStacked'],
+      expandedStackedColumns: { minimum: 1, maximum: 11, default: 2 } }
+    expect(() => normalizeDesignerCapabilities(invalidCompositeResponse))
+      .toThrow('2–11')
   })
 
   it('offers Stacked Omnidirectional ordinary barcode only in ESC/POS Raster', () => {

@@ -112,13 +112,20 @@ test('旧 Host 缺少 Expanded Stacked 特性时禁用制式并说明降级原�
     const response = await route.fetch()
     const headers = response.headers()
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
+      .filter(feature => feature.trim() !== 'gs1-databar-expanded-stacked-columns').join(',')
+    headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
       .filter(feature => feature.trim() !== 'gs1-composite-expanded-stacked' && feature.trim() !== 'gs1-composite-ean-upc' &&
+        feature.trim() !== 'gs1-composite-ean-upc-addons' &&
         feature.trim() !== 'gs1-composite-truncated' && feature.trim() !== 'gs1-composite-stacked-omnidirectional').join(',')
     if (route.request().url().includes('/capabilities')) {
       const json = await response.json()
+      delete json.expandedStackedColumns
+      if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
       if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
         .filter((type: string) => type !== 'Gs1DataBarExpandedStacked' &&
           !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated', 'Gs1DataBarStackedOmnidirectional'].includes(type))
+      if (json.gs1Composite?.primaryFormats) json.gs1Composite.primaryFormats = json.gs1Composite.primaryFormats
+        .filter((format: string) => format !== 'ean-upc-digits-with-addon')
       await route.fulfill({ response, headers, json })
     } else await route.fulfill({ response, headers })
   })
