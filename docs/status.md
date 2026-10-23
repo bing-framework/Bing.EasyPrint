@@ -4,7 +4,9 @@ DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；三条分隔行各为 2X，主码校验规则保持原样。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)及[附加码使用说明](gs1-composite-ean-upc-addons.md)。基础阶段与附加码阶段报告分别见[基础报告](ean-upc-composite-verification-2026-10-22.md)和[附加码报告](ean-upc-addons-verification-2026-10-22.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列，Composite 可配置 2–11 列。显式配置需要 `gs1-databar-expanded-stacked-columns` 和 Host 声明的范围。完整契约与示例见 [列数配置指南](expanded-stacked-columns.md)，基础编码范围见[ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列，Composite 可配置 2–11 列。也可按 2–11 条数据行上限布局；行数与列数互斥，分隔行不计入上限。显式配置需要 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows` 和 Host 声明的范围。完整契约与示例见 [列数配置指南](expanded-stacked-columns.md) 及[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)，基础编码范围见[ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
+GS1 括号 AI 输入已切换到固定版本 GS1 Barcode Syntax Dictionary（提交 `d1702ffb2fa5060f8460f7d581b01e377deaa1d6`）的完整 536 个已定义 AI，逐字段校验长度、字符集、固定/变长、分隔符和字典 Linter。具体码制容量、跨 AI 业务关联和实机扫描语义仍由编码器或调用方负责，见[AI 字典边界](expanded-stacked-rows-and-gs1-ai.md)。
 
 当前 GS1-128 Composite 支持显式 CC-A/CC-B，Auto 仍选择 CC-C；旧 Host 缺少 `gs1-composite-gs1-128-ab` 时仍可使用已声明的 Auto/CC-C。接口和协商细节见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。下文各历史阶段的计数保留原日期与范围。
 
@@ -16,7 +18,7 @@ ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A
 
 ### 后续软件能力
 
-EAN/UPC 的四种基本 Composite 组合及 2/5 位附加码、DataBar Composite 和 ExpandedStacked 自定义列数已接入。后续独立工作包括设计器真实条码位图预览、完整 GS1 AI 字典和复杂字体排版，仍为 `DEFERRED`。目标打印机兼容性和扫码结果需要实际设备验收；软件向量及自动化测试不替代实机结果。
+EAN/UPC 的四种基本 Composite 组合及 2/5 位附加码、DataBar Composite、ExpandedStacked 自定义列数/最大行数和固定版本完整 GS1 AI 字典已接入。后续独立工作包括设计器真实条码位图预览和复杂字体排版，仍为 `DEFERRED`。目标打印机兼容性和扫码结果需要实际设备验收；软件向量及自动化测试不替代实机结果。
 
 ### 打印传输与设备管理
 

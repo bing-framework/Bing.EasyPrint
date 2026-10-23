@@ -2,7 +2,7 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://mit-license.org/)
 
-Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打印指令生成库。当前代码支持 CPCL、ESC/POS、TSPL 和 ZPL，并提供协议命令、统一打印模型、版本化模板渲染以及浏览器模板设计器。统一打印模型与模板现支持受限的 GS1 Composite：EAN-8/EAN-13/UPC-A/UPC-E 和 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked + CC-A/CC-B，以及 GS1-128 + CC-A/CC-B/CC-C；EAN/UPC 支持严格 2/5 位附加码。普通 ESC/POS Raster ExpandedStacked 可配置 1–11 列，四协议 Composite 可配置 2–11 列，省略或 `null` 默认两列；这不代表完整 GS1 Composite 制式覆盖。
+Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打印指令生成库。当前代码支持 CPCL、ESC/POS、TSPL 和 ZPL，并提供协议命令、统一打印模型、版本化模板渲染以及浏览器模板设计器。统一打印模型与模板现支持受限的 GS1 Composite：EAN-8/EAN-13/UPC-A/UPC-E 和 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked + CC-A/CC-B，以及 GS1-128 + CC-A/CC-B/CC-C；EAN/UPC 支持严格 2/5 位附加码。普通 ESC/POS Raster ExpandedStacked 可配置 1–11 列，四协议 Composite 可配置 2–11 列，省略或 `null` 默认两列；也可按 2–11 条数据行上限布局（与列数互斥）。GS1 括号 AI 语法使用固定版本完整字典。这不代表完整 GS1 Composite 制式覆盖。
 
 项目只生成协议字节，不负责打印机连接、驱动、设备发现、打印队列或状态查询。
 
@@ -16,6 +16,7 @@ Bing.EasyPrint 是面向热敏打印机和部分针式打印场景的 .NET 打�
 - [EAN/UPC Composite 附加码使用说明](docs/gs1-composite-ean-upc-addons.md)
 - [ExpandedStacked 普通条码与 Composite 使用说明](docs/gs1-composite-expanded-stacked.md)
 - [ExpandedStacked 列数配置与 Host 协商](docs/expanded-stacked-columns.md)
+- [ExpandedStacked 最大行数与完整 GS1 AI 字典](docs/expanded-stacked-rows-and-gs1-ai.md)
 - [GS1-128 + CC-A/CC-B Composite 使用说明](docs/gs1-composite-gs1-128-ab.md)
 - [GS1-128 + CC-A/CC-B Composite 验收记录](docs/gs1-128-ab-verification-2026-10-22.md)
 - [GS1-128 + CC-C Composite 使用说明](docs/gs1-composite-cc-c.md)

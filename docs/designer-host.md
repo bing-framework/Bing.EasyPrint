@@ -4,7 +4,7 @@ DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验规则不变。固定值与动态绑定的 Host 协商差异见[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数/行数需 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 ## 功能说明
 
@@ -40,11 +40,11 @@ npm run dev
 
 Host 通过 `X-EasyPrint-Contract-Version`、`X-EasyPrint-Features` 和 `X-EasyPrint-Required-Features` 协商契约。错误响应使用稳定的 HTTP 状态、`code`、`phase`、可选 `fieldPath` 和资源诊断。
 
-ExpandedStacked 的显式列数（包括显式 2）要求 `gs1-databar-expanded-stacked-columns`。能力响应仅在支持的普通 ESC/POS Raster Type 31 下提供顶层 `expandedStackedColumns: { minimum: 1, maximum: 11, default: 2 }`；Composite 通过 `gs1Composite.expandedStackedColumns: { minimum: 2, maximum: 11, default: 2 }` 声明。省略或 `null` 表示默认两列，不要求新特性；旧 Host 的显式列数会被设计器保留并明确拦截。模板属性名使用 `ExpandedStackedColumns`；设计器拒绝其他大小写别名和重复声明，避免字段在旧 Host 请求中丢失。
+ExpandedStacked 的显式列数（包括显式 2）要求 `gs1-databar-expanded-stacked-columns`。能力响应仅在支持的普通 ESC/POS Raster Type 31 下提供顶层 `expandedStackedColumns: { minimum: 1, maximum: 11, default: 2 }`；Composite 通过 `gs1Composite.expandedStackedColumns: { minimum: 2, maximum: 11, default: 2 }` 声明。省略或 `null` 表示默认布局，不要求新特性；显式最大行数要求 `gs1-databar-expanded-stacked-rows`，对应顶层 `expandedStackedRows` / `gs1Composite.expandedStackedRows` 范围为 2–11，默认 `null`。旧 Host 的显式列数或行数会被设计器保留并明确拦截。模板属性名使用 `ExpandedStackedColumns` / `ExpandedStackedRows`；设计器拒绝其他大小写别名和重复声明，避免字段在旧 Host 请求中丢失。
 
 能力响应中的 `supportedNativeBarcodeHumanReadablePositions` 只描述 ESC/POS Native 的设备可读文字位置。字段可缺省或为 `null`；提供数组时（包括空数组）只允许出现在 ESC/POS Native 能力中，数组成员仍须是已知位置且不能重复。Host 的现有响应结构不变；设计器兼容字段缺省和 `null`，其他协议不得携带该数组。
 
-GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。能力响应的 `gs1Composite.linearTypes` 声明可用线性组件，`modes` 声明可用二维模式：EAN-8/EAN-13/UPC-A/UPC-E 与 DataBar Omnidirectional/Truncated/Limited、单行 Expanded、Stacked、StackedOmnidirectional 和 ExpandedStacked 支持 Auto/CC-A/CC-B，GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C。EAN/UPC 主数据可选带一个严格的 2/5 位附加码；Expanded 主数据和次数据都必须是括号式 GS1 AI；Stacked 主数据使用 GTIN，次数据使用支持的括号式 GS1 AI 子集；业务层仍需负责 AI 之间的关系校验。
+GS1 Composite 是 Type 11 模板元素，仅支持 V2/V3。能力响应的 `gs1Composite.linearTypes` 声明可用线性组件，`modes` 声明可用二维模式：EAN-8/EAN-13/UPC-A/UPC-E 与 DataBar Omnidirectional/Truncated/Limited、单行 Expanded、Stacked、StackedOmnidirectional 和 ExpandedStacked 支持 Auto/CC-A/CC-B，GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C。EAN/UPC 主数据可选带一个严格的 2/5 位附加码；Expanded 主数据和次数据都必须是括号式 GS1 AI；Stacked 主数据使用 GTIN，次数据使用固定版本 GS1 Syntax Dictionary 的完整 536 个已定义 AI 规则；跨 AI 的 req/ex 业务关联仍由业务层负责。
 
 Truncated 与 Stacked Omnidirectional 分别还要求 `gs1-composite-truncated`、`gs1-composite-stacked-omnidirectional`。基础 DataBar Composite 使用 `gs1-composite`；GS1-128 Auto/CC-C 还要求 `gs1-composite-cc-c`，显式 GS1-128 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab`，并且 `gs1Composite.linearTypes`、`modes` 必须分别包含 `UccEan128`、`CcA` 和 `CcB`；EAN/UPC 组合还要求 `gs1-composite-ean-upc`，以及 `Ean8/Ean13/UpcA/UpcE` 与 Auto/CcA/CcB 能力；EAN/UPC 附加码另要求 `gs1-composite-ean-upc-addons`；Expanded 和 Stacked 分别还要求 `gs1-composite-expanded` 和 `gs1-composite-stacked`。能力响应的 `modes` 可声明 `Auto`、`CcA`、`CcB`、`CcC`，但数组本身不表达组合支持，显式 GS1-128 A/B 还必须协商新增特性。新 Host 的 `gs1Composite.linearTypes` 在现有 Omnidirectional、Limited、UccEan128、Expanded、Stacked 项后追加 `Gs1DataBarExpandedStacked`，再追加 `Ean8`、`Ean13`、`UpcA`、`UpcE`，本阶段末尾追加 `Gs1DataBarTruncated`、`Gs1DataBarStackedOmnidirectional`，共 12 项；`modes` 和 `secondaryFormat` 保持不变，`primaryFormats` 在 `ean-upc-digits` 后追加 `ean-upc-digits-with-addon`。固定 `Field.Value` 附加码由设计器发送独立必需特性并校验 Host 响应；动态 `Field.Name` 在 Host 完成绑定后严格校验，设计器不提前推断数据值；旧 Host 的纯数字预检拒绝动态带加号的值，并保留纯数字输入。旧 Host 缺少对应特性或线性/模式能力时，设计器禁用相应选项并提示，服务端也会拒绝强制提交的请求；项目导入保留 A/B 模式，不静默改写，preview/render 请求携带必需特性并验证响应以防降级。旧能力响应中已声明的 Auto/CC-C、DataBar 和 Expanded 组合仍按原契约使用。完整示例见[GS1-128 CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[Expanded 使用说明](gs1-composite-expanded.md)、[Stacked 使用说明](gs1-composite-stacked.md)与[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。非法线性制式/模式配对在导入验证和服务端预检时拒绝。
 

@@ -8,6 +8,7 @@
 - [EAN/UPC Composite 阶段验收](ean-upc-composite-verification-2026-10-22.md)
 - [EAN/UPC Composite 附加码阶段验收](ean-upc-addons-verification-2026-10-22.md)
 - [ExpandedStacked 列数配置与 Host 协商](expanded-stacked-columns.md)
+- [ExpandedStacked 最大行数与完整 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)
 - [ExpandedStacked 列数配置阶段验收](expanded-stacked-columns-verification-2026-10-23.md)
 
 本目录是项目当前功能的开发者入口。代码是最终依据；带 `Rxx` 标题的文档记录历史迭代与验证证据，不应替代当前模块说明。
@@ -47,6 +48,7 @@
 - [模板详细说明](templates.md)：模板版本、元素、布局、字体校准和历史兼容细节。
 - [ExpandedStacked 普通条码与 Composite](gs1-composite-expanded-stacked.md)：输入、每行高度、A/B 与基础能力协商。
 - [ExpandedStacked 列数配置](expanded-stacked-columns.md)：默认列数、普通/Composite 范围、模板字段和新 Host 协商。
+- [ExpandedStacked 最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)：行数互斥语义、固定字典提交、逐字段校验和更新方法。
 - [ExpandedStacked 阶段验收](expanded-stacked-verification-2026-10-22.md)：功能矩阵、运行时及浏览器验证记录。
 - [GS1-128 CC-A/CC-B Composite](gs1-composite-gs1-128-ab.md)：显式 A/B、兼容 Auto/CC-C 与旧 Host 协商。
 - [单行 Expanded Composite](gs1-composite-expanded.md)：Expanded + CC-A/CC-B 的输入、尺寸、模板与能力协商。
@@ -56,6 +58,7 @@
 ## 验证记录
 
 - [GS1-128 A/B 阶段验收](gs1-128-ab-verification-2026-10-22.md)：本阶段最新自动化验收记录。
+- [ExpandedStacked 最大行数与完整 AI 字典验收](expanded-stacked-rows-gs1-ai-verification-2026-10-23.md)：本轮能力、矩阵与原始证据。
 - [多协议验证记录](multi-protocol-verification.md)：按迭代轮次保存的测试范围和已知环境问题。
 - [实现报告](implementation-report.md)：早期实现阶段的总结，不代表当前完整能力清单。
 - [组件校验基准](component-validation-benchmark.md)：特定提交与测试集的冻结基准。

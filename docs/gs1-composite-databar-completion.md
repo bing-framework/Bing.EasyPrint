@@ -4,7 +4,7 @@
 
 ## 输入与布局
 
-Composite 主数据接受 13 位 ASCII 数字 payload、校验位正确的 14 位 GTIN，或仅含该 GTIN 的括号 AI01。次数据沿用共享解析器的 GS1 AI 子集。`Auto` 优先 CC-A，容量不足时使用 CC-B；显式 A/B 超容量失败，CC-C 配对拒绝。普通 Type 32 只接受 13 位数字 payload，自动计算校验位；HRI 为 `(01)` 加 14 位 GTIN。
+Composite 主数据接受 13 位 ASCII 数字 payload、校验位正确的 14 位 GTIN，或仅含该 GTIN 的括号 AI01。次数据沿用固定版本完整 GS1 Syntax Dictionary 的 AI 规则。`Auto` 优先 CC-A，容量不足时使用 CC-B；显式 A/B 超容量失败，CC-C 配对拒绝。普通 Type 32 只接受 13 位数字 payload，自动计算校验位；HRI 为 `(01)` 加 14 位 GTIN。
 
 设 X 为模块宽度，H 为条高，R 为二维组件行数；下表尺寸均为旋转前且不含静区：
 

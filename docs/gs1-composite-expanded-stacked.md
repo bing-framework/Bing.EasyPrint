@@ -6,7 +6,7 @@
 
 普通条码沿用 [Expanded 输入规则](gs1-composite-expanded.md)对应的现有普通条码规范化入口；Composite 主数据必须使用圆括号或方括号 AI，例如 `(01)09501101530003(17)140704(10)AB-123`。Composite 开头 `(01)` 的 GTIN 校验位会校验；未知 AI、混合括号及容量超限会被拒绝。共享 AI 解析器仍是已声明的子集，不保证完整 AI 字典或字段间业务关系。
 
-默认布局为每行两个字符对，即最多四个符号字符。模板和统一模型可通过 `ExpandedStackedColumns` 调整每行字符对上限：普通 ESC/POS Raster 允许 1–11，Composite 允许 2–11；省略或 `null` 使用默认两列。编码器按内容和列数生成数据行；每两条数据行之间有三个 1X 分隔行。最后一行不足一对时按标准补位；反向行、短末行、保护条及定位符分隔规则在编码器内处理。列数与尺寸细节见[列数配置指南](expanded-stacked-columns.md)。
+默认布局为每行两个字符对，即最多四个符号字符。模板和统一模型可通过 `ExpandedStackedColumns` 调整每行字符对上限：普通 ESC/POS Raster 允许 1–11，Composite 允许 2–11；省略或 `null` 使用默认两列。也可用 `ExpandedStackedRows` 指定 2–11 条数据行的上限；它与列数互斥，分隔行不计入上限，无法满足时在编码前失败。编码器按内容和布局生成数据行；每两条数据行之间有三个 1X 分隔行。最后一行不足一对时按标准补位；反向行、短末行、保护条及定位符分隔规则在编码器内处理。列数、行数与尺寸细节见[列数配置指南](expanded-stacked-columns.md)及[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)。
 
 新类型的普通 `BarHeight`/模板 `Height` 和 Composite `LinearBarHeight` **均为每条数据行的高度，单位为 dot**，至少为模块宽度 1X，建议至少 34X。行间分隔行不包含在该高度内。现有 `Gs1DataBarStacked` 的上下行总高语义保持不变。
 
@@ -42,7 +42,7 @@ dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/
 
 ## Host 与设计器
 
-Host 在原有 Composite 线性能力数组末尾追加 `Gs1DataBarExpandedStacked`，并声明 `gs1-composite-expanded-stacked`。显式配置列数还要求 `gs1-databar-expanded-stacked-columns`：普通 ESC/POS Raster 的顶层 `expandedStackedColumns` 范围为 1–11，Composite 的 `gs1Composite.expandedStackedColumns` 范围为 2–11，默认均为 2。设计器按 Host 返回的范围启用选项；省略或 `null` 可继续用于未声明新特性的旧 Host，显式配置会在能力缺失时保留并提示，阻止预览和导出。
+Host 在原有 Composite 线性能力数组末尾追加 `Gs1DataBarExpandedStacked`，并声明 `gs1-composite-expanded-stacked`。显式配置列数还要求 `gs1-databar-expanded-stacked-columns`：普通 ESC/POS Raster 的顶层 `expandedStackedColumns` 范围为 1–11，Composite 的 `gs1Composite.expandedStackedColumns` 范围为 2–11，默认均为 2。显式配置最大行数要求 `gs1-databar-expanded-stacked-rows`，对应 `expandedStackedRows` / `gs1Composite.expandedStackedRows` 范围为 2–11，默认 `null`。设计器按 Host 返回的范围启用选项；省略或 `null` 可继续用于未声明新特性的旧 Host，显式配置会在能力缺失时保留并提示，阻止预览和导出。
 
 选择新制式后可以编辑列数、模块宽度、每行条高、主次数据、旋转和静区，并保存、重载或导出。切换制式保留非空原数据，不会将裸 GTIN 静默转换为括号 AI。在线预览使用 Host 返回的真实尺寸；当前画布仍显示不可扫描的布局占位，实际条码位图预览属于后续阶段。
 

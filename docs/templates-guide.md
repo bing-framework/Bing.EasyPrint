@@ -4,7 +4,7 @@ DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验位仍按原规则处理。旧 Host 保留纯数字输入，附加码模板格式与协商见[使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列，也可配置 2–11 条数据行上限（与列数互斥）。显式配置列数/行数需 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)、[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 ## 功能说明
 
@@ -72,7 +72,7 @@ Composite 的主数据使用继承的 `Field`，次数据必须提供 `Secondary
 
 编辑器可先调用 `TemplateProtocolCapabilities.Create(options)` 获取当前协议、布局和 Profile 的能力快照。该快照用于约束 UI 和静态校验，最终内容仍以实际渲染预检为准。
 
-结构化 GS1 条码由 `Gs1ApplicationIdentifierParser` 统一解析括号 AI 和 FNC1 边界，当前包含 AI `253`、`254`、`255` 及 Scan4Transport 等已声明子集。模板条码与协议 Provider 共用这些规则；这不是完整 GS1 AI 字典，业务关系仍应由业务层校验。
+结构化 GS1 条码由 `Gs1ApplicationIdentifierParser` 统一解析括号 AI 和 FNC1 边界，AI 集合与逐字段规则来自固定提交 `d1702ffb2fa5060f8460f7d581b01e377deaa1d6` 的完整 GS1 Barcode Syntax Dictionary（536 个已定义 AI），包括 253/254/255 与 Scan4Transport 等族。模板条码与协议 Provider 共用这些规则；跨 AI 的 `req`/`ex` 业务关联、具体码制容量和扫描语义仍由编码器或业务层负责，边界见[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)。
 
 自定义 `IPrintProtocolProvider` 可用于直接渲染统一 `PrintDocument`，但 `TemplateRenderer` 当前固定创建内置 Provider，不能通过 `TemplateRenderOptions` 注入自定义 Provider 或工厂。自定义 Provider 的任务收尾和部分切纸编码也不自动获得内置实现；新增协议要接入模板/Host，需扩展其明确的 Provider 分发与收尾路径。
 

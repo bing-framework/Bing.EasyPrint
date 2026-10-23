@@ -8,7 +8,7 @@ Auto、CC-A 和 CC-B 分别对应 `Gs1CompositeMode.Auto`、`CcA`、`CcB`，以�
 
 Composite 在 CPCL、TSPL、ZPL 和 ESC/POS Raster 输出中由主机生成图形；ESC/POS Native 不支持 Composite。该元素不内置 HRI，需要可读文字时另加文字元素。自动化向量和软件验证不能代替目标固件的打印质量和实机扫描验收。
 
-主数据可使用 13 位 GTIN、校验位正确的 14 位 GTIN，或带括号 AI 的 `(01)` 与有效 GTIN-14，例如 `(01)09506000134352`。GTIN 校验位会校验。次数据必须是共享解析器当前支持的括号式 GS1 AI 子集；这不代表完整 AI 字典，也不校验所有 AI 之间的业务关系。
+主数据可使用 13 位 GTIN、校验位正确的 14 位 GTIN，或带括号 AI 的 `(01)` 与有效 GTIN-14，例如 `(01)09506000134352`。GTIN 校验位会校验。次数据必须是共享解析器固定版本完整 GS1 Syntax Dictionary（提交 d1702ffb2fa5060f8460f7d581b01e377deaa1d6）的完整 AI 规则；跨 AI 业务关联仍由业务层校验。
 
 ## 尺寸
 

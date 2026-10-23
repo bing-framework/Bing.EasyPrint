@@ -4,7 +4,9 @@ DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验规则不变。附加码的输入、尺寸、Host 协商和独立码图见[使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数/行数需 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+
+> 当前 GS1 括号 AI 语法使用固定提交 `d1702ffb2fa5060f8460f7d581b01e377deaa1d6` 的完整 536 个已定义 AI 字典；下文带 `Rxxx` 编号的章节保留其历史子集范围，不再代表当前解析器。跨 AI 业务关联、具体码制容量和设备扫描语义仍需业务层或编码器校验，详见[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)。
 
 当前 GS1 Composite 的模式和能力协商见 [GS1-128 CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)与[Stacked 使用说明](gs1-composite-stacked.md)。
 
