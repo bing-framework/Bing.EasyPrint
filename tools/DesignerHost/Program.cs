@@ -23,6 +23,10 @@ app.MapPost("/api/designer/preview", context => DesignerRequestExecution.Execute
     context, DesignerRequestProcessor.Preview, serverMaxWorkingBytes, admission));
 app.MapPost("/api/designer/render", context => DesignerRequestExecution.ExecuteAsync(
     context, DesignerRequestProcessor.Render, serverMaxWorkingBytes, admission));
+app.MapPost("/api/designer/element-png", context => DesignerRequestExecution.ExecuteAsync(
+    context, DesignerRequestProcessor.ElementPng, serverMaxWorkingBytes, admission));
+app.MapPost("/api/designer/page-png", context => DesignerRequestExecution.ExecuteAsync(
+    context, DesignerRequestProcessor.PagePng, serverMaxWorkingBytes, admission));
 app.Run();
 
 public partial class Program { }

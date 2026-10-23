@@ -9,6 +9,10 @@ using Bing.EasyPrint.Printing;
 using Bing.EasyPrint.Templates;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Metadata;
+using SixLabors.ImageSharp.PixelFormats;
 
 internal static class DesignerRequestProcessor
 {
@@ -119,7 +123,15 @@ internal static class DesignerRequestProcessor
                 capabilities.SupportsBarcodeHumanReadable,
                 capabilities.SupportsCut,
                 capabilities.SupportsExtraFeed,
-                capabilities.SupportsFilledRectangles
+                capabilities.SupportsFilledRectangles,
+                rasterPreview = GetRasterPreviewCapabilities(capabilities, options),
+                gs1TwoDimensional = new
+                {
+                    qr = true,
+                    dataMatrix = true,
+                    native = false,
+                    associationValidation = true
+                }
             }, WebJson);
         }
         catch (OperationCanceledException) { throw; }
@@ -262,6 +274,161 @@ internal static class DesignerRequestProcessor
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception error) { return Error(error); }
+    }
+
+    internal static IResult ElementPng(DesignerRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var input = Prepare(request, cancellationToken);
+            var result = new TemplateRenderer().RenderWithLayoutAndPrimitives(input.Template, input.Data,
+                input.Resources, input.Options, cancellationToken);
+            try
+            {
+                var pageIndex = request.PageIndex ?? 0;
+                if (pageIndex < 0 || pageIndex >= result.Pages.Count)
+                    throw new DesignerOptionException("InvalidPageIndex", "pageIndex 超出预览页范围。", "pageIndex");
+                var page = result.Pages[pageIndex];
+                var elementIndex = request.ElementIndex ?? -1;
+                if (elementIndex < 0 || elementIndex >= page.Elements.Count)
+                    throw new DesignerOptionException("InvalidElementIndex", "elementIndex 超出当前页元素范围。",
+                        "elementIndex");
+                var layout = page.Elements[elementIndex];
+                if (!string.IsNullOrEmpty(request.SourcePath) &&
+                    !string.Equals(layout.SourcePath, request.SourcePath, StringComparison.Ordinal))
+                    throw new DesignerOptionException("ElementSourcePathMismatch",
+                        "sourcePath 与 elementIndex 指向的元素不一致。", "sourcePath");
+                var capabilities = TemplateProtocolCapabilities.Create(input.Options);
+                if (!ElementPngSupported(input.Options, layout.Type))
+                    throw new NotSupportedException(
+                        $"元素类型 {layout.Type} 在当前协议下没有准确的元素码图；请查看布局示意。");
+                var primitives = new List<PrintElement>();
+                for (var index = 0; index < page.RenderElements.Count; index++)
+                {
+                    if (index < page.RenderElementOwnership.Count &&
+                        ReferenceEquals(page.RenderElementOwnership[index], layout))
+                        primitives.Add(page.RenderElements[index]);
+                }
+                using var preview = PrintRasterPreview.RenderElements(primitives, layout.X, layout.Y,
+                    Math.Max(1, layout.Width), Math.Max(1, layout.Height),
+                    input.Options.EscPosDevice?.RasterFonts,
+                    input.Options.EscPosDevice?.RasterBarcodeHumanReadableFontSize ??
+                    capabilities.RasterBarcodeHumanReadableFontSize ?? 12, cancellationToken);
+                var png = EncodePng(preview, RasterDpiX(input.Options, capabilities),
+                    RasterDpiY(input.Options, capabilities), cancellationToken);
+                return Results.File(png, "image/png", $"easyprint-element-{pageIndex + 1}-{elementIndex + 1}.png");
+            }
+            finally
+            {
+                result.ReleaseRenderElements();
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception error) { return Error(error); }
+    }
+
+    internal static IResult PagePng(DesignerRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var input = Prepare(request, cancellationToken);
+            if (input.Options.Protocol != PrintProtocol.EscPos ||
+                input.Options.EscPosLayout != EscPosLayoutMode.Raster)
+                throw new NotSupportedException(
+                    "完整页面 PNG 仅支持 ESC/POS Raster；当前协议只提供可准确编码的元素码图。");
+            var result = new TemplateRenderer().RenderWithLayoutAndPrimitives(input.Template, input.Data,
+                input.Resources, input.Options, cancellationToken);
+            try
+            {
+                var capabilities = TemplateProtocolCapabilities.Create(input.Options);
+                var dpiX = RasterDpiX(input.Options, capabilities);
+                var dpiY = RasterDpiY(input.Options, capabilities);
+                var font = input.Options.EscPosDevice?.RasterBarcodeHumanReadableFontSize ??
+                    capabilities.RasterBarcodeHumanReadableFontSize ?? 12;
+                if (request.PageIndex is int pageIndex)
+                {
+                    if (pageIndex < 0 || pageIndex >= result.Pages.Count)
+                        throw new DesignerOptionException("InvalidPageIndex", "pageIndex 超出预览页范围。", "pageIndex");
+                    var page = result.Pages[pageIndex];
+                    using var preview = PrintRasterPreview.RenderElements(page.RenderElements, page.Width,
+                        page.Height, input.Options.EscPosDevice?.RasterFonts, font, cancellationToken);
+                    var png = EncodePng(preview, dpiX, dpiY, cancellationToken);
+                    return Results.File(png, "image/png", $"easyprint-page-{pageIndex + 1}.png");
+                }
+                if (result.Pages.Count == 1)
+                {
+                    using var preview = PrintRasterPreview.RenderElements(result.Pages[0].RenderElements,
+                        result.Pages[0].Width, result.Pages[0].Height,
+                        input.Options.EscPosDevice?.RasterFonts, font, cancellationToken);
+                    var png = EncodePng(preview, dpiX, dpiY, cancellationToken);
+                    return Results.File(png, "image/png", "easyprint-page-1.png");
+                }
+                using var archiveStream = new BudgetedHostStream("Host.PngZipBuffer", cancellationToken);
+                using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, true))
+                {
+                    for (var index = 0; index < result.Pages.Count; index++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        using var preview = PrintRasterPreview.RenderElements(result.Pages[index].RenderElements,
+                            result.Pages[index].Width, result.Pages[index].Height,
+                            input.Options.EscPosDevice?.RasterFonts, font, cancellationToken);
+                        var png = EncodePng(preview, dpiX, dpiY, cancellationToken);
+                        var entry = archive.CreateEntry($"page-{index + 1:000}.png", CompressionLevel.Fastest);
+                        using var target = entry.Open();
+                        WriteBytes(target, png, cancellationToken);
+                    }
+                }
+                return Results.File(archiveStream.ToArray("Host.PngZipOutput"), "application/zip",
+                    "easyprint-pages-png.zip");
+            }
+            finally
+            {
+                result.ReleaseRenderElements();
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception error) { return Error(error); }
+    }
+
+    private static bool ElementPngSupported(TemplateRenderOptions options, int elementType)
+    {
+        if (elementType == 0) return true;
+        if (elementType == 1 || elementType == 4)
+            return options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster;
+        return elementType is 2 or 3 or 5 or 7 or 8 or 9 or 10 or 11;
+    }
+
+    private static int RasterDpiX(TemplateRenderOptions options, TemplateProtocolCapabilities capabilities)
+        => options.EscPosDevice?.Profile?.HorizontalDpi ?? capabilities.Dpi;
+
+    private static int RasterDpiY(TemplateRenderOptions options, TemplateProtocolCapabilities capabilities)
+        => options.EscPosDevice?.Profile?.VerticalDpi ?? capabilities.Dpi;
+
+    private static byte[] EncodePng(PrintRasterPreviewResult preview, int dpiX, int dpiY,
+        CancellationToken cancellationToken)
+    {
+        if (dpiX <= 0) dpiX = 203;
+        if (dpiY <= 0) dpiY = 203;
+        using var rgbaLease = PrintResourceScope.Reserve(
+            checked((long)preview.Width * preview.Height * 4), "Host.PngRgba");
+        using var stream = new BudgetedHostStream("Host.PngBuffer", cancellationToken);
+        using (var image = new Image<Rgba32>(preview.Width, preview.Height, new Rgba32(255, 255, 255)))
+        {
+            for (var y = 0; y < preview.Height; y++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (var x = 0; x < preview.Width; x++)
+                    if ((preview.Raster[y * preview.RowBytes + x / 8] & (0x80 >> (x % 8))) != 0)
+                        image[x, y] = new Rgba32(0, 0, 0);
+            }
+            image.Metadata.HorizontalResolution = dpiX;
+            image.Metadata.VerticalResolution = dpiY;
+            image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
+            image.Save(stream, new PngEncoder());
+        }
+        return stream.ToArray("Host.PngOutput");
     }
 
     internal static IResult GetSamples()
@@ -415,6 +582,7 @@ internal static class DesignerRequestProcessor
                 },
                 StringComparer.Ordinal),
             RequireDeclaredNativeBounds = request.RequireDeclaredNativeBounds,
+            ValidateGs1Associations = request.ValidateGs1Associations,
             EscPosDevice = escPosDevice,
             TsplMedia = protocol == PrintProtocol.Tspl
                 ? new TsplMediaOptions
@@ -465,6 +633,28 @@ internal static class DesignerRequestProcessor
         kioskPartialUncutMillimeters = cutter.KioskPartialUncutMillimeters,
         kioskCutMarginMillimeters = cutter.KioskCutMarginMillimeters
     };
+
+    private static object GetRasterPreviewCapabilities(TemplateProtocolCapabilities capabilities,
+        TemplateRenderOptions options)
+    {
+        var escPosRaster = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster;
+        var elementTypes = escPosRaster
+            ? new[] { 0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11 }
+            : new[] { 0, 2, 3, 5, 7, 8, 9, 10, 11 };
+        var dpiX = options.EscPosDevice?.Profile?.HorizontalDpi ?? capabilities.Dpi;
+        var dpiY = options.EscPosDevice?.Profile?.VerticalDpi ?? capabilities.Dpi;
+        return new
+        {
+            softwareBitmap = true,
+            elementPng = true,
+            elementTypes,
+            pagePng = escPosRaster,
+            pagePngReason = escPosRaster ? null :
+                "完整页面 PNG 仅支持 ESC/POS Raster；当前协议只提供可准确编码的元素码图。",
+            dpiX,
+            dpiY
+        };
+    }
 
     private static object? GetLabelProfileCapabilities(TemplateProtocolCapabilities capabilities, TemplateRenderOptions options)
     {
@@ -1126,6 +1316,10 @@ internal sealed class DesignerRequest
     public double? DeviceLineHeightAt24 { get; set; }
     public Dictionary<string, DesignerDeviceFontCalibrationRequest>? DeviceFontCalibrations { get; set; }
     public bool RequireDeclaredNativeBounds { get; set; }
+    public bool ValidateGs1Associations { get; set; }
+    public int? PageIndex { get; set; }
+    public int? ElementIndex { get; set; }
+    public string? SourcePath { get; set; }
     public DesignerEscPosDeviceRequest? EscPosDevice { get; set; }
     public DesignerTsplMediaRequest? TsplMedia { get; set; }
     public DesignerZplMediaRequest? ZplMedia { get; set; }

@@ -6,7 +6,7 @@ internal static class DesignerContract
     internal const string RequiredFeaturesHeader = "X-EasyPrint-Required-Features";
     internal const string Version = "1";
     private static readonly string[] Features =
-        ["structured-errors", "strict-options", "binding-diagnostics", "multi-protocol", "ordered-output-segments", "gs1-composite", "gs1-composite-cc-c", "gs1-composite-expanded", "gs1-composite-stacked", "gs1-composite-gs1-128-ab", "gs1-composite-expanded-stacked", "gs1-composite-ean-upc", "gs1-composite-ean-upc-addons", "gs1-databar-expanded-stacked-columns", "gs1-databar-expanded-stacked-rows", "gs1-composite-truncated", "gs1-composite-stacked-omnidirectional"];
+        ["structured-errors", "strict-options", "binding-diagnostics", "multi-protocol", "ordered-output-segments", "gs1-composite", "gs1-composite-cc-c", "gs1-composite-expanded", "gs1-composite-stacked", "gs1-composite-gs1-128-ab", "gs1-composite-expanded-stacked", "gs1-composite-ean-upc", "gs1-composite-ean-upc-addons", "gs1-databar-expanded-stacked-columns", "gs1-databar-expanded-stacked-rows", "gs1-composite-truncated", "gs1-composite-stacked-omnidirectional", "raster-element-png", "raster-page-png", "gs1-two-dimensional", "gs1-association-validation"];
 
     internal static object Description => new { version = 1, features = Features.ToArray() };
 

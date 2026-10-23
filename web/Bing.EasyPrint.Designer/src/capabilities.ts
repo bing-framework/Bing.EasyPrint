@@ -12,6 +12,22 @@ import { supportsGs1CompositeExpandedStacked } from './gs1Composite'
 export type CapabilityRange = { minimum: number; maximum: number | null }
 export type ExpandedStackedColumnsCapability = { minimum: number; maximum: number; default: number }
 export type ExpandedStackedRowsCapability = { minimum: number; maximum: number; default: number | null }
+export type Gs1TwoDimensionalCapability = {
+  qr: boolean
+  dataMatrix: boolean
+  native: boolean
+  associationValidation: boolean
+}
+
+export type RasterPreviewCapability = {
+  softwareBitmap: true
+  elementPng: boolean
+  elementTypes: number[]
+  pagePng: boolean
+  pagePngReason: string | null
+  dpiX: number
+  dpiY: number
+}
 
 export type DeviceFontCapability = {
   name: string
@@ -91,6 +107,8 @@ export type DesignerCapabilities = {
   supportsGs1Composite?: boolean
   expandedStackedColumns?: ExpandedStackedColumnsCapability | null
   expandedStackedRows?: ExpandedStackedRowsCapability | null
+  rasterPreview?: RasterPreviewCapability | null
+  gs1TwoDimensional?: Gs1TwoDimensionalCapability | null
   gs1Composite?: { rotations: number[]; modes: string[]; linearTypes: string[]; primaryFormats?: string[];
     expandedStackedColumns?: ExpandedStackedColumnsCapability | null
     expandedStackedRows?: ExpandedStackedRowsCapability | null } | null
@@ -118,6 +136,14 @@ export type DesignerCapabilities = {
   expandedStackedColumnsFeature?: boolean
   /** 来自协商响应头；旧 Host 不视为支持按最大数据行数布局。 */
   expandedStackedRowsFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持元素码图 PNG。 */
+  rasterElementPngFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持完整页面 PNG。 */
+  rasterPagePngFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持 GS1 二维。 */
+  gs1TwoDimensionalFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持严格 GS1 关联校验。 */
+  gs1AssociationValidationFeature?: boolean
 }
 
 export type ZplCutterCapability = {
@@ -189,6 +215,50 @@ ExpandedStackedRowsCapability | null | undefined {
   return { minimum: minimum as number, maximum: maximum as number, default: defaultValue as number | null }
 }
 
+function parseRasterPreviewCapability(value: unknown, path: string):
+RasterPreviewCapability | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`能力响应的 ${path} 无效。`)
+  const capability = value as Record<string, unknown>
+  const elementTypes = capability.elementTypes
+  if (capability.softwareBitmap !== true || typeof capability.elementPng !== 'boolean' ||
+    typeof capability.pagePng !== 'boolean' ||
+    !Array.isArray(elementTypes) || elementTypes.some((type) => !Number.isInteger(type) || (type as number) < 0 || (type as number) > 11) ||
+    !(capability.pagePngReason === null || typeof capability.pagePngReason === 'string') ||
+    typeof capability.dpiX !== 'number' || capability.dpiX <= 0 ||
+    typeof capability.dpiY !== 'number' || capability.dpiY <= 0) {
+    throw new Error(`能力响应的 ${path} 无效。`)
+  }
+  return {
+    softwareBitmap: true,
+    elementPng: capability.elementPng,
+    elementTypes: [...new Set(elementTypes as number[])],
+    pagePng: capability.pagePng,
+    pagePngReason: capability.pagePngReason as string | null,
+    dpiX: capability.dpiX,
+    dpiY: capability.dpiY,
+  }
+}
+
+function parseGs1TwoDimensionalCapability(value: unknown, path: string):
+Gs1TwoDimensionalCapability | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`能力响应中 ${path} 无效。`)
+  const capability = value as Record<string, unknown>
+  if (typeof capability.qr !== 'boolean' || typeof capability.dataMatrix !== 'boolean' ||
+    typeof capability.native !== 'boolean' || typeof capability.associationValidation !== 'boolean' ||
+    capability.qr !== true && capability.dataMatrix !== true)
+    throw new Error(`能力响应中 ${path} 无效。`)
+  if (capability.native) throw new Error(`能力响应中 ${path}.native 必须为 false。`)
+  return {
+    qr: capability.qr,
+    dataMatrix: capability.dataMatrix,
+    native: false,
+    associationValidation: capability.associationValidation,
+  }
+}
 function parseNumberArray(value: unknown, path: string): number[] {
   if (!Array.isArray(value) || value.some((item) => !isFiniteNumber(item))) throw new Error(`能力响应的 ${path} 无效。`)
   return [...new Set(value as number[])]
@@ -656,6 +726,12 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     input.expandedStackedRows, 'expandedStackedRows')
   if (expandedStackedRows && (protocol !== 'EscPos' || escPosLayoutMode !== 'Raster' || !barcodeTypes.includes(31)))
     throw new Error('能力响应的 expandedStackedRows 仅能用于支持 Expanded Stacked 的 ESC/POS Raster。')
+  const rasterPreview = parseRasterPreviewCapability(input.rasterPreview, 'rasterPreview')
+  const gs1TwoDimensional = parseGs1TwoDimensionalCapability(input.gs1TwoDimensional, 'gs1TwoDimensional')
+  if (rasterPreview && (!rasterPreview.elementPng || rasterPreview.elementTypes.length === 0))
+    throw new Error('能力响应的 rasterPreview 必须声明可预览元素类型。')
+  if (rasterPreview && rasterPreview.pagePng && (protocol !== 'EscPos' || escPosLayoutMode !== 'Raster'))
+    throw new Error('能力响应的 rasterPreview.pagePng 仅能用于 ESC/POS Raster。')
   let gs1Composite: DesignerCapabilities['gs1Composite'] = null
   if (input.gs1Composite !== undefined && input.gs1Composite !== null) {
     const composite = input.gs1Composite as Record<string, unknown>
@@ -754,7 +830,11 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     supportsGs1Composite: input.supportsGs1Composite === undefined ? false : parseBoolean(input.supportsGs1Composite, 'supportsGs1Composite'),
     ...(expandedStackedColumns === undefined ? {} : { expandedStackedColumns }),
     ...(expandedStackedRows === undefined ? {} : { expandedStackedRows }),
+    ...(rasterPreview === undefined ? {} : { rasterPreview }),
+    ...(gs1TwoDimensional === undefined ? {} : { gs1TwoDimensional }),
     expandedStackedRowsFeature: input.expandedStackedRowsFeature === undefined ? false : parseBoolean(input.expandedStackedRowsFeature, 'expandedStackedRowsFeature'),
+    rasterElementPngFeature: input.rasterElementPngFeature === undefined ? false : parseBoolean(input.rasterElementPngFeature, 'rasterElementPngFeature'),
+    rasterPagePngFeature: input.rasterPagePngFeature === undefined ? false : parseBoolean(input.rasterPagePngFeature, 'rasterPagePngFeature'),
     gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
     gs1CompositeExpandedFeature: input.gs1CompositeExpandedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedFeature, 'gs1CompositeExpandedFeature'),
     gs1CompositeStackedFeature: input.gs1CompositeStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedFeature, 'gs1CompositeStackedFeature'),
@@ -1006,4 +1086,31 @@ export type CapabilityRequestShape = {
   zplMedia?: ZplMediaRequest
   allowRasterizedLines?: boolean
   requireCutContract?: boolean
+}
+
+export function rasterElementPngSupported(caps: DesignerCapabilities | undefined, type: number): boolean {
+  return Boolean(caps?.rasterElementPngFeature && caps.rasterPreview?.elementPng &&
+    caps.rasterPreview.elementTypes.includes(type))
+}
+
+export function rasterPagePngSupported(caps: DesignerCapabilities | undefined): boolean {
+  return Boolean(caps?.rasterPagePngFeature && caps.rasterPreview?.pagePng)
+}
+
+export function rasterPreviewUnavailableReason(caps: DesignerCapabilities | undefined, type: number): string | undefined {
+  if (rasterElementPngSupported(caps, type)) return undefined
+  if (!caps?.rasterPreview?.elementPng) return '当前 Host 未协商真实码图预览，仅显示布局示意。'
+  if (!caps.rasterElementPngFeature) return '当前 Host 缺少元素码图 PNG 能力，请更新 Host。'
+  return `元素类型 ${type} 当前没有准确的软件位图编码，仅显示布局示意。`
+}
+
+export function gs1TwoDimensionalSupported(caps: DesignerCapabilities | undefined, format: 'QR' | 'DataMatrix'): boolean {
+  const capability = caps?.gs1TwoDimensional
+  if (!caps?.gs1TwoDimensionalFeature || !capability) return false
+  if (caps.protocol === 'EscPos' && caps.escPosLayoutMode === 'Native') return false
+  return format === 'QR' ? capability.qr : capability.dataMatrix
+}
+
+export function gs1AssociationValidationSupported(caps: DesignerCapabilities | undefined): boolean {
+  return Boolean(caps?.gs1AssociationValidationFeature && caps.gs1TwoDimensional?.associationValidation)
 }

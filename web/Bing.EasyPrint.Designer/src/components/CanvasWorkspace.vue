@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { Grid2X2, Minus, Plus, Ruler } from '@lucide/vue'
-import type { BpTemplate, PreviewElement, PreviewPage, RotationAngle, TemplateElement, TemplateResource } from '../model'
+import { previewElementKey, type BpTemplate, type PreviewElement, type PreviewPage, type RotationAngle, type TemplateElement, type TemplateResource } from '../model'
 import { dotsToMm, getAlignmentSnap, snapDeltaToGrid } from '../coordinates'
 import { findCell, findElement, findRow } from '../tree'
 
@@ -18,6 +18,7 @@ const props = defineProps<{
   pageIndex: number
   pageCount: number
   resources: TemplateResource[]
+  previewImages?: Record<string, string>
   mode: 'select' | 'pan'
 }>()
 const emit = defineEmits<{
@@ -66,8 +67,21 @@ watch(() => props.resources.map((resource) => `${resource.key}\n${resource.dataU
   imageAssets.value = next
 }, { immediate: true })
 
+const previewAssets = shallowRef<Record<string, HTMLImageElement>>({})
+watch(() => props.previewImages, (value) => {
+  const next: Record<string, HTMLImageElement> = {}
+  for (const [key, url] of Object.entries(value ?? {})) {
+    const image = new Image()
+    image.onload = () => { previewAssets.value = { ...previewAssets.value, [key]: image } }
+    image.src = url
+    next[key] = image
+  }
+  previewAssets.value = next
+}, { immediate: true })
+
 onBeforeUnmount(() => {
   for (const image of Object.values(imageAssets.value)) image.src = ''
+  for (const image of Object.values(previewAssets.value)) image.src = ''
 })
 
 function nodeRect(element: PreviewElement) {
@@ -283,6 +297,11 @@ function resourceImage(element: PreviewElement): HTMLImageElement | undefined {
   return image?.complete && image.naturalWidth > 0 ? image : undefined
 }
 
+function hostPreviewImage(element: PreviewElement): HTMLImageElement | undefined {
+  const image = previewAssets.value[previewElementKey(props.pageIndex, element)]
+  return image?.complete && image.naturalWidth > 0 ? image : undefined
+}
+
 function imageConfig(element: PreviewElement) {
   const image = resourceImage(element)
   const content = contentDimensions(element)
@@ -360,7 +379,7 @@ function dropTool(event: DragEvent) {
       <div class="canvas-origin"><Ruler :size="13" /><span>{{ unit === 'mm' ? 'mm' : 'pt' }}</span></div>
       <div class="page-frame" ref="pageFrame" :style="{ width: `${stageWidth}px`, height: `${stageHeight}px` }">
         <v-stage :config="{ width: stageWidth, height: stageHeight }">
-          <v-layer>
+          <v-layer :config="{ imageSmoothingEnabled: false }">
             <v-rect :config="{ x: 0, y: 0, width: stageWidth, height: stageHeight, fill: '#ffffff', stroke: '#c8d1d3', strokeWidth: 1, shadowColor: 'rgba(20, 38, 41, 0.16)', shadowBlur: 18, shadowOffset: { x: 0, y: 7 }, shadowOpacity: 0.7 }" />
             <template v-for="tick in ticks" :key="`grid-x-${tick}`">
               <v-line :config="{ points: [tick * scale, 0, tick * scale, stageHeight], stroke: tick % 200 === 0 ? '#e6ebec' : '#f0f3f4', strokeWidth: 1, listening: false }" />
@@ -403,14 +422,20 @@ function dropTool(event: DragEvent) {
                 </template>
               </template>
               <template v-else-if="element.type === 3">
-                <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#fff', stroke: nodeRect(element).stroke, strokeWidth: 1, listening: false }" />
-                <v-text :config="{ ...textConfig(element), text: previewLabel(element), fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#4b6490' }" />
+                <v-image v-if="hostPreviewImage(element)" :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, image: hostPreviewImage(element), listening: false }" />
+                <template v-else>
+                  <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#fff', stroke: nodeRect(element).stroke, strokeWidth: 1, listening: false }" />
+                  <v-text :config="{ ...textConfig(element), text: `${previewLabel(element)}（示意）`, fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#4b6490' }" />
+                </template>
               </template>
               <template v-else-if="element.type === 4">
-                <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#fff', stroke: nodeRect(element).stroke, strokeWidth: 1, listening: false }" />
-                <v-group :config="contentRotationConfig(element)">
-                  <v-line v-for="bar in 20" :key="bar" :config="{ points: [bar * contentDimensions(element).width * scale / 21, 5 * scale, bar * contentDimensions(element).width * scale / 21, Math.max(8 * scale, contentDimensions(element).height * scale - 5 * scale)], stroke: bar % 3 ? '#253b33' : '#83918a', strokeWidth: bar % 4 === 0 ? 2 * scale : 1 * scale, listening: false }" />
-                </v-group>
+                <v-image v-if="hostPreviewImage(element)" :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, image: hostPreviewImage(element), listening: false }" />
+                <template v-else>
+                  <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#fff', stroke: nodeRect(element).stroke, strokeWidth: 1, listening: false }" />
+                  <v-group :config="contentRotationConfig(element)">
+                    <v-line v-for="bar in 20" :key="bar" :config="{ points: [bar * contentDimensions(element).width * scale / 21, 5 * scale, bar * contentDimensions(element).width * scale / 21, Math.max(8 * scale, contentDimensions(element).height * scale - 5 * scale)], stroke: bar % 3 ? '#253b33' : '#83918a', strokeWidth: bar % 4 === 0 ? 2 * scale : 1 * scale, listening: false }" />
+                  </v-group>
+                </template>
               </template>
               <template v-else-if="element.type === 2">
                 <!-- 预览尺寸已经是旋转后的外框；图片本身保持原始宽高，仅在局部组内顺时针旋转。 -->
@@ -420,6 +445,13 @@ function dropTool(event: DragEvent) {
                 <template v-else>
                   <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#f4f1e9', stroke: nodeRect(element).stroke, strokeWidth: 1, dash: [4, 3], listening: false }" />
                   <v-text :config="{ ...textConfig(element), text: previewLabel(element), fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#805d35' }" />
+                </template>
+              </template>
+              <template v-else-if="element.type === 10 || element.type === 11">
+                <v-image v-if="hostPreviewImage(element)" :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, image: hostPreviewImage(element), listening: false }" />
+                <template v-else>
+                  <v-rect :config="{ x: 0, y: 0, width: nodeRect(element).width, height: nodeRect(element).height, fill: '#f4f1e9', stroke: nodeRect(element).stroke, strokeWidth: 1, dash: [4, 3], listening: false }" />
+                  <v-text :config="{ ...textConfig(element), text: `${previewLabel(element)}（示意）`, fontSize: Math.max(9, 13 * scale), align: 'center', fill: '#805d35' }" />
                 </template>
               </template>
               <template v-else>
@@ -444,7 +476,7 @@ function dropTool(event: DragEvent) {
         <button class="icon-button" type="button" :disabled="pageIndex >= pageCount - 1" title="下一页" @click="emit('page-change', pageIndex + 1)">›</button>
       </div>
       <span v-if="pageContext" class="canvas-footer-note">{{ pageContext }}</span>
-      <span v-else class="canvas-footer-note">拖动对象调整位置 · 单位以打印点保存</span>
+      <span v-else class="canvas-footer-note">拖动调整位置 · PNG 码图为软件位图，其余为布局示意</span>
     </footer>
   </section>
 </template>

@@ -251,6 +251,61 @@ public sealed class Gs1CompositeHostTests
     }
 
     [Theory]
+    [InlineData("Cpcl", "")]
+    [InlineData("Tspl", "")]
+    [InlineData("Zpl", "")]
+    [InlineData("EscPos", "Raster")]
+    public async Task Gs1_128_split_carriers_preview_and_render_with_merged_association_scope(
+        string protocol, string layout)
+    {
+        foreach (var (primary, secondary) in new[]
+        {
+            ("(00)123456789012345675", "(4300)ACME"),
+            ("(414)1234567890128", "(254)EXT")
+        })
+        {
+            using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+            var template = SplitCompositeTemplate(primary, secondary);
+            var feature = "gs1-composite,gs1-composite-cc-c,gs1-association-validation";
+            var preview = CreateContext(BuildRequest(protocol, layout, template, "{}", null,
+                "\"validateGs1Associations\":true"), feature);
+            await DesignerRequestExecution.ExecuteAsync(preview, DesignerRequestProcessor.Preview);
+            Assert.Equal(StatusCodes.Status200OK, preview.Response.StatusCode);
+            using var json = ReadJson(preview);
+            var element = Assert.Single(json.RootElement.GetProperty("pages")[0]
+                .GetProperty("elements").EnumerateArray()
+                .Where(value => value.GetProperty("type").GetInt32() == 11));
+            Assert.True(element.GetProperty("width").GetInt32() > 0);
+            Assert.True(element.GetProperty("height").GetInt32() > 0);
+
+            var render = CreateContext(BuildRequest(protocol, layout, template, "{}", null,
+                "\"validateGs1Associations\":true"), feature);
+            await DesignerRequestExecution.ExecuteAsync(render, DesignerRequestProcessor.Render);
+            Assert.Equal(StatusCodes.Status200OK, render.Response.StatusCode);
+            using var archive = new ZipArchive(new MemoryStream(ReadResponseBytes(render)), ZipArchiveMode.Read);
+            Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("page-001.") && entry.Length > 0);
+            Assert.Equal(0, parent.CurrentBytes);
+        }
+    }
+
+    [Fact]
+    public async Task Invalid_merged_composite_relation_reports_source_path_without_preview()
+    {
+        using var parent = PrintResourceScope.Begin(8 * 1024 * 1024);
+        var template = SplitCompositeTemplate("(00)123456789012345675", "(02)12345678901231");
+        var context = CreateContext(BuildRequest("Cpcl", "", template, "{}", null,
+            "\"validateGs1Associations\":true"), "gs1-composite,gs1-composite-cc-c,gs1-association-validation");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var json = ReadJson(context);
+        var error = json.RootElement.GetProperty("errors")[0];
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+        Assert.Contains("02", error.GetProperty("message").GetString());
+        Assert.Contains("37", error.GetProperty("message").GetString());
+        Assert.Equal(0, parent.CurrentBytes);
+    }
+
+    [Theory]
     [InlineData(27, 3)]
     [InlineData(30, 3)]
     [InlineData(25, 3)]
@@ -611,6 +666,36 @@ public sealed class Gs1CompositeHostTests
         Assert.Equal(0, budget.CurrentBytes);
     }
 
+    private static string SplitCompositeTemplate(string primary, string secondary)
+        => JsonSerializer.Serialize(new
+        {
+            Version = 3,
+            Width = 400,
+            Height = 500,
+            Rows = new[]
+            {
+                new
+                {
+                    Cells = new[]
+                    {
+                        new
+                        {
+                            Elements = new[]
+                            {
+                                new
+                                {
+                                    Type = 11, LinearType = 11, Mode = 3, ModuleWidth = 1,
+                                    LinearBarHeight = 40,
+                                    Field = new { Value = primary },
+                                    SecondaryField = new { Value = secondary }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
     private static string RepeatedCompositeTemplate()
         => "{\"Version\":3,\"Width\":500,\"Height\":500,\"Components\":[" +
         "{\"Id\":\"composite\",\"Width\":500,\"Height\":80,\"Elements\":[" +
@@ -620,13 +705,15 @@ public sealed class Gs1CompositeHostTests
         "{\"Type\":6,\"ComponentId\":\"composite\"}]}]}]}";
 
     private static string BuildRequest(string protocol, string escPosLayout,
-        string template = CompositeTemplate, string data = ValidData, string? mediaJson = null)
+        string template = CompositeTemplate, string data = ValidData, string? mediaJson = null,
+        string? extraOptions = null)
     {
         var options = "\"protocol\":\"" + protocol + "\",\"encoding\":\"ASCII\"," +
             "\"feedLines\":0,\"cutAfterPrint\":false";
         if (!string.IsNullOrEmpty(escPosLayout))
             options += ",\"escPosLayoutMode\":\"" + escPosLayout + "\"";
         if (!string.IsNullOrEmpty(mediaJson)) options += "," + mediaJson;
+        if (!string.IsNullOrEmpty(extraOptions)) options += "," + extraOptions;
         return "{\"template\":" + template + ",\"data\":" + data + "," + options + "}";
     }
 

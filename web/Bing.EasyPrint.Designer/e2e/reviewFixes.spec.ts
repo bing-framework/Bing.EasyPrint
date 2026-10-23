@@ -41,7 +41,7 @@ test('GS1 Composite 真实 Host 编辑预览导出及项目往返保持编码参
   await expect.poll(() => page.evaluate(() => {
     const root = document.querySelector('.page-frame')!.firstElementChild as HTMLElement & { __vueParentComponent?: any }
     const stage = root.__vueParentComponent?.exposed?.getNode?.()
-    return stage?.find('Text').some((node: any) => node.text() === 'GS1 Composite') ?? false
+    return (stage?.find('Image').length ?? 0) > 0
   })).toBe(true)
 
   const jsonDownload = page.waitForEvent('download')

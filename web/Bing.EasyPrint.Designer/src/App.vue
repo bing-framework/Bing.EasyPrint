@@ -10,7 +10,7 @@ import CanvasWorkspace from './components/CanvasWorkspace.vue'
 import PropertyInspector from './components/PropertyInspector.vue'
 import TemplateTree from './components/TemplateTree.vue'
 import LabelPrinterProfileEditor from './components/LabelPrinterProfileEditor.vue'
-import { DesignerValidationError, loadDesignerSamples, previewTemplate, renderTemplate, type DesignerSample,
+import { DesignerValidationError, loadDesignerSamples, previewWithImages, elementPng, pagePng, renderTemplate, type DesignerSample,
   loadDesignerCapabilities, type PrintProtocol, type EscPosLayoutMode, type TsplMediaRequest, type ZplMediaRequest,
   type ZplMediaTracking, type PrintEncoding, type EscPosDeviceRequest,
   type EscPosNativeFlowMode,
@@ -23,7 +23,7 @@ import { DesignerValidationError, loadDesignerSamples, previewTemplate, renderTe
   defaultEscPosPrinterProfile } from './api'
 import { canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, elementTypeReason,
   expandedStackedColumnsIssue,
-  expandedStackedRowsIssue,
+  expandedStackedRowsIssue, rasterElementPngSupported, rasterPagePngSupported, rasterPreviewUnavailableReason,
   type CapabilitiesState, type CapabilityQuery, type DesignerCapabilities } from './capabilities'
 import { collectResourceKeys, createComponentTemplate, exportTemplateBundle, importTemplateBundle, MAX_TEMPLATE_JSON_BYTES, resourceForImage } from './archive'
 import { buildLocalLayout } from './layout'
@@ -81,6 +81,7 @@ const deviceFontCalibrationHalfCellWidthAt24 = ref<number | undefined>()
 const deviceFontCalibrationFullCellWidthAt24 = ref<number | undefined>()
 const deviceFontCalibrationLineHeightAt24 = ref<number | undefined>()
 const requireDeclaredNativeBounds = ref(false)
+const validateGs1Associations = ref(false)
 const copies = ref<number | undefined>()
 const feedLines = ref<number | undefined>()
 const cutAfterPrint = ref<boolean | undefined>()
@@ -252,6 +253,16 @@ const showAdvancedTools = ref(false)
 const resources = ref<TemplateResource[]>([])
 const dataText = ref('{}')
 const previewPages = ref<PreviewPage[]>([])
+const previewImages = ref<Record<string, string>>({})
+
+function replacePreviewImages(next: Record<string, string>) {
+  for (const url of Object.values(previewImages.value)) URL.revokeObjectURL(url)
+  previewImages.value = next
+}
+
+onBeforeUnmount(() => {
+  for (const url of Object.values(previewImages.value)) URL.revokeObjectURL(url)
+})
 const previewIndex = ref(0)
 const previewSource = ref<'service' | 'local'>('local')
 const previewBusy = ref(false)
@@ -298,6 +309,7 @@ const outputSettingsSnapshot = (): DesignerOutputSettings => ({
       .map(([name, calibration]) => [name, { ...calibration }])),
   },
   requireDeclaredNativeBounds: requireDeclaredNativeBounds.value,
+  validateGs1Associations: validateGs1Associations.value,
   copies: copies.value,
   feedLines: feedLines.value,
   cutAfterPrint: cutAfterPrint.value,
@@ -328,6 +340,7 @@ function applyOutputSettings(settings: DesignerOutputSettings) {
       .map(([name, calibration]) => [name, { ...calibration }])),
   }
   requireDeclaredNativeBounds.value = settings.requireDeclaredNativeBounds
+  validateGs1Associations.value = settings.validateGs1Associations
   copies.value = settings.copies
   feedLines.value = settings.feedLines
   cutAfterPrint.value = settings.cutAfterPrint
@@ -445,7 +458,7 @@ const sampleOptions = computed(() => [
 watch([template, resources, outputTarget, allowRasterizedLines, imageThreshold,
   deviceHalfCellWidthAt24, deviceFullCellWidthAt24, deviceLineHeightAt24,
   deviceFontCalibrations,
-  requireDeclaredNativeBounds, copies, feedLines, cutAfterPrint, cutOptions, job, encoding,
+  requireDeclaredNativeBounds, validateGs1Associations, copies, feedLines, cutAfterPrint, cutOptions, job, encoding,
   escPosDevice, tsplMedia, zplMedia], () => {
   if (historyApplying) return
   if (historyTimer) clearTimeout(historyTimer)
@@ -1479,6 +1492,7 @@ watch(labelProfileError, () => { void refreshPreview() })
 
 async function refreshPreview() {
   invalidatePreview()
+  replacePreviewImages({})
   if (labelProfileError.value) {
     previewError.value = labelProfileError.value
     previewDiagnostics.value = []
@@ -1519,7 +1533,7 @@ async function refreshPreview() {
   previewAbort = new AbortController()
   previewBusy.value = true
   try {
-    const result = await previewTemplate(template.value, parsedData.value.value, resources.value,
+    const result = await previewWithImages(template.value, parsedData.value.value, resources.value,
       previewAbort.signal, printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
       imageThreshold.value, usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
       usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
@@ -1533,7 +1547,9 @@ async function refreshPreview() {
       usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
        deviceFontCalibrationsForRequest.value, job.value,
-       jobEnabled.value ? undefined : cutOptions.value)
+       jobEnabled.value ? undefined : cutOptions.value,
+       capabilities.value?.rasterElementPngFeature ? (capabilities.value.rasterPreview?.elementTypes ?? []).filter((type) => [3, 4, 10, 11].includes(type)) : [],
+       validateGs1Associations.value)
     if (request !== previewRequest) return
     if (result.errors?.length) {
       setPreviewDiagnostics(result.errors)
@@ -1545,6 +1561,7 @@ async function refreshPreview() {
     }
     setPreviewDiagnostics([])
     previewPages.value = result.pages
+    replacePreviewImages(result.images ?? {})
     previewIndex.value = Math.min(previewIndex.value, Math.max(0, result.pages.length - 1))
     previewSource.value = 'service'
     statusMessage.value = `引擎预览 · ${result.pages.length} 页`
@@ -1566,6 +1583,7 @@ async function refreshPreview() {
       .map((element) => ({ sourcePath: element.sourcePath, message: `图片资源尚未导入：${element.resourceKey ?? ''}` }))
     setPreviewDiagnostics([...local.errors, ...missingImages])
     previewPages.value = local.pages
+    replacePreviewImages({})
     previewIndex.value = Math.min(previewIndex.value, Math.max(0, local.pages.length - 1))
     previewSource.value = 'local'
     statusMessage.value = '本地预览 · 近似布局'
@@ -2118,6 +2136,113 @@ function downloadBlob(blob: Blob, name: string) {
   URL.revokeObjectURL(url)
 }
 
+const rasterDownloadBusy = ref(false)
+
+function selectedPreviewElementIndex(): number {
+  const page = currentPage.value
+  if (!page) return -1
+  return page.elements.findIndex((element) =>
+    (element.definitionPath && element.definitionPath === selectedPath.value) ||
+    element.sourcePath === selectedPath.value)
+}
+
+function selectedElementType(): number | undefined {
+  if (selectedElement.value) return selectedElement.value.Type
+  const page = currentPage.value
+  const index = selectedPreviewElementIndex()
+  return page && index >= 0 ? page.elements[index]!.type : undefined
+}
+
+function selectedElementPngSupported(): boolean {
+  const type = selectedElementType()
+  return type !== undefined && rasterElementPngSupported(capabilities.value, type)
+}
+
+function selectedElementPngTitle(): string {
+  const type = selectedElementType()
+  if (type === undefined) return '请先在画布中选择一个元素'
+  return rasterPreviewUnavailableReason(capabilities.value, type)
+    ?? '下载当前选中元素的真实软件码图 PNG'
+}
+
+function saveDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+}
+
+async function downloadElementPreview() {
+  const page = currentPage.value
+  const elementIndex = selectedPreviewElementIndex()
+  if (!page || elementIndex < 0) {
+    showToast('请先在画布中选择一个元素。', 'warning')
+    return
+  }
+  const element = page.elements[elementIndex]!
+  if (!rasterElementPngSupported(capabilities.value, element.type)) {
+    showToast(rasterPreviewUnavailableReason(capabilities.value, element.type) ?? '当前元素不支持 PNG 下载。', 'warning')
+    return
+  }
+  rasterDownloadBusy.value = true
+  try {
+    const blob = await elementPng(template.value, parsedData.value.value, resources.value, undefined,
+      printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
+      usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
+      usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
+      jobEnabled.value ? undefined : copies.value,
+      jobEnabled.value ? undefined : (usesFeedLines.value ? feedLines.value : undefined),
+      jobEnabled.value ? undefined : (usesCutAfterPrint.value ? cutAfterPrint.value : undefined),
+      usesTsplMedia.value ? tsplMedia.value : undefined, usesZplMedia.value ? zplMedia.value : undefined,
+      effectiveEncoding.value, effectiveEscPosDevice.value,
+      usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
+      usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
+      deviceFontCalibrationsForRequest.value, job.value,
+      jobEnabled.value ? undefined : cutOptions.value,
+      previewIndex.value, elementIndex, element.sourcePath, validateGs1Associations.value)
+    saveDownload(blob, `easyprint-element-${previewIndex.value + 1}-${elementIndex + 1}.png`)
+    showToast('元素码图 PNG 已下载。')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '元素码图下载失败。', 'error')
+  } finally {
+    rasterDownloadBusy.value = false
+  }
+}
+
+async function downloadPagePreview() {
+  if (!rasterPagePngSupported(capabilities.value)) {
+    showToast(capabilities.value?.rasterPreview?.pagePngReason ?? '当前 Host 或协议不支持完整页面 PNG。', 'warning')
+    return
+  }
+  rasterDownloadBusy.value = true
+  try {
+    const blob = await pagePng(template.value, parsedData.value.value, resources.value, undefined,
+      printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
+      usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
+      usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
+      jobEnabled.value ? undefined : copies.value,
+      jobEnabled.value ? undefined : (usesFeedLines.value ? feedLines.value : undefined),
+      jobEnabled.value ? undefined : (usesCutAfterPrint.value ? cutAfterPrint.value : undefined),
+      usesTsplMedia.value ? tsplMedia.value : undefined, usesZplMedia.value ? zplMedia.value : undefined,
+      effectiveEncoding.value, effectiveEscPosDevice.value,
+      usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
+      usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
+      deviceFontCalibrationsForRequest.value, job.value,
+      jobEnabled.value ? undefined : cutOptions.value, undefined, validateGs1Associations.value)
+    saveDownload(blob, blob.type === 'application/zip' ? 'easyprint-pages-png.zip' : 'easyprint-page-1.png')
+    showToast(blob.type === 'application/zip' ? '多页 PNG 压缩包已下载。' : '页面 PNG 已下载。')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '页面 PNG 下载失败。', 'error')
+  } finally {
+    rasterDownloadBusy.value = false
+  }
+}
+
 function exportJson() {
   try {
     assertTemplate(template.value)
@@ -2196,7 +2321,7 @@ async function exportPrintData() {
       usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
        deviceFontCalibrationsForRequest.value, job.value,
-       jobEnabled.value ? undefined : cutOptions.value)
+       jobEnabled.value ? undefined : cutOptions.value, validateGs1Associations.value)
     downloadBlob(blob, `easyprint-${printProtocol.value.toLowerCase()}-pages.zip`)
     showToast(`${printProtocol.value.toUpperCase()} 页面包已导出`)
   } catch (error) {
@@ -2458,6 +2583,8 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
               </template>
              </template>
             <label v-if="usesImageThreshold" class="field-label">图片黑白阈值 <span>0–255</span><input class="field-input" type="number" min="0" max="255" :value="imageThreshold" aria-label="图片黑白阈值" @input="setImageThreshold" /></label>
+            <label v-if="capabilities?.gs1TwoDimensional" class="raster-line-option" title="对 GS1 元素执行固定字典 req/ex 关联校验"><input v-model="validateGs1Associations" type="checkbox" aria-label="严格 GS1 关联校验" :disabled="!capabilities?.gs1AssociationValidationFeature" /><span>严格 GS1 关联</span></label>
+            <p v-if="validateGs1Associations && capabilities && !capabilities.gs1AssociationValidationFeature" class="field-note capability-warning">当前 Host 未协商严格 GS1 关联校验。</p>
             <template v-if="printProtocol === 'Tspl' || printProtocol === 'Zpl'">
               <label class="field-label">半角字宽 <span>24 点</span><input class="field-input" type="number" min="0.1" step="0.1" :value="deviceCellWidthValue(deviceHalfCellWidthAt24)" aria-label="半角字宽" placeholder="自动估算" @input="setDeviceCellWidth('half', $event)" /></label>
               <label class="field-label">全角字宽 <span>24 点</span><input class="field-input" type="number" min="0.1" step="0.1" :value="deviceCellWidthValue(deviceFullCellWidthAt24)" aria-label="全角字宽" placeholder="半角 × 2" @input="setDeviceCellWidth('full', $event)" /></label>
@@ -2504,6 +2631,8 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
         <button class="button-secondary" type="button" @click="openTemplatePicker"><Upload :size="15" /><span>导入</span></button>
         <button class="button-secondary" type="button" @click="exportJson"><Download :size="15" /><span>导出 JSON</span></button>
         <button class="button-secondary" type="button" @click="saveProject"><Save :size="15" /><span>保存项目</span></button>
+        <button class="button-secondary" type="button" :disabled="rasterDownloadBusy || !currentPage || !selectedElementPngSupported()" :title="selectedElementPngTitle()" @click="downloadElementPreview"><Download :size="15" /><span>下载码图</span></button>
+        <button class="button-secondary" type="button" :disabled="rasterDownloadBusy || !rasterPagePngSupported(capabilities)" :title="capabilities?.rasterPreview?.pagePngReason ?? '下载当前页面 PNG；多页时导出每页 PNG 的 ZIP'" @click="downloadPagePreview"><Download :size="15" /><span>下载页面 PNG</span></button>
         <button v-if="resources.length || escPosDevice.rasterFonts" class="button-secondary has-resource" type="button" @click="exportBundle"><ArrowDownToLine :size="15" /><span>模板包</span></button>
         <button class="button-primary" type="button" :disabled="previewBusy" :aria-label="printDataLabel" :title="printDataLabel" @click="exportPrintData"><Printer :size="15" /><span>{{ printDataLabel }}</span></button>
       </div>
@@ -2656,6 +2785,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
           :page-index="previewIndex"
           :page-count="previewPages.length"
           :resources="resources"
+          :preview-images="previewImages"
           :mode="canvasMode"
           @select="selectElement"
           @move="moveElement"

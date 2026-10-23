@@ -85,6 +85,8 @@ export type QrElement = BaseElement & {
   Type: 3
   UnitWidth?: number
   ErrorLevel?: 'L' | 'M' | 'Q' | 'H'
+  /** 显式 GS1 QR Code；省略或 false 保持普通 QR。 */
+  Gs1?: boolean
   Width?: number
   Height?: number
   Rotation?: RotationAngle
@@ -124,7 +126,7 @@ export type GroupElement = BaseElement & {
 export type RectangleElement = BaseElement & { Type: 7; Width: number; Height: number; LineWidth?: number; Filled?: boolean }
 export type EllipseElement = BaseElement & { Type: 8; Width: number; Height: number; LineWidth?: number }
 export type IconElement = BaseElement & { Type: 9; Icon: 'check' | 'cross' | 'info'; Size: number; LineWidth?: number }
-export type MatrixElement = BaseElement & { Type: 10; Format: 'DataMatrix' | 'PDF417'; Width: number; Height: number }
+export type MatrixElement = BaseElement & { Type: 10; Format: 'DataMatrix' | 'PDF417'; Gs1?: boolean; Width: number; Height: number }
 /** 完整符号的尺寸由 Host 编码决定，不提供任意拉伸宽高或内置 HRI。 */
 export type Gs1CompositeElement = BaseElement & {
   Type: 11
@@ -242,6 +244,12 @@ export type DesignerDiagnostic = {
   maxBytes?: number | null
 }
 export type PreviewResponse = { pages: PreviewPage[]; errors?: DesignerDiagnostic[] }
+
+/** 生成预览元素在单次响应中的稳定键，供 Host 码图映射和画布复用。 */
+export function previewElementKey(pageIndex: number, element: PreviewElement): string {
+  return `${pageIndex}:${element.sourcePath}:${element.componentInstancePath ?? ''}:${
+    element.instanceIndices?.join('.') ?? ''}:${element.fragmentIndex ?? ''}:${element.type}`
+}
 
 export type TemplateResource = { key: string; fileName: string; mimeType: string; dataUrl: string }
 
@@ -417,6 +425,12 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
     if (expandedStackedColumns !== undefined && expandedStackedColumns !== null &&
       expandedStackedRows !== undefined && expandedStackedRows !== null)
       throw new Error(`${context.path}.ExpandedStackedColumns 与 ExpandedStackedRows 互斥，不能同时指定。`)
+    if (own(rawElement, 'Gs1')) {
+      if (typeof rawElement.Gs1 !== 'boolean') throw new Error(`${context.path}.Gs1 必须为布尔值。`)
+      if (element.Type !== 3 && element.Type !== 10) throw new Error(`${context.path}.Gs1 仅支持二维码或二维点阵元素。`)
+      if (element.Type === 10 && rawElement.Gs1 === true && (rawElement.Format ?? 'DataMatrix') !== 'DataMatrix')
+        throw new Error(`${context.path}.Gs1 仅支持 DataMatrix，PDF417 不能启用 Gs1。`)
+    }
     if (own(rawElement, 'Filled')) {
       if (typeof rawElement.Filled !== 'boolean') throw new Error(`${context.path}.Filled 必须为布尔值。`)
       if (element.Type !== 7 && rawElement.Filled === true) throw new Error(`${context.path}.Filled 仅支持矩形元素。`)

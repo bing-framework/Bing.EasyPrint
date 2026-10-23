@@ -47,6 +47,7 @@ export type DesignerOutputSettings = {
   deviceLineHeightAt24?: number
   deviceFontCalibrations: DeviceFontCalibrationSets
   requireDeclaredNativeBounds: boolean
+  validateGs1Associations: boolean
   copies?: number
   feedLines?: number
   cutAfterPrint?: boolean
@@ -728,6 +729,7 @@ export function defaultDesignerOutputSettings(): DesignerOutputSettings {
     imageThreshold: 128,
     deviceFontCalibrations: { Tspl: {}, Zpl: {} },
     requireDeclaredNativeBounds: false,
+    validateGs1Associations: false,
     escPosDevice: {},
     tsplMedia: {},
     zplMedia: {},
@@ -739,7 +741,7 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
   if (!isRecord(value)) fail('outputSettings', '必须为对象。')
   assertKnownKeys(value, [
     'outputTarget', 'allowRasterizedLines', 'imageThreshold', 'deviceHalfCellWidthAt24',
-    'deviceFullCellWidthAt24', 'deviceLineHeightAt24', 'requireDeclaredNativeBounds',
+    'deviceFullCellWidthAt24', 'deviceLineHeightAt24', 'requireDeclaredNativeBounds', 'validateGs1Associations',
     'deviceFontCalibrations',
     'copies', 'feedLines', 'cutAfterPrint', 'cutOptions', 'job', 'encoding', 'escPosDevice', 'tsplMedia', 'zplMedia',
   ], 'outputSettings')
@@ -757,6 +759,8 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
   const deviceFontCalibrations = cloneDeviceFontCalibrations(value.deviceFontCalibrations, 'outputSettings.deviceFontCalibrations')
   const requireDeclaredNativeBounds = optionalBoolean(value.requireDeclaredNativeBounds ?? defaults.requireDeclaredNativeBounds,
     'outputSettings.requireDeclaredNativeBounds')!
+  const validateGs1Associations = optionalBoolean(value.validateGs1Associations ?? defaults.validateGs1Associations,
+    'outputSettings.validateGs1Associations')!
   const copies = optionalInteger(value.copies, 'outputSettings.copies', (item) => item >= 1)
   const feedLines = optionalInteger(value.feedLines, 'outputSettings.feedLines', (item) => item >= 0)
   const cutAfterPrint = optionalBoolean(value.cutAfterPrint, 'outputSettings.cutAfterPrint')
@@ -794,6 +798,7 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
     ...(deviceLineHeightAt24 === undefined ? {} : { deviceLineHeightAt24 }),
     deviceFontCalibrations,
     requireDeclaredNativeBounds,
+    validateGs1Associations,
     ...(copies === undefined ? {} : { copies }),
     ...(feedLines === undefined ? {} : { feedLines }),
     ...(cutAfterPrint === undefined ? {} : { cutAfterPrint }),

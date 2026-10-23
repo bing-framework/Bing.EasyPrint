@@ -14,7 +14,7 @@ import {
   deviceFontCapability, expandedStackedColumnsIssue, expandedStackedColumnsRange, expandedStackedColumnsSupported,
   expandedStackedRowsIssue, expandedStackedRowsRange, expandedStackedRowsSupported,
   fontSizeRule, fontSourceSupported, hostFontFamilySupported, legacyDeviceFontSupported,
-  qrModuleSizeSupported, rotationSupported, textSizeSupported, valueInRange, wideModuleWidthSupported,
+  qrModuleSizeSupported, rotationSupported, textSizeSupported, valueInRange, wideModuleWidthSupported, gs1TwoDimensionalSupported,
   type CapabilitiesState, type DesignerCapabilities,
 } from '../capabilities'
 import {
@@ -538,6 +538,21 @@ function addVariable() {
   props.template.Variables[name] = path
   variableName.value = ''
   variablePath.value = ''
+}
+
+type Gs1TwoDimensionalElement = QrElement | Extract<TemplateElement, { Type: 10 }>
+
+function gs1TwoDimensionalDisabled(element: Gs1TwoDimensionalElement): boolean {
+  if (!capabilitiesReady.value) return true
+  if (element.Type === 10 && element.Format !== 'DataMatrix') return true
+  return !gs1TwoDimensionalSupported(props.capabilities, element.Type === 3 ? 'QR' : 'DataMatrix')
+}
+
+function setGs1(element: Gs1TwoDimensionalElement, event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  if (checked && gs1TwoDimensionalDisabled(element)) return
+  if (checked) element.Gs1 = true
+  else delete element.Gs1
 }
 
 function setMatrixFormat(element: Extract<TemplateElement, { Type: 10 }>, event: Event) {
@@ -1258,6 +1273,8 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <label class="field-label">模块宽度 <span v-if="capabilities?.qrModuleSize">{{ capabilities.qrModuleSize.minimum }}–{{ capabilities.qrModuleSize.maximum ?? '以上' }}</span><input class="field-input" type="number" :min="capabilities?.qrModuleSize?.minimum ?? 1" :max="capabilities?.qrModuleSize?.maximum ?? undefined" :value="element.UnitWidth || 4" :disabled="!capabilitiesReady" @input="setQrModuleSize(element, $event)" /></label>
           <p v-if="capabilitiesReady && !qrModuleSizeSupported(capabilities, element.UnitWidth ?? 4)" class="field-note capability-warning">当前二维码模块宽度超出协议范围，请改为支持的值。</p>
           <label class="field-label">纠错级别<select class="field-input" :value="element.ErrorLevel ?? 'M'" @change="element.ErrorLevel = ($event.target as HTMLSelectElement).value as 'L' | 'M' | 'Q' | 'H'"><option>L</option><option>M</option><option>Q</option><option>H</option></select></label>
+          <label class="raster-line-option" title="使用首位 FNC1 的 GS1 QR Code；Native 不支持"><input type="checkbox" aria-label="GS1 QR Code" :checked="element.Gs1 === true" :disabled="gs1TwoDimensionalDisabled(element)" @change="setGs1(element, $event)" /><span>GS1 QR Code</span></label>
+          <p v-if="gs1TwoDimensionalDisabled(element)" class="field-note capability-warning">当前 Host 或协议不支持 GS1 QR Code；Native 请改用 ESC/POS Raster。</p>
         </section>
         <section v-if="element.Type === 4" class="inspector-section">
           <div class="section-title"><span>条码参数</span></div>
@@ -1358,6 +1375,9 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
         <section v-if="element.Type === 10" class="inspector-section">
           <div class="section-title"><span>二维点阵码</span></div>
           <label class="field-label">制式<select class="field-input" :value="element.Format" @change="setMatrixFormat(element, $event)"><option value="DataMatrix">DataMatrix</option><option value="PDF417">PDF417</option></select></label>
+          <label class="raster-line-option" title="仅 DataMatrix 支持 GS1；PDF417 禁用"><input type="checkbox" aria-label="GS1 DataMatrix" :checked="element.Gs1 === true" :disabled="gs1TwoDimensionalDisabled(element)" @change="setGs1(element, $event)" /><span>GS1 DataMatrix</span></label>
+          <p v-if="element.Format === 'PDF417'" class="field-note">PDF417 不支持 GS1 模式。</p>
+          <p v-else-if="gs1TwoDimensionalDisabled(element)" class="field-note capability-warning">当前 Host 或协议不支持 GS1 DataMatrix。</p>
         </section>
 
         <section v-if="element.Type === 11" class="inspector-section">

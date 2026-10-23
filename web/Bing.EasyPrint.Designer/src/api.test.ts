@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defaultEscPosPrinterProfile, DesignerValidationError, loadDesignerCapabilities, previewTemplate, renderTemplate } from './api'
+import { defaultEscPosPrinterProfile, DesignerValidationError, loadDesignerCapabilities, previewTemplate, previewWithImages, renderTemplate } from './api'
 import { createBlankSample } from './samples'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -54,6 +54,46 @@ function validTsplCutterCapabilitiesResponse(overrides: Record<string, unknown> 
   })
 }
 
+describe('raster preview images', () => {
+  it('loads real element PNGs only after the raster preview feature is negotiated', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',raster-element-png'
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pages: [{ width: 100, height: 50, elements: [
+        { type: 4, sourcePath: 'Rows[0].Cells[0].Elements[0]', x: 0, y: 0, width: 80, height: 40 },
+      ] }] }), { headers }))
+      .mockResolvedValueOnce(new Response(new Blob([png], { type: 'image/png' }),
+        { headers: { ...headers, 'Content-Type': 'image/png' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await previewWithImages(createBlankSample(), {}, [], undefined, 'EscPos', 'Raster', false,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, [4])
+    expect(Object.keys(result.images)).toHaveLength(1)
+    expect(fetchMock.mock.calls[1]![0]).toBe('/api/designer/element-png')
+    const headersSent = fetchMock.mock.calls[1]![1]!.headers as Record<string, string>
+    expect(headersSent['X-EasyPrint-Required-Features']).toContain('raster-element-png')
+    expect(fetchMock.mock.calls[1]![1]!.body as string).toContain('"elementIndex":0')
+  })
+})
+
+describe('GS1 two-dimensional request negotiation', () => {
+  it('requires the GS1 two-dimensional feature for an enabled element', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',gs1-two-dimensional'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }),
+      { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const template = createBlankSample()
+    template.Rows[0]!.Cells![0]!.Elements = [{
+      Type: 3, UnitWidth: 4, ErrorLevel: 'M', Gs1: true, Field: { Value: '(01)12345678901231' },
+    }]
+    await previewTemplate(template, {}, [])
+    const requestHeaders = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(requestHeaders['X-EasyPrint-Required-Features']).toContain('gs1-two-dimensional')
+    expect(fetchMock.mock.calls[0]![1]!.body as string).toContain('"Gs1":true')
+  })
+})
 describe('designer preview errors', () => {
   it.each([
     ['Cpcl', 'Native'],

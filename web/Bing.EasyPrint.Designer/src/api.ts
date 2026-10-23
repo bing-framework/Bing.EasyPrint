@@ -1,4 +1,4 @@
-import type { BpTemplate, DesignerDiagnostic, Gs1CompositeElement, PreviewResponse, TemplateResource } from './model'
+import { previewElementKey, type BpTemplate, type DesignerDiagnostic, type Gs1CompositeElement, type PreviewResponse, type TemplateResource } from './model'
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
 import {
@@ -207,7 +207,9 @@ export type PreviewRequest = { template: BpTemplate; data: unknown; resources?: 
   deviceFontCalibrations?: DeviceFontCalibrationMap;
   copies?: number; feedLines?: number; cutAfterPrint?: boolean;
   tsplMedia?: TsplMediaRequest; zplMedia?: ZplMediaRequest;
-  encoding?: PrintEncoding; escPosDevice?: EscPosDeviceRequest; cutOptions?: PrintCutOptions; job?: PrintJobOptions }
+  encoding?: PrintEncoding; escPosDevice?: EscPosDeviceRequest; cutOptions?: PrintCutOptions; job?: PrintJobOptions
+  validateGs1Associations?: boolean
+  pageIndex?: number; elementIndex?: number; sourcePath?: string }
 
 /** 能力查询只接受输出配置，不携带模板、业务数据或图片资源。 */
 export type DesignerCapabilitiesRequest = {
@@ -308,6 +310,10 @@ const GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME = GS1_COMPOSITE_EAN_UPC_ADDONS_F
 const GS1_COMPOSITE_TRUNCATED_FEATURE_NAME = GS1_COMPOSITE_TRUNCATED_FEATURE
 const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME = GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE
 const GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE = 'gs1-databar-expanded-stacked-rows'
+const RASTER_ELEMENT_PNG_FEATURE = 'raster-element-png'
+const RASTER_PAGE_PNG_FEATURE = 'raster-page-png'
+const GS1_TWO_DIMENSIONAL_FEATURE = 'gs1-two-dimensional'
+const GS1_ASSOCIATION_VALIDATION_FEATURE = 'gs1-association-validation'
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
 
 function clientValidationError(message: string, code: string, phase: string): DesignerValidationError {
@@ -379,14 +385,25 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
       const message = '打印服务缺少 GS1 DataBar Expanded Stacked 最大行数功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
+    if (missingFeatures.includes(RASTER_ELEMENT_PNG_FEATURE)) {
+      throw clientValidationError('打印服务缺少元素码图 PNG 功能，请更新 Host。',
+        'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(RASTER_PAGE_PNG_FEATURE)) {
+      throw clientValidationError('打印服务缺少完整页面 PNG 功能，请更新 Host。',
+        'ContractFeatureUnavailable', 'Contract')
+    }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
       'ContractFeatureUnavailable', 'Contract')
   }
 }
 
-async function postDesignerJson(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+async function postDesignerJson(path: string, body: unknown, signal?: AbortSignal,
+  additionalRequiredFeatures: string[] = []): Promise<Response> {
   const requiredFeatures: string[] = [...DESIGNER_REQUIRED_FEATURES]
   const template = (body as { template?: BpTemplate }).template
+  if ((body as { validateGs1Associations?: boolean }).validateGs1Associations && !requiredFeatures.includes(GS1_ASSOCIATION_VALIDATION_FEATURE))
+    requiredFeatures.push(GS1_ASSOCIATION_VALIDATION_FEATURE)
   if (template) walkTemplateNodes(template, (node, context) => {
     if (context.kind !== 'element' || !('Type' in node)) return
     const requestContract = body as { protocol?: PrintProtocol; escPosLayoutMode?: EscPosLayoutMode }
@@ -398,6 +415,11 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
       const message = `${context.path}.ExpandedStackedColumns 属性名必须为 ExpandedStackedColumns${
         duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`
       throw clientValidationError(message, 'InvalidExpandedStackedColumns', 'Validation')
+    }
+    if ((node.Type === 3 || node.Type === 10) && (node as { Gs1?: boolean }).Gs1 === true) {
+      if (node.Type === 10 && (node as { Format?: string }).Format !== 'DataMatrix')
+        throw clientValidationError(`${context.path}.Gs1 仅支持 DataMatrix，PDF417 不能启用 Gs1。`, 'InvalidGs1TwoDimensional', 'Validation')
+      if (!requiredFeatures.includes(GS1_TWO_DIMENSIONAL_FEATURE)) requiredFeatures.push(GS1_TWO_DIMENSIONAL_FEATURE)
     }
     if (node.Type === 4 || node.Type === 11) {
       const element = node as { Type: number; BarcodeType?: number; LinearType?: number; ExpandedStackedColumns?: number | null;
@@ -501,6 +523,8 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
       requiredFeatures.push(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
     }
   })
+  for (const feature of additionalRequiredFeatures)
+    if (!requiredFeatures.includes(feature)) requiredFeatures.push(feature)
   const serializedBody = JSON.stringify(body)
   let response: Response
   try {
@@ -603,6 +627,10 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   capabilities.gs1CompositeStackedOmnidirectionalFeature = features.has(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
   capabilities.expandedStackedColumnsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)
   capabilities.expandedStackedRowsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE)
+  capabilities.rasterElementPngFeature = features.has(RASTER_ELEMENT_PNG_FEATURE)
+  capabilities.rasterPagePngFeature = features.has(RASTER_PAGE_PNG_FEATURE)
+  capabilities.gs1TwoDimensionalFeature = features.has(GS1_TWO_DIMENSIONAL_FEATURE)
+  capabilities.gs1AssociationValidationFeature = features.has(GS1_ASSOCIATION_VALIDATION_FEATURE)
   return capabilities
 }
 
@@ -622,14 +650,32 @@ export async function previewTemplate(template: BpTemplate, data: unknown, resou
   encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
   deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
   deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
-  cutOptions?: PrintCutOptions): Promise<PreviewResponse> {
+  cutOptions?: PrintCutOptions, validateGs1Associations = false): Promise<PreviewResponse> {
   await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding, escPosDevice,
     cutOptions, job, signal)
+  const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
+    imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
+    tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+  const response = await postDesignerJson('/api/designer/preview', body, signal)
+  const result = await response.json() as PreviewResponse
+  if (!Array.isArray(result.pages)) throw new Error('预览服务返回的数据格式无效。')
+  return { ...result, errors: normalizeDesignerDiagnostics(result.errors) }
+}
+
+function buildPreviewBody(template: BpTemplate, data: unknown, resources: TemplateResource[],
+  protocol: PrintProtocol, escPosLayoutMode: EscPosLayoutMode, allowRasterizedLines: boolean,
+  imageThreshold?: number, deviceHalfCellWidthAt24?: number, deviceFullCellWidthAt24?: number,
+  copies?: number, feedLines?: number, cutAfterPrint?: boolean, tsplMedia?: TsplMediaRequest,
+  zplMedia?: ZplMediaRequest, encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
+  deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
+  deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
+  cutOptions?: PrintCutOptions, validateGs1Associations = false): PreviewRequest {
   const compactTsplMedia = compactOptions(tsplMedia)
   const compactZplMedia = compactOptions(zplMedia)
   const compactEscPosDevice = compactOptions(escPosDevice)
   const compactJob = job === undefined ? undefined : compactOptions(job) ?? {}
-  const body: PreviewRequest = {
+  return {
     template, data, resources: resourcesAsBase64(resources), protocol, escPosLayoutMode, allowRasterizedLines,
     ...(imageThreshold === undefined ? {} : { imageThreshold }),
     ...(deviceHalfCellWidthAt24 === undefined ? {} : { deviceHalfCellWidthAt24 }),
@@ -646,11 +692,8 @@ export async function previewTemplate(template: BpTemplate, data: unknown, resou
     ...(compactEscPosDevice === undefined ? {} : { escPosDevice: compactEscPosDevice }),
     ...(compactOptions(cutOptions) === undefined ? {} : { cutOptions: compactOptions(cutOptions) }),
     ...(compactJob === undefined ? {} : { job: compactJob }),
+    ...(validateGs1Associations ? { validateGs1Associations: true } : {}),
   }
-  const response = await postDesignerJson('/api/designer/preview', body, signal)
-  const result = await response.json() as PreviewResponse
-  if (!Array.isArray(result.pages)) throw new Error('预览服务返回的数据格式无效。')
-  return { ...result, errors: normalizeDesignerDiagnostics(result.errors) }
 }
 
 export async function renderTemplate(template: BpTemplate, data: unknown, resources: TemplateResource[],
@@ -661,31 +704,103 @@ export async function renderTemplate(template: BpTemplate, data: unknown, resour
   encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
   deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
   deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
-  cutOptions?: PrintCutOptions): Promise<Blob> {
+  cutOptions?: PrintCutOptions, validateGs1Associations = false): Promise<Blob> {
   await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding, escPosDevice,
     cutOptions, job)
-  const compactTsplMedia = compactOptions(tsplMedia)
-  const compactZplMedia = compactOptions(zplMedia)
-  const compactEscPosDevice = compactOptions(escPosDevice)
-  const compactJob = job === undefined ? undefined : compactOptions(job) ?? {}
-  const body: PreviewRequest = {
-    template, data, resources: resourcesAsBase64(resources), protocol, escPosLayoutMode, allowRasterizedLines,
-    ...(imageThreshold === undefined ? {} : { imageThreshold }),
-    ...(deviceHalfCellWidthAt24 === undefined ? {} : { deviceHalfCellWidthAt24 }),
-    ...(deviceFullCellWidthAt24 === undefined ? {} : { deviceFullCellWidthAt24 }),
-    ...(deviceLineHeightAt24 === undefined ? {} : { deviceLineHeightAt24 }),
-    ...(requireDeclaredNativeBounds === undefined ? {} : { requireDeclaredNativeBounds }),
-    ...(deviceFontCalibrations === undefined ? {} : { deviceFontCalibrations }),
-    ...(copies === undefined ? {} : { copies }),
-    ...(feedLines === undefined ? {} : { feedLines }),
-    ...(cutAfterPrint === undefined ? {} : { cutAfterPrint }),
-    ...(compactTsplMedia === undefined ? {} : { tsplMedia: compactTsplMedia }),
-    ...(compactZplMedia === undefined ? {} : { zplMedia: compactZplMedia }),
-    ...(encoding === undefined ? {} : { encoding }),
-    ...(compactEscPosDevice === undefined ? {} : { escPosDevice: compactEscPosDevice }),
-    ...(compactOptions(cutOptions) === undefined ? {} : { cutOptions: compactOptions(cutOptions) }),
-    ...(compactJob === undefined ? {} : { job: compactJob }),
-  }
+  const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
+    imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
+    tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
   const response = await postDesignerJson('/api/designer/render', body)
+  return response.blob()
+}
+
+export async function previewWithImages(template: BpTemplate, data: unknown, resources: TemplateResource[],
+  signal?: AbortSignal, protocol: PrintProtocol = 'Cpcl', escPosLayoutMode: EscPosLayoutMode = 'Native',
+  allowRasterizedLines = false, imageThreshold?: number, deviceHalfCellWidthAt24?: number,
+  deviceFullCellWidthAt24?: number, copies?: number, feedLines?: number, cutAfterPrint?: boolean,
+  tsplMedia?: TsplMediaRequest, zplMedia?: ZplMediaRequest, encoding?: PrintEncoding,
+  escPosDevice?: EscPosDeviceRequest, deviceLineHeightAt24?: number,
+  requireDeclaredNativeBounds?: boolean, deviceFontCalibrations?: DeviceFontCalibrationMap,
+  job?: PrintJobOptions, cutOptions?: PrintCutOptions, imageElementTypes: number[] = [],
+  validateGs1Associations = false):
+  Promise<PreviewResponse & { images: Record<string, string> }> {
+  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
+    escPosDevice, cutOptions, job, signal)
+  const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
+    imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
+    tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+  const response = await postDesignerJson('/api/designer/preview', body, signal)
+  const result = await response.json() as PreviewResponse
+  if (!Array.isArray(result.pages)) throw new Error('预览服务返回的数据格式无效。')
+  const images: Record<string, string> = {}
+  try {
+    for (let pageIndex = 0; pageIndex < result.pages.length; pageIndex++) {
+      const page = result.pages[pageIndex]!
+      for (let elementIndex = 0; elementIndex < page.elements.length; elementIndex++) {
+        const element = page.elements[elementIndex]!
+        if (!imageElementTypes.includes(element.type)) continue
+        try {
+          const imageResponse = await postDesignerJson('/api/designer/element-png',
+            { ...body, pageIndex, elementIndex, sourcePath: element.sourcePath }, signal,
+            [RASTER_ELEMENT_PNG_FEATURE])
+          const blob = await imageResponse.blob()
+          images[previewElementKey(pageIndex, element)] = URL.createObjectURL(blob)
+        } catch (error) {
+          if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
+          // A single unsupported element must not blank the whole layout preview.
+        }
+      }
+    }
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    return { ...result, errors: normalizeDesignerDiagnostics(result.errors), images }
+  } catch (error) {
+    for (const url of Object.values(images)) URL.revokeObjectURL(url)
+    throw error
+  }
+}
+
+export async function elementPng(template: BpTemplate, data: unknown, resources: TemplateResource[],
+  signal: AbortSignal | undefined, protocol: PrintProtocol, escPosLayoutMode: EscPosLayoutMode,
+  allowRasterizedLines: boolean, imageThreshold: number | undefined,
+  deviceHalfCellWidthAt24: number | undefined, deviceFullCellWidthAt24: number | undefined,
+  copies: number | undefined, feedLines: number | undefined, cutAfterPrint: boolean | undefined,
+  tsplMedia: TsplMediaRequest | undefined, zplMedia: ZplMediaRequest | undefined,
+  encoding: PrintEncoding | undefined, escPosDevice: EscPosDeviceRequest | undefined,
+  deviceLineHeightAt24: number | undefined, requireDeclaredNativeBounds: boolean | undefined,
+  deviceFontCalibrations: DeviceFontCalibrationMap | undefined, job: PrintJobOptions | undefined,
+  cutOptions: PrintCutOptions | undefined, pageIndex: number, elementIndex: number,
+  sourcePath?: string, validateGs1Associations = false): Promise<Blob> {
+  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
+    escPosDevice, cutOptions, job, signal)
+  const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
+    imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
+    tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+  const response = await postDesignerJson('/api/designer/element-png',
+    { ...body, pageIndex, elementIndex, ...(sourcePath === undefined ? {} : { sourcePath }) }, signal,
+    [RASTER_ELEMENT_PNG_FEATURE])
+  return response.blob()
+}
+
+export async function pagePng(template: BpTemplate, data: unknown, resources: TemplateResource[],
+  signal: AbortSignal | undefined, protocol: PrintProtocol, escPosLayoutMode: EscPosLayoutMode,
+  allowRasterizedLines: boolean, imageThreshold: number | undefined,
+  deviceHalfCellWidthAt24: number | undefined, deviceFullCellWidthAt24: number | undefined,
+  copies: number | undefined, feedLines: number | undefined, cutAfterPrint: boolean | undefined,
+  tsplMedia: TsplMediaRequest | undefined, zplMedia: ZplMediaRequest | undefined,
+  encoding: PrintEncoding | undefined, escPosDevice: EscPosDeviceRequest | undefined,
+  deviceLineHeightAt24: number | undefined, requireDeclaredNativeBounds: boolean | undefined,
+  deviceFontCalibrations: DeviceFontCalibrationMap | undefined, job: PrintJobOptions | undefined,
+  cutOptions: PrintCutOptions | undefined, pageIndex?: number, validateGs1Associations = false): Promise<Blob> {
+  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
+    escPosDevice, cutOptions, job, signal)
+  const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
+    imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
+    tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+  const response = await postDesignerJson('/api/designer/page-png',
+    { ...body, ...(pageIndex === undefined ? {} : { pageIndex }) }, signal, [RASTER_PAGE_PNG_FEATURE])
   return response.blob()
 }

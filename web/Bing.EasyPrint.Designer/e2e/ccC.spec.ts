@@ -26,7 +26,7 @@ test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page })
   await expect(page.locator('.status-spinner')).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => {
     const root = document.querySelector('.page-frame')!.firstElementChild as HTMLElement & { __vueParentComponent?: any }
-    return root.__vueParentComponent?.exposed?.getNode?.()?.find('Text').some((node: any) => node.text() === 'GS1 Composite') ?? false
+    return (root.__vueParentComponent?.exposed?.getNode?.()?.find('Image').length ?? 0) > 0
   })).toBe(true)
 
   const output = page.waitForEvent('download')
@@ -52,6 +52,33 @@ test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page })
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('11')
   await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('3')
+})
+
+test('严格关联允许分散 Composite 主次数据并拒绝非法合并', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.capability-note')).toHaveClass(/ready/)
+  await page.locator('.sample-picker select').selectOption('blank')
+  await page.getByRole('button', { name: '组件与表格' }).click()
+  await page.getByRole('button', { name: 'GS1 Composite', exact: true }).click()
+  await page.getByLabel('Composite 线性组件', { exact: true }).selectOption('11')
+  await page.getByLabel('显示内容', { exact: true }).fill('(00)123456789012345675')
+  await page.getByLabel('Composite 次数据', { exact: true }).fill('(4300)ACME')
+
+  const strictPreview = page.waitForResponse(response =>
+    response.url().includes('/api/designer/preview') &&
+    response.status() === 200 &&
+    JSON.stringify(response.request().postDataJSON()?.template).includes('(4300)ACME') &&
+    response.request().postDataJSON()?.validateGs1Associations === true)
+  await page.locator('.output-settings-button').click()
+  await page.getByLabel('严格 GS1 关联校验').check()
+  const layout = await (await strictPreview).json()
+  const element = layout.pages.flatMap((page: { elements: any[] }) => page.elements)
+    .find((item: { type: number }) => item.type === 11)
+  expect(element.width).toBeGreaterThan(0)
+  expect(element.height).toBeGreaterThan(0)
+
+  await page.getByLabel('Composite 次数据', { exact: true }).fill('(02)12345678901231')
+  await expect(page.locator('.diagnostic-panel')).toContainText('37')
 })
 
 test('GS1-128 CC-A 和 CC-B 真实 Host 编辑、预览、输出与项目往返', async ({ page }) => {

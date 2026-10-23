@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import {
   barcodeTypeSupported, canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, filledRectangleSupported, legacyDeviceFontSupported, normalizeDesignerCapabilities,
   expandedStackedColumnsIssue, expandedStackedColumnsSupported, rotationSupported, textSizeSupported,
-  expandedStackedRowsIssue, expandedStackedRowsSupported,
+  expandedStackedRowsIssue, expandedStackedRowsSupported, rasterPreviewUnavailableReason,
+  gs1TwoDimensionalSupported, gs1AssociationValidationSupported,
   valueInRange, type DesignerCapabilities,
 } from './capabilities'
 import type { FontElement } from './model'
@@ -102,6 +103,61 @@ describe('designer capabilities rules', () => {
     expect(() => normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Native',
       nativeFlow: 'Rows', imageRotations: [0], barcodeTypes: [31], expandedStackedRows: ordinaryRange })))
       .toThrow('仅能用于支持 Expanded Stacked 的 ESC/POS Raster')
+  })
+  it('normalizes real raster preview capabilities and rejects inconsistent page PNG claims', () => {
+    const raster = normalizeDesignerCapabilities(capabilities({
+      protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31],
+      rasterPreview: { softwareBitmap: true, elementPng: true, elementTypes: [0, 1, 4, 11], pagePng: true,
+        pagePngReason: null, dpiX: 203, dpiY: 203 },
+    }))
+    raster.rasterElementPngFeature = true
+    expect(raster.rasterPreview?.elementTypes).toEqual([0, 1, 4, 11])
+    expect(rasterPreviewUnavailableReason(raster, 0)).toBeUndefined()
+    expect(rasterPreviewUnavailableReason(raster, 4)).toBeUndefined()
+    expect(rasterPreviewUnavailableReason(raster, 1)).toBeUndefined()
+    expect(rasterPreviewUnavailableReason(raster, 2)).toContain('没有准确')
+
+    const native = normalizeDesignerCapabilities(capabilities({
+      protocol: 'EscPos', escPosLayoutMode: 'Native', nativeFlow: 'Rows', imageRotations: [0],
+      rasterPreview: { softwareBitmap: true, elementPng: true, elementTypes: [0, 3, 11], pagePng: false,
+        pagePngReason: '仅 Raster', dpiX: 203, dpiY: 203 },
+    }))
+    native.rasterElementPngFeature = true
+    expect(native.rasterPreview?.pagePng).toBe(false)
+    expect(rasterPreviewUnavailableReason(native, 4)).toContain('没有准确')
+    expect(() => normalizeDesignerCapabilities(capabilities({
+      protocol: 'Cpcl',
+      rasterPreview: { softwareBitmap: true, elementPng: true, elementTypes: [4], pagePng: true,
+        pagePngReason: null, dpiX: 203, dpiY: 203 },
+    } as unknown as Record<string, unknown>))).toThrow('pagePng 仅能用于 ESC/POS Raster')
+    expect(() => normalizeDesignerCapabilities(capabilities({
+      protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31],
+      rasterPreview: { softwareBitmap: true, elementPng: true, elementTypes: [12], pagePng: false,
+        pagePngReason: null, dpiX: 203, dpiY: 203 },
+    } as unknown as Record<string, unknown>))).toThrow('rasterPreview')
+  })
+
+  it('normalizes GS1 two-dimensional capabilities and rejects Native support', () => {
+    const gs1 = normalizeDesignerCapabilities(capabilities({
+      protocol: 'Cpcl',
+      gs1TwoDimensional: { qr: true, dataMatrix: true, native: false, associationValidation: true },
+    }))
+    gs1.gs1TwoDimensionalFeature = true
+    gs1.gs1AssociationValidationFeature = true
+    expect(gs1TwoDimensionalSupported(gs1, 'QR')).toBe(true)
+    expect(gs1TwoDimensionalSupported(gs1, 'DataMatrix')).toBe(true)
+    expect(gs1AssociationValidationSupported(gs1)).toBe(true)
+
+    const native = normalizeDesignerCapabilities(capabilities({
+      protocol: 'EscPos', escPosLayoutMode: 'Native', nativeFlow: 'Rows', imageRotations: [0],
+      gs1TwoDimensional: { qr: true, dataMatrix: true, native: false, associationValidation: true },
+    }))
+    native.gs1TwoDimensionalFeature = true
+    expect(gs1TwoDimensionalSupported(native, 'QR')).toBe(false)
+    expect(() => normalizeDesignerCapabilities(capabilities({
+      protocol: 'Cpcl',
+      gs1TwoDimensional: { qr: true, dataMatrix: true, native: true, associationValidation: true },
+    } as unknown as Record<string, unknown>))).toThrow('native')
   })
   it('validates ordinary and Composite Expanded Stacked column capability ranges and defaults', () => {
     const ordinaryRange = { minimum: 1, maximum: 11, default: 2 }
