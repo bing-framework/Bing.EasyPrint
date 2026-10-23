@@ -1,0 +1,14 @@
+{
+  "Version": 3,
+  "Width": 200,
+  "Height": 500,
+  "Rows": [{ "Cells": [{ "Elements": [{
+    "Type": 4,
+    "BarcodeType": 31,
+    "ExpandedStackedColumns": 1,
+    "Height": 35,
+    "NarrowModuleWidth": 2,
+    "HumanReadable": false,
+    "Field": { "Name": "Primary" }
+  }] }] }]
+}

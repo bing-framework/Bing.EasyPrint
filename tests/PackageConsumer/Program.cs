@@ -44,6 +44,7 @@ internal static class Program
             VerifyGs1128AbOutputs();
             VerifyExpandedOutputs();
             VerifyExpandedStackedOutputs();
+            VerifyExpandedStackedColumns();
             VerifyEanUpcCompositeOutputs();
             VerifyDataBarCompletionOutputs();
             VerifyStackedOutputs();
@@ -147,23 +148,48 @@ internal static class Program
         }
     }
 
+    private static void VerifyExpandedStackedColumns()
+    {
+        const string primary = "[91]1234567890123456789012345678901234";
+        var size = EscPosRasterCanvas.MeasureExpandedStackedSize(primary, 35, 2, 3);
+        Require(size.Width == 302 && size.Height == 76, "ExpandedStacked 三列精确尺寸");
+        var barcode = new PrintBarcodeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked, primary, 35,
+            humanReadable: false).WithExpandedStackedColumns(3);
+        var document = new PrintDocument();
+        document.AddPage(size.Width, size.Height).Add(barcode);
+        var rasterProvider = PrintProtocolProviderFactory.Create(PrintProtocol.EscPos, Encoding.ASCII, EscPosLayoutMode.Raster);
+        var command = new EscPosPrintCommand(Encoding.ASCII, EscPosLayoutMode.Raster).Initialize()
+            .BeginRasterPage(size.Width, size.Height).RasterExpandedStackedBarcode(0, 0, primary, 35, 3)
+            .EndRasterPage().Build().GetBytes();
+        RequireBytesEqual(command, Single(rasterProvider.Render(document), "ExpandedStacked 三列"), "三列新公共入口一致");
+        foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.EscPos, PrintProtocol.Tspl, PrintProtocol.Zpl })
+        {
+            var composite = new PrintDocument();
+            composite.AddPage(302, 90).Add(new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpandedStacked,
+                primary, "[20]12", 35, mode: Gs1CompositeMode.CcA).WithExpandedStackedColumns(3));
+            var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
+            Require(Single(provider.Render(composite), "Composite 三列").Length > 0, $"Composite 三列输出：{protocol}");
+        }
+    }
+
     private static void VerifyEanUpcCompositeOutputs()
     {
         foreach (var pair in new[] { (BarcodeType.Ean8, "12345670"), (BarcodeType.Ean13, "1234567890128"),
             (BarcodeType.UpcA, "012345678905"), (BarcodeType.UpcE, "01234565") })
+        foreach (var suffix in new[] { "", "+12", "+51234" })
         foreach (var protocol in new[] { PrintProtocol.Cpcl, PrintProtocol.Tspl, PrintProtocol.Zpl, PrintProtocol.EscPos })
         {
             var provider = PrintProtocolProviderFactory.Create(protocol, Encoding.ASCII, EscPosLayoutMode.Raster);
             var auto = new PrintDocument();
-            auto.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2, "(91)123456", 40));
+            auto.AddPage(400, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2 + suffix, "(91)123456", 40));
             var explicitMode = new PrintDocument();
-            explicitMode.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+            explicitMode.AddPage(400, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2 + suffix,
                 "(91)123456", 40, mode: Gs1CompositeMode.CcA));
             var output = Single(provider.Render(auto), "EAN/UPC Auto");
             Require(output.Length > 0, $"{pair.Item1} Composite 输出: {protocol}");
             RequireBytesEqual(output, Single(provider.Render(explicitMode), "EAN/UPC CC-A"), $"{pair.Item1} Auto 字节: {protocol}");
             var ccB = new PrintDocument();
-            ccB.AddPage(300, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2,
+            ccB.AddPage(400, 200).Add(new PrintGs1CompositeElement(0, 0, pair.Item1, pair.Item2 + suffix,
                 "(91)123456", 40, mode: Gs1CompositeMode.CcB));
             Require(Single(provider.Render(ccB), "EAN/UPC CC-B").Length > 0, $"{pair.Item1} CC-B 输出: {protocol}");
         }

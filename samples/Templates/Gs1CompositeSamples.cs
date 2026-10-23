@@ -20,6 +20,9 @@ internal static class Gs1CompositeSamples
             "(01)09506000134352(10)LOT-A", "expanded");
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.Auto,
             "(01)09506000134352(10)LOT-A", "expanded-stacked");
+        WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarExpandedStacked, Gs1CompositeMode.Auto,
+            "[91]1234567890123456789012345678901234", "expanded-stacked-columns", expandedStackedColumns: 3);
+        WriteOrdinaryColumns(output, loader, renderer);
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarStacked, Gs1CompositeMode.Auto,
             "(01)12345678901231", "stacked");
         WriteVariant(output, loader, renderer, BarcodeType.Ean8, Gs1CompositeMode.Auto,
@@ -30,6 +33,14 @@ internal static class Gs1CompositeSamples
             "012345678905", "upca");
         WriteVariant(output, loader, renderer, BarcodeType.UpcE, Gs1CompositeMode.Auto,
             "01234565", "upce");
+        WriteVariant(output, loader, renderer, BarcodeType.Ean8, Gs1CompositeMode.CcB,
+            "9876543+65", "ean8-addon");
+        WriteVariant(output, loader, renderer, BarcodeType.Ean13, Gs1CompositeMode.CcB,
+            "123456789012+54321", "ean13-addon");
+        WriteVariant(output, loader, renderer, BarcodeType.UpcA, Gs1CompositeMode.CcB,
+            "12345678901+12", "upca-addon");
+        WriteVariant(output, loader, renderer, BarcodeType.UpcE, Gs1CompositeMode.CcB,
+            "1876543+56789", "upce-addon");
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarTruncated, Gs1CompositeMode.Auto,
             "(01)12345678901231", "truncated");
         WriteVariant(output, loader, renderer, BarcodeType.Gs1DataBarStackedOmnidirectional, Gs1CompositeMode.Auto,
@@ -37,7 +48,8 @@ internal static class Gs1CompositeSamples
     }
 
     private static void WriteVariant(string output, TemplateLoader loader, TemplateRenderer renderer,
-        BarcodeType linearType, Gs1CompositeMode mode, string primary, string name, int linearHeight = 40)
+        BarcodeType linearType, Gs1CompositeMode mode, string primary, string name, int linearHeight = 40,
+        int? expandedStackedColumns = null)
     {
         var template = new BpTemplate
         {
@@ -48,7 +60,7 @@ internal static class Gs1CompositeSamples
                 {
                     LinearType = linearType, Mode = mode,
                     Field = new BgField { Name = "Primary" }, SecondaryField = new BgField { Name = "Secondary" },
-                    ModuleWidth = 2, LinearBarHeight = linearHeight
+                    ModuleWidth = 2, LinearBarHeight = linearHeight, ExpandedStackedColumns = expandedStackedColumns
                 } }
             } } } }
         };
@@ -70,5 +82,27 @@ internal static class Gs1CompositeSamples
             File.WriteAllBytes(Path.Combine(output, $"gs1-composite-{name}.{protocol.ToString().ToLowerInvariant()}"), fromCode);
         }
         Console.WriteLine($"Composite {name} 四协议 C#/JSON/往返输出一致。");
+    }
+
+    private static void WriteOrdinaryColumns(string output, TemplateLoader loader, TemplateRenderer renderer)
+    {
+        var template = new BpTemplate { Version = 3, Width = 200, Height = 500,
+            Rows = new List<BpRow> { new BpRow { Cells = new List<BpCell> { new BpCell {
+                Elements = new List<BpElement> { new BpBarcodeElement {
+                    BarcodeType = BarcodeType.Gs1DataBarExpandedStacked, ExpandedStackedColumns = 1,
+                    Height = 35, NarrowModuleWidth = 2, HumanReadable = false, Field = new BgField { Name = "Primary" }
+                } }
+            } } } } };
+        var data = new { Primary = "[91]1234567890123456789012345678901234" };
+        var options = new TemplateRenderOptions { Protocol = PrintProtocol.EscPos, EscPosLayout = EscPosLayoutMode.Raster,
+            Encoding = Encoding.ASCII, FeedLines = 0, CutAfterPrint = false };
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "expanded-stacked-columns.json"));
+        var code = renderer.Render(template, data, options: options).Pages.Single().Data;
+        var loaded = renderer.Render(loader.LoadJson(json, options), data, options: options).Pages.Single().Data;
+        var restored = renderer.Render(loader.LoadJson(loader.SaveJson(template, options), options), data, options: options).Pages.Single().Data;
+        if (!code.SequenceEqual(loaded) || !code.SequenceEqual(restored))
+            throw new InvalidOperationException("普通 ExpandedStacked 单列 C#/JSON/往返输出不一致。");
+        File.WriteAllBytes(Path.Combine(output, "expanded-stacked-columns.escpos"), code);
+        Console.WriteLine("普通 ExpandedStacked 单列 Raster C#/JSON/往返输出一致。");
     }
 }
