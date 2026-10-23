@@ -109,12 +109,12 @@ public sealed class ZplUccEan128ProviderTests
         var output = Encoding.ASCII.GetString(new ZplPrintCommand(Encoding.ASCII)
             .Start()
             .BarcodeUccEan128(10, 20,
-                "(3909)1(3910)8401(3947)1234(3959)123456(17)250101", 40, false, 2)
+                "(3909)1(3910)8401(3943)1234(3955)123456(17)250101", 40, false, 2)
             .End()
             .Build().GetBytes());
 
         Assert.Contains(
-            "^FD>;>839091>839108401>839471234395912345617250101^FS",
+            "^FD>;>839091>839108401>839431234395512345617250101^FS",
             output);
     }
 

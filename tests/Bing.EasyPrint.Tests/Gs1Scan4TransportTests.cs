@@ -35,7 +35,7 @@ public sealed class Gs1Scan4TransportTests
     [InlineData("4322", "0", false)]
     [InlineData("4323", "1", false)]
     [InlineData("4324", "2601011200", false)]
-    [InlineData("4325", "2601319999", false)]
+    [InlineData("4325", "2601312359", false)]
     [InlineData("4326", "260201", false)]
     public void Scan4transport_ai_fields_normalize_with_their_defined_fnc1_boundary(
         string ai, string value, bool variable)

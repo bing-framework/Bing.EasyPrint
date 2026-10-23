@@ -9,6 +9,7 @@
   <ItemGroup>
     <None Remove="ThirdPartyNotices.txt" />
     <None Include="ThirdPartyNotices.txt" Pack="true" PackagePath="" />
+    <EmbeddedResource Include="Protocols\Data\gs1-syntax-dictionary-d1702ffb2fa5060f8460f7d581b01e377deaa1d6.txt" />
   </ItemGroup>
   
 	<!--用于解决单元测试internal测试-->

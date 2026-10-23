@@ -521,9 +521,9 @@ public sealed class EscPosRasterGs1DataBarExpandedTests
     public void Expanded_gtin_amount_and_discount_ai_use_generic_field_with_fnc1_boundaries()
     {
         const string bracketed =
-            "(01)12345678901231(3909)1(3910)8401(3947)1234(3959)123456";
+            "(01)12345678901231(3909)1(3910)8401(3943)1234(3955)123456";
         const string normalized =
-            "011234567890123139091\u001D39108401\u001D394712343959123456";
+            "011234567890123139091\u001D39108401\u001D394312343955123456";
 
         Assert.Equal(
             EscPosRasterCanvas.EncodeGs1DataBarExpandedPattern(normalized),

@@ -75,11 +75,11 @@ public sealed class TsplUccEan128ProviderTests
     {
         var output = Encoding.ASCII.GetString(new TsplPrintCommand(Encoding.ASCII)
             .BarcodeUccEan128(10, 20,
-                "(3909)1(3910)8401(3947)1234(3959)123456(17)250101", 40, 1, 0, 2, 2)
+                "(3909)1(3910)8401(3943)1234(3955)123456(17)250101", 40, 1, 0, 2, 2)
             .Build().GetBytes());
 
         Assert.Contains(
-            "\"EAN128\",40,1,0,2,2,\"39091!10239108401!10239471234395912345617250101\"",
+            "\"EAN128\",40,1,0,2,2,\"39091!10239108401!10239431234395512345617250101\"",
             output);
     }
 

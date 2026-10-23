@@ -65,9 +65,9 @@ public sealed class EscPosNativeDataBarTests
     [Fact]
     public void Native_gs1_128_normalizes_amount_and_discount_ai_with_specified_boundaries()
     {
-        const string data = "(3909)123456789012345(3918)840123456789012345(3947)1234(3959)123456(17)250101";
+        const string data = "(3909)123456789012345(3918)840123456789012345(3943)1234(3955)123456(17)250101";
         const string normalized =
-            "3909123456789012345\u001D3918840123456789012345\u001D39471234395912345617250101";
+            "3909123456789012345\u001D3918840123456789012345\u001D39431234395512345617250101";
 
         var bytes = new EscPosPrintCommand(Encoding.ASCII)
             .BarcodeUccEan128(data, 40, 2, 0)
@@ -326,8 +326,8 @@ public sealed class EscPosNativeDataBarTests
     [Fact]
     public void Native_provider_renders_new_amount_and_discount_ai_after_preflight()
     {
-        const string data = "(3909)1(3910)8401(3947)1234(3959)123456(17)250101";
-        const string normalized = "39091\u001D39108401\u001D39471234395912345617250101";
+        const string data = "(3909)1(3910)8401(3943)1234(3955)123456(17)250101";
+        const string normalized = "39091\u001D39108401\u001D39431234395512345617250101";
         var document = new PrintDocument();
         document.AddPage(700, 120).Add(new PrintBarcodeElement(0, 0, BarcodeType.UccEan128,
             data, 40, 2, 2, humanReadable: false), "Barcode");
