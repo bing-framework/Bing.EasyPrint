@@ -114,7 +114,7 @@ public sealed class ZplUccEan128ProviderTests
             .Build().GetBytes());
 
         Assert.Contains(
-            "^FD>;>839091>839108401>839431234395512345617250101^FS",
+            "^FD>;>839091>839108401>839431234>83955123456>817250101^FS",
             output);
     }
 

@@ -18,25 +18,25 @@ public sealed class Gs1Scan4TransportTests
     [InlineData("4304", "MULGRAVE", true)]
     [InlineData("4305", "MELBOURNE", true)]
     [InlineData("4306", "VICTORIA", true)]
-    [InlineData("4307", "AU", false)]
+    [InlineData("4307", "AU", true)]
     [InlineData("4308", "+61390000000", true)]
-    [InlineData("4309", "12345678901234567890", false)]
+    [InlineData("4309", "12345678901234567890", true)]
     [InlineData("4310", "RETURNS+HQ", true)]
     [InlineData("4311", "RETURN+DESK", true)]
     [InlineData("4312", "42+TEST+ROAD", true)]
     [InlineData("4314", "SUBURB", true)]
     [InlineData("4315", "LOCALITY", true)]
     [InlineData("4316", "REGION", true)]
-    [InlineData("4317", "US", false)]
+    [InlineData("4317", "US", true)]
     [InlineData("4318", "12345", true)]
     [InlineData("4319", "18005550199", true)]
     [InlineData("4320", "HANDLE+WITH+CARE", true)]
-    [InlineData("4321", "1", false)]
-    [InlineData("4322", "0", false)]
-    [InlineData("4323", "1", false)]
-    [InlineData("4324", "2601011200", false)]
-    [InlineData("4325", "2601312359", false)]
-    [InlineData("4326", "260201", false)]
+    [InlineData("4321", "1", true)]
+    [InlineData("4322", "0", true)]
+    [InlineData("4323", "1", true)]
+    [InlineData("4324", "2601011200", true)]
+    [InlineData("4325", "2601312359", true)]
+    [InlineData("4326", "260201", true)]
     public void Scan4transport_ai_fields_normalize_with_their_defined_fnc1_boundary(
         string ai, string value, bool variable)
     {
@@ -146,7 +146,7 @@ public sealed class Gs1Scan4TransportTests
     public void Scan4transport_gs1_128_is_normalized_by_native_raster_tspl_and_zpl()
     {
         const string input = "(00)123456789012345675(4300)ACME+WAREHOUSE(4307)US(4321)1";
-        const string normalized = "001234567890123456754300ACME+WAREHOUSE\u001D4307US43211";
+        const string normalized = "001234567890123456754300ACME+WAREHOUSE\u001D4307US\u001D43211";
 
         var native = new EscPosPrintCommand(Encoding.ASCII)
             .BarcodeUccEan128(input, 40, 2, 0).Build().GetBytes();
@@ -164,11 +164,11 @@ public sealed class Gs1Scan4TransportTests
 
         var tspl = Encoding.ASCII.GetString(new TsplPrintCommand(Encoding.ASCII)
             .BarcodeUccEan128(10, 20, input, 40, 0, 0, 2, 2).Build().GetBytes());
-        Assert.Contains("4300ACME+WAREHOUSE!1024307US43211", tspl);
+        Assert.Contains("4300ACME+WAREHOUSE!1024307US!10243211", tspl);
 
         var zpl = Encoding.ASCII.GetString(new ZplPrintCommand(Encoding.ASCII).Start()
             .BarcodeUccEan128(10, 20, input, 40, false, 2).End().Build().GetBytes());
-        Assert.Contains("^FD>;>8001234567890123456754300ACME+WAREHOUSE>84307US43211^FS", zpl);
+        Assert.Contains("^FD>;>8001234567890123456754300ACME+WAREHOUSE>84307US>843211^FS", zpl);
     }
 
     private static string Normalize(string input)

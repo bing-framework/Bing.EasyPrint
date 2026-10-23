@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Bing.EasyPrint.Printing;
 using Bing.EasyPrint.Protocols;
 using Xunit;
 
@@ -123,6 +125,141 @@ public sealed class Gs1SyntaxDictionaryTests
         Assert.Equal(raw, EscPosRasterCanvas.NormalizeBarcodeData(BarcodeType.Gs1DataBarExpanded, raw));
         Assert.Equal(raw, Gs1ApplicationIdentifierParser.NormalizeForProtocol(
             "(01)12345678901231(10)LOT-A(17)260101", "data", 255));
+    }
+
+    [Theory]
+    [InlineData("(01)12345678901231(7001)1234567890123(10)LOT",
+        "011234567890123170011234567890123\u001D10LOT")]
+    [InlineData("(01)12345678901231(402)12345678901234560(10)LOT",
+        "011234567890123140212345678901234560\u001D10LOT")]
+    [InlineData("(00)123456789012345675(4307)AU(10)LOT",
+        "001234567890123456754307AU\u001D10LOT")]
+    [InlineData("(00)123456789012345675(4325)2601312359(10)LOT",
+        "0012345678901234567543252601312359\u001D10LOT")]
+    [InlineData("(01)12345678901231(8111)0500(10)LOT",
+        "011234567890123181110500\u001D10LOT")]
+    [InlineData("(01)12345678901231(10)LOT", "011234567890123110LOT")]
+    public void Fixed_length_ais_without_predefined_flag_require_fnc1_before_following_elements(
+        string input, string expected)
+    {
+        Assert.Equal(expected, Normalize(input));
+    }
+
+    [Fact]
+    public void Last_element_never_appends_a_trailing_fnc1()
+    {
+        Assert.Equal("011234567890123170011234567890123", Normalize("(01)12345678901231(7001)1234567890123"));
+        Assert.Equal("011234567890123110LOT", Normalize("(01)12345678901231(10)LOT"));
+    }
+
+    public static IEnumerable<object[]> OfficialFnc1Flags() => Gs1OfficialFnc1Flags.All();
+
+    [Theory]
+    [MemberData(nameof(OfficialFnc1Flags))]
+    public void Requires_separator_matches_official_syntax_engine_aitable(string ai, bool requiresSeparator)
+    {
+        Assert.True(Gs1SyntaxDictionary.TryGet(ai, out var definition), $"missing official AI {ai}");
+        Assert.Equal(requiresSeparator, definition.RequiresSeparator);
+    }
+
+    [Fact]
+    public void Official_fnc1_table_covers_every_loaded_ai()
+    {
+        Assert.Equal(Gs1SyntaxDictionary.Count, Gs1OfficialFnc1Flags.All().Count());
+    }
+
+    // Vectors selected from the official GS1 Syntax Dictionary linter unit tests at
+    // d1702ffb2fa5060f8460f7d581b01e377deaa1d6 and the GS1 Syntax Engine JavaScript
+    // tests at 9ae7fae0d43a731b6e22005d482f81482e092499. Expected accept/reject is
+    // taken from the official sources, not from Bing.EasyPrint output.
+    [Theory]
+    [InlineData("(01)12345678901231", true)]
+    [InlineData("(01)12345678901232", false)]
+    [InlineData("(8013)1987654Ad4X4bL5ttr2310c2K", true)]
+    [InlineData("(8013)1987654Ad4X4bL5ttr2310cXK", false)]
+    [InlineData("(11)250606", true)]
+    [InlineData("(11)251306", false)]
+    [InlineData("(7006)250606", true)]
+    [InlineData("(7006)250006", false)]
+    [InlineData("(8008)2601012359", true)]
+    [InlineData("(8008)2601012400", false)]
+    [InlineData("(8008)2601012360", false)]
+    [InlineData("(7003)2601012359", true)]
+    [InlineData("(7003)2601012460", false)]
+    [InlineData("(422)840", true)]
+    [InlineData("(422)999", false)]
+    [InlineData("(00)123456789012345675(4307)US", true)]
+    [InlineData("(00)123456789012345675(4307)AA", false)]
+    [InlineData("(3910)8401", true)]
+    [InlineData("(3910)0001", false)]
+    [InlineData("(7252)1", true)]
+    [InlineData("(7252)3", false)]
+    [InlineData("(8007)FR7630006000011234567890189", true)]
+    [InlineData("(8007)FR7630006000011234567890188", false)]
+    [InlineData("(8006)123456789012310102", true)]
+    [InlineData("(8006)123456789012310002", false)]
+    [InlineData("(7041)1A", true)]
+    [InlineData("(7041)ZZZ", false)]
+    [InlineData("(8110)012345612345611110123", true)]
+    [InlineData("(8110)01234561234561111012a", false)]
+    [InlineData("(8112)001234561234560123456", true)]
+    [InlineData("(8112)201234561234560123456", false)]
+    [InlineData("(00)123456789012345675(4300)A", true)]
+    [InlineData("(00)123456789012345675(4300)%0G", false)]
+    [InlineData("(253)1234567890128ABC", true)]
+    [InlineData("(253)1234567890128ABC@", false)]
+    [InlineData("(01)12345678901231(423)840", true)]
+    [InlineData("(01)12345678901231(423)840999", false)]
+    [InlineData("(9999)1", false)]
+    public void Official_linter_and_engine_vectors_compare_acceptance(string input, bool valid)
+    {
+        if (valid)
+        {
+            Assert.False(string.IsNullOrEmpty(Normalize(input)));
+            return;
+        }
+        var error = Assert.Throws<ArgumentException>(() => Normalize(input));
+        Assert.Contains("GS1", error.Message);
+    }
+
+    [Theory]
+    [InlineData("(01)12312312312319(99)TESTING123", "011231231231231999TESTING123")]
+    [InlineData("(02)12312312312319", "0212312312312319")]
+    public void Official_engine_normalized_element_strings_match(string input, string expected)
+    {
+        Assert.Equal(expected, Normalize(input));
+    }
+
+    [Fact]
+    public void Official_fixed_non_predefined_fnc1_reaches_gs1_128_expanded_and_composite()
+    {
+        const string input = "(01)12345678901231(7001)1234567890123(10)LOT";
+        const string normalized = "011234567890123170011234567890123\u001D10LOT";
+
+        Assert.Equal(normalized, Normalize(input));
+        Assert.Equal(normalized, EscPosRasterCanvas.NormalizeBarcodeData(BarcodeType.Gs1DataBarExpanded, input));
+
+        var native = new EscPosPrintCommand(Encoding.ASCII).BarcodeUccEan128(input, 40, 2, 0).Build().GetBytes();
+        Assert.True(ContainsSequence(native, Encoding.ASCII.GetBytes(normalized)));
+
+        var tspl = Encoding.ASCII.GetString(new TsplPrintCommand(Encoding.ASCII)
+            .BarcodeUccEan128(10, 20, input, 40, 0, 0, 2, 2).Build().GetBytes());
+        Assert.Contains("011234567890123170011234567890123!10210LOT", tspl);
+
+        var zpl = Encoding.ASCII.GetString(new ZplPrintCommand(Encoding.ASCII).Start()
+            .BarcodeUccEan128(10, 20, input, 40, false, 2).End().Build().GetBytes());
+        Assert.Contains("^FD>;>8011234567890123170011234567890123>810LOT^FS", zpl);
+
+        var composite = new PrintGs1CompositeElement(0, 0, BarcodeType.Gs1DataBarExpanded,
+            input, "[20]12", 40, 2, Gs1CompositeMode.CcA);
+        Assert.NotNull(Gs1CompositeEncoder.Encode(composite));
+    }
+
+    private static bool ContainsSequence(byte[] bytes, byte[] sequence)
+    {
+        for (var start = 0; start <= bytes.Length - sequence.Length; start++)
+            if (bytes.Skip(start).Take(sequence.Length).SequenceEqual(sequence)) return true;
+        return false;
     }
 
     private static string Normalize(string input)

@@ -37,11 +37,10 @@ internal sealed class Gs1SyntaxAiDefinition
 
     /// <summary>获取字段是否需要 FNC1 分隔。</summary>
     /// <remarks>
-    /// 固定总长度的 AI 不需要 FNC1；只有字典规格允许可变总长度时才插入分隔符。
-    /// 该判定保留项目既有固定长度 AI 的规范化字节兼容，也与 GS1 元素串规则一致；
-    /// 字典的 '*' 标记仍保留在 <see cref="PredefinedLength"/> 供追溯。
+    /// 固定字典的 '*' 表示“预定义长度、无需 FNC1”；没有 '*' 的 AI 即使字段总长度固定，
+    /// 在后续还有元素时仍必须插入 FNC1。该规则与 GS1 Syntax Dictionary 第 41 行一致。
     /// </remarks>
-    internal bool RequiresSeparator => MinimumLength != MaximumLength;
+    internal bool RequiresSeparator => !PredefinedLength;
 
     /// <summary>获取字段总最小长度。</summary>
     internal int MinimumLength { get; }

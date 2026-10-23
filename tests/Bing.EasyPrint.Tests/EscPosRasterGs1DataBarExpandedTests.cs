@@ -523,7 +523,7 @@ public sealed class EscPosRasterGs1DataBarExpandedTests
         const string bracketed =
             "(01)12345678901231(3909)1(3910)8401(3943)1234(3955)123456";
         const string normalized =
-            "011234567890123139091\u001D39108401\u001D394312343955123456";
+            "011234567890123139091\u001D39108401\u001D39431234\u001D3955123456";
 
         Assert.Equal(
             EscPosRasterCanvas.EncodeGs1DataBarExpandedPattern(normalized),

@@ -65,3 +65,13 @@ The ISO 3166/4217 generated tables are distributed under the BSD-3-Clause
 terms reproduced above. The Linter behavior is used only to validate the
 pinned GS1 Syntax Dictionary version; the dictionary remains the source of the
 AI set and field specifications.
+
+GS1 Barcode Syntax Engine test vectors and FNC1 reference
+Source: https://github.com/gs1/gs1-syntax-engine
+Commit: 9ae7fae0d43a731b6e22005d482f81482e092499 (2025-02-24)
+Files referenced: src/c-lib/aitable.inc (NO_FNC1/DO_FNC1 flags), test/linter/*.js and
+test/engine/*.js offline vectors. The embedded dictionary in this Engine commit is
+Release 2025-01-30 and matches the pinned GS1 Syntax Dictionary AI definitions.
+Copyright (c) 2021-2025 GS1 AISBL
+Licensed under the Apache License, Version 2.0; see the Apache text above.
+Only test reference data and behavior are used; no Engine runtime is redistributed.
