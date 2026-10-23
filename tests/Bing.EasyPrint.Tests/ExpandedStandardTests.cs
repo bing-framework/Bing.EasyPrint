@@ -16,7 +16,7 @@ public sealed class ExpandedStandardTests
         var normalized = EscPosRasterCanvas.NormalizeBarcodeData(BarcodeType.Gs1DataBarExpanded, data);
         var method = typeof(EscPosRasterCanvas).GetMethod("EncodeGs1DataBarExpandedBinary",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        var binary = method.Invoke(null, new object[] { normalized, System.Threading.CancellationToken.None, false, false });
+        var binary = method.Invoke(null, new object[] { normalized, System.Threading.CancellationToken.None, false, false, 2 });
         var bits = (string)binary.GetType().GetProperty("Bits",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(binary);
         Assert.Equal('0', bits[0]); // Standalone linkage.

@@ -28,6 +28,8 @@ public sealed class BpGs1CompositeElement : BpElement
     /// 获取或设置模块宽度，单位为打印点，默认 2。
     /// </summary>
     public int ModuleWidth { get; set; } = 2;
+    /// <summary>获取或设置 ExpandedStacked 每行字符对数上限，范围 2–11；null 默认两列，其他制式不允许设置。</summary>
+    public int? ExpandedStackedColumns { get; set; }
     /// <summary>
     /// 获取或设置线性条高，单位为打印点，默认 40；Truncated 至少 13X；StackedOmnidirectional 表示每条数据行高度，至少 33X，中间另加三个 1X 分隔行；EAN/UPC 不含三条 2X 分隔行；Stacked 表示上下数据行总高，至少为模块宽度的 12 倍，不含内部分隔行，上行取总高的 5/12 向下取整，下行取余量；ExpandedStacked 表示每条数据行高度，至少 1X，建议 34X，行间另加三个 1X 分隔行。
     /// </summary>

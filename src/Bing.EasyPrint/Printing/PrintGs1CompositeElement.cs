@@ -94,6 +94,24 @@ public sealed class PrintGs1CompositeElement : PrintElement
         QuietZone = quietZone;
     }
 
+    /// <summary>获取 ExpandedStacked 每行字符对数上限；null 沿用两列，仅适用于 ExpandedStacked。</summary>
+    public int? ExpandedStackedColumns { get; private set; }
+
+    /// <summary>创建指定 ExpandedStacked 列数的不可变副本；原元素不变，尺寸在编码时确定。</summary>
+    /// <param name="columns">每行字符对数上限，范围 2–11；不是打印点宽或二维组件列数。</param>
+    /// <returns>保留其余配置的新元素；不持有外部资源，元数据计入当前打印资源作用域。</returns>
+    /// <exception cref="NotSupportedException">元素制式不是 ExpandedStacked。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">列数超出支持范围。</exception>
+    public PrintGs1CompositeElement WithExpandedStackedColumns(int columns)
+    {
+        EscPosRasterCanvas.ValidateExpandedStackedColumns(LinearType, columns, true);
+        var copy = new PrintGs1CompositeElement(X, Y, LinearType, PrimaryData, SecondaryData,
+            LinearBarHeight, ModuleWidth, Mode, Rotation, QuietZone);
+        copy.SourcePath = SourcePath;
+        copy.ExpandedStackedColumns = columns;
+        return copy;
+    }
+
     /// <summary>
     /// 校验当前实现支持的线性组件与二维模式组合。
     /// </summary>

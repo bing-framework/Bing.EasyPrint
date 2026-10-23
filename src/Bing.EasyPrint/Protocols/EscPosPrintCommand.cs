@@ -408,6 +408,34 @@ public sealed partial class EscPosPrintCommand : ProtocolPrintCommandBase<EscPos
         return this;
     }
 
+    /// <summary>在 Raster 光栅页绘制指定列数的 ExpandedStacked；失败时不改变本次绘制之前的画布。</summary>
+    /// <param name="x">旋转后编码区左上角 X 点坐标。</param>
+    /// <param name="y">旋转后编码区左上角 Y 点坐标。</param>
+    /// <param name="data">与普通 Expanded 相同的 GS1 输入。</param>
+    /// <param name="height">每条数据行点高，至少 1X，建议 34X；不含行间分隔。</param>
+    /// <param name="columns">每行字符对数上限，范围 1–11。</param>
+    /// <param name="moduleWidth">模块点宽，默认 2，必须大于零。</param>
+    /// <param name="humanReadable">是否绘制可读文字，默认 false。</param>
+    /// <param name="humanReadableReserveHeight">可读文字预留点高，默认 0；关闭文字时必须为 0。</param>
+    /// <param name="fontFamily">可读文字字体或别名；null 使用默认字体。</param>
+    /// <param name="humanReadableFontSize">可读文字点字号，默认 12，范围 1–255。</param>
+    /// <param name="rotation">顺时针角度，默认 0，允许 0、90、180、270。</param>
+    /// <returns>当前命令对象；调用方继续管理光栅页和命令生命周期。</returns>
+    /// <exception cref="InvalidOperationException">尚未开始 Raster 页。</exception>
+    /// <exception cref="ArgumentException">输入、列数或尺寸无效，或超出画布。</exception>
+    /// <exception cref="OperationCanceledException">当前光栅页取消令牌已取消。</exception>
+    public EscPosPrintCommand RasterExpandedStackedBarcode(int x, int y, string data, int height, int columns,
+        int moduleWidth = 2, bool humanReadable = false, int humanReadableReserveHeight = 0,
+        string fontFamily = null, int humanReadableFontSize = EscPosRasterCanvas.DefaultHumanReadableFontSize,
+        int rotation = 0)
+    {
+        var canvas = RequireRasterPage("绝对坐标条码");
+        ValidateRasterPoint(canvas, x, y);
+        canvas.DrawExpandedStackedBarcode(x, y, data, height, columns, moduleWidth, humanReadable,
+            humanReadableReserveHeight, fontFamily, humanReadableFontSize, rotation);
+        return this;
+    }
+
     /// <summary>在 Raster 光栅页绘制主机编码的二维码。</summary>
     /// <param name="x">旋转后二维码外框左上角 X 坐标。</param>
     /// <param name="y">旋转后二维码外框左上角 Y 坐标。</param>

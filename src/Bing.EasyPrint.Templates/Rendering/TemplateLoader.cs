@@ -229,6 +229,17 @@ public sealed class TemplateLoader
                 token.Value<int>("Type") != 11 &&
                 (rotation.Type != JTokenType.Integer || rotation.Value<long>() != 0))
                 throw new JsonSerializationException("此元素类型不支持 Rotation；旋转仅用于文字、图片、二维码、一维条码和 Composite。");
+            // 不允许 JSON 小数或字符串被 Populate 隐式转换为整数列数。
+            if (token.Properties().Count(property => string.Equals(property.Name, "ExpandedStackedColumns", StringComparison.OrdinalIgnoreCase)) > 1)
+                throw new JsonSerializationException("ExpandedStackedColumns 不允许重复声明。");
+            if (token.GetValue("ExpandedStackedColumns", StringComparison.OrdinalIgnoreCase) is JToken stackedColumns && stackedColumns.Type != JTokenType.Null)
+            {
+                var type = token.Value<int>("Type");
+                if (stackedColumns.Type != JTokenType.Integer ||
+                    type != 4 && type != 11 ||
+                    stackedColumns.Value<decimal>() < (type == 11 ? 2 : 1) || stackedColumns.Value<decimal>() > 11)
+                    throw new JsonSerializationException("ExpandedStackedColumns 仅适用于 ExpandedStacked；普通条码为 1–11 的整数，Composite 为 2–11 的整数。");
+            }
             BpElement element;
             switch (token.Value<int>("Type"))
             {

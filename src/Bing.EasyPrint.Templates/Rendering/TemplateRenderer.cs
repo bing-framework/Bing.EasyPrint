@@ -1009,12 +1009,12 @@ public sealed class TemplateRenderer
                 var quietZone = barcode.QuietZone;
                 var requiredWidth = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster
                         ? checked((quietZone == null ? layout.Left * 2 : quietZone.Left + quietZone.Right) + EscPosRasterCanvas.MeasureBarcodeWidth(
-                            barcode.BarcodeType, layout.Data, narrow ?? checked(barcode.LineWidth + 1)))
+                            barcode.BarcodeType, layout.Data, narrow ?? checked(barcode.LineWidth + 1), cancellation, barcode.ExpandedStackedColumns))
                     : layout.Width;
                 var w = barcode.Width == 0 ? requiredWidth : barcode.Width;
                 var barHeight = (barcode.BarcodeType == BarcodeType.Gs1DataBarExpandedStacked || barcode.BarcodeType == BarcodeType.Gs1DataBarStackedOmnidirectional)
                     ? EscPosRasterCanvas.MeasureBarcodeHeight(barcode.BarcodeType, layout.Data, barcode.Height,
-                        narrow ?? checked(barcode.LineWidth + 1), cancellation) : barcode.Height;
+                        narrow ?? checked(barcode.LineWidth + 1), cancellation, barcode.ExpandedStackedColumns) : barcode.Height;
                 var h = checked(barHeight + barcode.HumanReadableReserveHeight +
                     (quietZone == null ? 0 : checked(quietZone.Top + quietZone.Bottom)));
                 var quarterTurn = barcode.Rotation == RotationAngle.Rotate90 || barcode.Rotation == RotationAngle.Rotate270;
@@ -1030,7 +1030,7 @@ public sealed class TemplateRenderer
                             cmd.DrawBarcode1D(barcode.BarcodeType, checked(x + rotatedZone.Left), checked(y + rotatedZone.Top),
                                 layout.Data, barcode.LineWidth, barcode.Height, barcode.Ratio, barcode.Rotation,
                                 barcode.HumanReadable, barcode.HumanReadableReserveHeight,
-                                w - quietZone.Left - quietZone.Right, narrow, wide, quietZone);
+                                w - quietZone.Left - quietZone.Right, narrow, wide, quietZone, barcode.ExpandedStackedColumns);
                             return;
                         }
                         // 静区沿条码数据轴分配；旋转后的预留区域仍以左上角定位。
@@ -1042,7 +1042,7 @@ public sealed class TemplateRenderer
                             barcode.LineWidth, barcode.Height, barcode.Ratio, barcode.Rotation,
                             barcode.HumanReadable, barcode.HumanReadableReserveHeight,
                             options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Native
-                                ? w : w - layout.Left, narrow, wide);
+                                ? w : w - layout.Left, narrow, wide, expandedStackedColumns: barcode.ExpandedStackedColumns);
                     } });
             }
             return result;
@@ -1064,6 +1064,7 @@ public sealed class TemplateRenderer
             if (payloadBytes > options.MaxOutputBytes) throw new ArgumentException("字段数据超过输出预算。");
             var model = new PrintGs1CompositeElement(0, 0, element.LinearType, primary, secondary,
                 element.LinearBarHeight, element.ModuleWidth, element.Mode, element.Rotation, element.QuietZone);
+            if (element.ExpandedStackedColumns.HasValue) model = model.WithExpandedStackedColumns(element.ExpandedStackedColumns.Value);
             int occupiedWidth, occupiedHeight;
             using (var measurement = PrintResourceScope.BeginTemporary())
             {

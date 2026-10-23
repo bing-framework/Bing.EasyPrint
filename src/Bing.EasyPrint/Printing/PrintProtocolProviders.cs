@@ -368,7 +368,7 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
         CancellationToken cancellationToken)
     {
         if (barcode.Type == BarcodeType.Code128 || barcode.Type == BarcodeType.UccEan128)
-            return EscPosRasterCanvas.MeasureBarcodeWidth(barcode.Type, barcode.Data, barcode.NarrowWidth, cancellationToken);
+            return EscPosRasterCanvas.MeasureBarcodeWidth(barcode.Type, barcode.Data, barcode.NarrowWidth, cancellationToken, barcode.ExpandedStackedColumns);
         var modules = barcode.Type switch
         {
             BarcodeType.Ean8 => 67,
@@ -587,12 +587,12 @@ public abstract class PrintProtocolProviderBase : IPrintCancelableProtocolProvid
     {
         if (protocol == PrintProtocol.EscPos && barcode.Type == BarcodeType.Gs1DataBarStacked)
             return EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
-                barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None);
+                barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None, barcode.ExpandedStackedColumns);
         if (protocol == PrintProtocol.EscPos && (barcode.Type == BarcodeType.Code49 ||
             barcode.Type == BarcodeType.Gs1DataBarExpandedStacked || barcode.Type == BarcodeType.Gs1DataBarStackedOmnidirectional))
         {
             var symbolHeight = EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
-                barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None);
+                barcode.BarHeight, barcode.NarrowWidth, CancellationToken.None, barcode.ExpandedStackedColumns);
             return checked((long)symbolHeight + barcode.HumanReadableReserveHeight);
         }
         if (protocol == PrintProtocol.Zpl && barcode.Type == BarcodeType.Code49)
@@ -1634,9 +1634,9 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
                 break;
             case PrintBarcodeElement barcode:
                 var barcodeWidth = EscPosRasterCanvas.MeasureBarcodeWidth(barcode.Type, barcode.Data,
-                    barcode.NarrowWidth, ValidationCancellationToken);
+                    barcode.NarrowWidth, ValidationCancellationToken, barcode.ExpandedStackedColumns);
                 var barcodeSymbolHeight = EscPosRasterCanvas.MeasureBarcodeHeight(barcode.Type, barcode.Data,
-                    barcode.BarHeight, barcode.NarrowWidth, ValidationCancellationToken);
+                    barcode.BarHeight, barcode.NarrowWidth, ValidationCancellationToken, barcode.ExpandedStackedColumns);
                 var barcodeRasterHeight = checked(barcodeSymbolHeight +
                     (barcode.HumanReadable == true ? barcode.HumanReadableReserveHeight : 0));
                 var barcodeQuarterTurn = barcode.Rotation == RotationAngle.Rotate90 ||
@@ -1829,10 +1829,10 @@ public sealed class EscPosPrintProtocolProvider : PrintProtocolProviderBase
                                 break;
                             case PrintBarcodeElement barcode:
                                 // 公共模型按声明占位保护静区，整页预检已完成；Code 49 绘制完整符号外框。
-                                canvas.DrawBarcode(barcode.Type, barcode.X, barcode.Y, barcode.Data, barcode.BarHeight,
+                                canvas.DrawBarcodeWithColumns(barcode.Type, barcode.X, barcode.Y, barcode.Data, barcode.BarHeight,
                                     barcode.NarrowWidth, barcode.HumanReadable == true,
                                     barcode.HumanReadableReserveHeight, null, _rasterHumanReadableFontSize,
-                                    (int)barcode.Rotation);
+                                    (int)barcode.Rotation, barcode.ExpandedStackedColumns);
                                 break;
                             case PrintQrCodeElement qr:
                                 canvas.DrawQrCode(qr.X, qr.Y, qr.Data, qr.ModuleSize, qr.ErrorLevel,

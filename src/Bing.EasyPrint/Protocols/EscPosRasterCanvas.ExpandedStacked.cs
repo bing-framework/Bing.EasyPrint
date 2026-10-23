@@ -11,34 +11,37 @@ public sealed partial class EscPosRasterCanvas
 {
     // Layout and separator algorithm adapted from Zint 2.15.0 rss.c (BSD-3-Clause).
     // The full copyright and license are in ThirdPartyNotices.txt.
-    /// <summary>编码固定两列的 Expanded Stacked 逻辑行；每四行中的首行为数据，其余为分隔行。</summary>
+    /// <summary>编码指定列数的 Expanded Stacked 逻辑行；每四行中的首行为数据，其余为分隔行。</summary>
     /// <param name="data">普通入口接受与 Expanded 相同的输入；Composite 调用方传入已校验的规范化 AI。</param>
     /// <param name="cancellationToken">在字符、行和模块循环中观察的取消令牌。</param>
     /// <param name="composite">是否设置线性组件连接标志。</param>
+    /// <param name="columns">每行字符对数上限，普通为 1–11，Composite 为 2–11，默认 2。</param>
     /// <returns>等宽的独立模块串，不含外围静区或 Composite 外部分隔行。</returns>
     internal static string[] EncodeGs1DataBarExpandedStackedPattern(string data,
-        CancellationToken cancellationToken = default, bool composite = false)
+        CancellationToken cancellationToken = default, bool composite = false, int columns = 2)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ValidateExpandedStackedColumns(BarcodeType.Gs1DataBarExpandedStacked, columns, composite);
         var normalized = composite ? data : NormalizeBarcodeData(BarcodeType.Gs1DataBarExpandedStacked, data);
-        return BuildExpandedStackedRows(normalized, cancellationToken, composite);
+        return BuildExpandedStackedRows(normalized, cancellationToken, composite, columns);
     }
 
-    private static string[] BuildExpandedStackedRows(string normalized, CancellationToken cancellationToken, bool composite)
+    private static string[] BuildExpandedStackedRows(string normalized, CancellationToken cancellationToken, bool composite, int columnsPerRow)
     {
-        var elements = EncodeExpandedElements(normalized, cancellationToken, composite, true);
+        var elements = EncodeExpandedElements(normalized, cancellationToken, composite, true, columnsPerRow);
         var blocks = (elements.Length - 4 + 20) / 21;
         var characters = (elements.Length - 4 - blocks * 5) / 8;
-        var rowCount = (blocks + 1) / 2;
+        var rowCount = (blocks + columnsPerRow - 1) / columnsPerRow;
         var rows = new string[rowCount * 4 - 3];
         var block = 0;
         var versionTwo = false;
         for (var row = 0; row < rowCount; row++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var columns = Math.Min(2, blocks - block);
-            var special = row == rowCount - 1 && row % 2 == 1 && columns == 1;
-            var forward = row % 2 == 0 || special;
+            var columns = Math.Min(columnsPerRow, blocks - block);
+            var special = row == rowCount - 1 && row % 2 == 1 && columns < columnsPerRow &&
+                columnsPerRow % 2 == 0 && columns % 2 == 1;
+            var forward = columnsPerRow % 2 == 1 || row % 2 == 0 || special;
             var sub = new int[columns * 21 + 4];
             sub[0] = special ? 2 : 1;
             sub[1] = sub[sub.Length - 2] = sub[sub.Length - 1] = 1;
@@ -54,8 +57,8 @@ public sealed partial class EscPosRasterCanvas
                     sub[target] = elements[source];
                 }
             }
-            var pattern = new StringBuilder(102);
-            var black = !forward;
+            var pattern = new StringBuilder(49 * columnsPerRow + 4);
+            var black = row % 2 == 1 && !special;
             foreach (var width in sub)
             {
                 pattern.Append(black ? '1' : '0', width);
@@ -65,8 +68,8 @@ public sealed partial class EscPosRasterCanvas
             rows[row * 4] = linear;
             if (row > 0)
             {
-                var middle = new char[102];
-                for (var x = 0; x < middle.Length; x++) middle[x] = x >= 5 && x < 98 && x % 2 == 1 ? '1' : '0';
+                var middle = new char[49 * columnsPerRow + 4];
+                for (var x = 0; x < middle.Length; x++) middle[x] = x >= 5 && x < 49 * columnsPerRow && x % 2 == 1 ? '1' : '0';
                 rows[row * 4 - 2] = new string(middle);
                 rows[row * 4 - 1] = ExpandedStackedSeparator(linear, columns, special, forward,
                     row == rowCount - 1 && characters % 2 == 1, versionTwo, cancellationToken);
@@ -112,12 +115,12 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private static (BitMatrix Matrix, int First, int Last) EncodeGs1DataBarExpandedStacked(
-        string normalizedData, CancellationToken cancellationToken)
+        string normalizedData, CancellationToken cancellationToken, int columns)
     {
         // Includes the bounded width arrays, strings, checksum workspace and binary padding.
         using var workspace = PrintResourceScope.Reserve(16384, "ExpandedStacked.EncodingWorkspace");
         // Already normalized by EncodeBarcode; composite=true here would change the linkage bit.
-        var elements = BuildExpandedStackedRows(normalizedData, cancellationToken, false);
+        var elements = BuildExpandedStackedRows(normalizedData, cancellationToken, false, columns);
         PrintResourceScope.Retain(checked((elements[0].Length + 31L) / 32 * elements.Length * sizeof(int)),
             "Matrix.Gs1DataBarExpandedStacked");
         var matrix = new BitMatrix(elements[0].Length, elements.Length);

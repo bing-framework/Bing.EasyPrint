@@ -34,6 +34,8 @@
         public int? NarrowModuleWidth { get; set; }
         /// <summary>获取或设置 TSPL 的宽条模块宽度，单位为打印点；其他协议不支持显式指定。</summary>
         public int? WideModuleWidth { get; set; }
+        /// <summary>获取或设置 ExpandedStacked 每行字符对数上限，范围 1–11；null 默认两列，其他制式不允许设置。</summary>
+        public int? ExpandedStackedColumns { get; set; }
         /// <summary>
         /// 获取或设置条码预留宽度，单位为打印点；零表示按条码内容和制式计算。
         /// </summary>

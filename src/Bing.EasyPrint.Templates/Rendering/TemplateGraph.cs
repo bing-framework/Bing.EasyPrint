@@ -338,9 +338,12 @@ internal static class TemplateGraph
                 if (expected == 0 || element.Type != expected || (template.Version == 1 && expected > 5))
                     throw new ArgumentException("元素类型与 Type 或模板版本不匹配。");
                 ValidateProtocolElement(element, elementPath);
+                if (element is BpBarcodeElement stackedBarcode)
+                    EscPosRasterCanvas.ValidateExpandedStackedColumns(stackedBarcode.BarcodeType, stackedBarcode.ExpandedStackedColumns);
                 if (saving && element.Field?.ValueFunc != null) throw new ArgumentException("含 ValueFunc 的模板不能保存为 JSON。");
                 if (element is BpGs1CompositeElement composite)
                 {
+                    Protocols.EscPosRasterCanvas.ValidateExpandedStackedColumns(composite.LinearType, composite.ExpandedStackedColumns, true);
                     if (composite.SecondaryField == null)
                         throw new ArgumentException("Composite 必须指定 SecondaryField。");
                     if (saving && composite.SecondaryField.ValueFunc != null)

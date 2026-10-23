@@ -103,7 +103,7 @@ internal static partial class Gs1CompositeEncoder
         try
         {
             if (expandedStacked)
-                expandedRows = EscPosRasterCanvas.EncodeGs1DataBarExpandedStackedPattern(primary, cancellationToken, true);
+                expandedRows = EscPosRasterCanvas.EncodeGs1DataBarExpandedStackedPattern(primary, cancellationToken, true, element.ExpandedStackedColumns ?? 2);
             linear = retail ? EncodeEanUpcLinear(element.LinearType, primary, cancellationToken)
                 : expandedStacked ? expandedRows[0] : gs1 ? EncodeGs1Linear(primary, mode, cancellationToken)
                 : EscPosRasterCanvas.EncodeGs1CompositeLinearPattern(element.LinearType, primary, cancellationToken);
