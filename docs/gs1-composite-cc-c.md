@@ -14,7 +14,7 @@
 | DataBar Stacked | A→B | 支持 | 支持 | 不支持 |
 | GS1-128 (`UccEan128`) | 是 | 是 | 是 | 是 |
 
-GS1-128 的 `Auto` 直接选择 CC-C。DataBar 的 `Auto` 保持原策略：先尝试 CC-A，容量不足时选择 CC-B。DataBar+CC-C 仍是非法组合；构造、模板导入验证、预览和渲染都会拒绝。GS1-128 显式 CC-A/CC-B 需要新 Host 特性 `gs1-composite-gs1-128-ab`，详见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。单行 Expanded 和 DataBar Stacked 均支持 A/B，分别见[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。ExpandedStacked 和不带附加码的 EAN/UPC Composite 已分别接入，见[ExpandedStacked 指南](gs1-composite-expanded-stacked.md)和[EAN/UPC 指南](gs1-composite-ean-upc.md)。
+GS1-128 的 `Auto` 直接选择 CC-C。DataBar 的 `Auto` 保持原策略：先尝试 CC-A，容量不足时选择 CC-B。DataBar+CC-C 和 EAN/UPC+CC-C 仍是非法组合；构造、模板导入验证、预览和渲染都会拒绝。GS1-128 显式 CC-A/CC-B 需要新 Host 特性 `gs1-composite-gs1-128-ab`，详见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。单行 Expanded 和 DataBar Stacked 均支持 A/B，分别见[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。ExpandedStacked 和 EAN/UPC Composite（包括 2/5 位附加码）已分别接入，见[ExpandedStacked 指南](gs1-composite-expanded-stacked.md)、[EAN/UPC 指南](gs1-composite-ean-upc.md)及[附加码指南](gs1-composite-ean-upc-addons.md)。
 
 ## 数据和尺寸
 

@@ -2,13 +2,13 @@
 
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
 
-EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验位仍按原规则处理。旧 Host 保留纯数字输入，附加码模板格式与协商见[使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 ## 功能说明
 
-`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。当前 DataBar Omnidirectional/Truncated/Limited、单行 Expanded、Stacked、StackedOmnidirectional 和 ExpandedStacked 支持 CC-A/CC-B，GS1-128 支持 CC-A/CC-B/CC-C；输入、尺寸和能力协商限制见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
+`Bing.EasyPrint.Templates` 将版本化模板、业务数据和受控资源转换为 CPCL、ESC/POS、TSPL 或 ZPL 的逐页输出。默认协议为 CPCL。模板支持 V1、V2、V3 模型、分页、重复明细、条件、页眉页脚、布局轨迹和任务级输出；GS1 Composite Type 11 元素支持 V2/V3，并在目标 Provider 能力允许时生成。当前 EAN-8/EAN-13/UPC-A/UPC-E、DataBar Omnidirectional/Truncated/Limited、单行 Expanded、Stacked、StackedOmnidirectional 和 ExpandedStacked 支持 CC-A/CC-B，EAN/UPC 主字段可附加严格 2/5 位数字码，GS1-128 支持 CC-A/CC-B/CC-C；各制式输入、尺寸和能力协商限制见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)、[Stacked 使用说明](gs1-composite-stacked.md)及[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。
 
 ## 基本用法
 
@@ -58,7 +58,7 @@ CPCL 与模板图片入口在 `Image.Identify` 前预检 TIFF 目录结构；截
 
 字段绑定支持常量值和对象路径；重复区从集合来源生成实例。绑定和资源异常会携带模板路径，Host 还会将其转换为结构化诊断。
 
-Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`。EAN-8/EAN-13/UPC-A/UPC-E 与 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 只接受 Auto/CC-A/CC-B；GS1-128 (`UccEan128`) 接受 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C；DataBar+CC-C 及其他未声明配对在导入验证和渲染预检时拒绝。Stacked 的 `LinearBarHeight` 是上下两条数据行的总高，不含内部一模块分隔行，且不得小于 `12 × ModuleWidth`。模块宽度和线性条高均为打印点数，整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 仅具备 `gs1-composite` 时保留其已声明组合；GS1-128 Auto/CC-C 需要 `gs1-composite-cc-c`，显式 CC-A/CC-B 还需 `gs1-composite-gs1-128-ab` 及 `UccEan128`、`CcA`、`CcB` 能力，EAN/UPC 需要 `gs1-composite-ean-upc`，ExpandedStacked 需要 `gs1-composite-expanded-stacked`；Expanded 和 Stacked 分别需要对应协商特性和线性制式能力。缺失时设计器禁用并提示，服务端对强制请求明确拒绝。详细协议与模板示例见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。
+Composite 的主数据使用继承的 `Field`，次数据必须提供 `SecondaryField`。EAN/UPC 主数据可为纯零售数字，或按严格格式追加一个 `+` 和 2/5 位 ASCII 附加码；其他 DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 只接受 Auto/CC-A/CC-B，GS1-128 (`UccEan128`) 接受 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C；DataBar+CC-C 及其他未声明配对在导入验证和渲染预检时拒绝。EAN/UPC 输入与旧 Host 协商见[附加码使用说明](gs1-composite-ean-upc-addons.md)。Stacked 的 `LinearBarHeight` 是上下两条数据行的总高，不含内部一模块分隔行，且不得小于 `12 × ModuleWidth`。模块宽度和线性条高均为打印点数，整个符号作为一个布局块，旋转后的编码尺寸用于单元格和页面边界检查。模板静区随完整符号旋转；设计器画布显示选择/布局占位，不显示可扫描的编码位图，在线 Host 预览返回实际编码尺寸。旧 Host 仅具备 `gs1-composite` 时保留其已声明组合；GS1-128 Auto/CC-C 需要 `gs1-composite-cc-c`，显式 CC-A/CC-B 还需 `gs1-composite-gs1-128-ab` 及 `UccEan128`、`CcA`、`CcB` 能力，EAN/UPC 需要 `gs1-composite-ean-upc`，附加码需 `gs1-composite-ean-upc-addons`；ExpandedStacked 需要 `gs1-composite-expanded-stacked`；Expanded 和 Stacked 分别需要对应协商特性和线性制式能力。缺失时设计器禁用并提示，服务端对强制请求明确拒绝。详细协议与模板示例见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)、[Stacked 使用说明](gs1-composite-stacked.md)及[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。
 
 ## 配置
 

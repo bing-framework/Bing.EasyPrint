@@ -48,4 +48,4 @@ Host 在已有十个 `gs1Composite.linearTypes` 项后追加 `Gs1DataBarTruncate
 
 [固定向量](../tests/Bing.EasyPrint.Tests/Fixtures/DataBarCompletionVectors.cs) 来自 [Zint 2.15.0 test_rss.c](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_rss.c) 和同提交的 [test_composite.c](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_composite.c)，覆盖 7 组普通条码（包括 finder=3 特殊分隔）及 5 组 Composite 的连接位、完整二维组件和对齐。Truncated 复用既有独立 Omnidirectional 向量验证。布局参考 [rss.c](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/rss.c)，许可保留在 [ThirdPartyNotices.txt](../src/Bing.EasyPrint/ThirdPartyNotices.txt)。
 
-这些能力不包含 EAN/UPC 附加码、ExpandedStacked 自定义列数、完整 GS1 AI 字典或设计器真实码图预览。五目标框架保持不变；图片依赖大版本迁移继续延期，现有依赖告警仍需单独处理。实机验收按用户要求排除。[本轮验收报告](databar-completion-verification-2026-10-22.md)记录自动化证据。
+这些 DataBar 能力与另行接入的 [EAN/UPC 2/5 位附加码](gs1-composite-ean-upc-addons.md)相互独立；ExpandedStacked 自定义列数见[独立配置指南](expanded-stacked-columns.md)。完整 GS1 AI 字典或设计器真实码图预览仍不在本指南范围内。五目标框架保持不变；图片依赖大版本迁移继续延期，现有依赖告警仍需单独处理。目标设备打印与扫码仍需实机确认。[本轮验收报告](databar-completion-verification-2026-10-22.md)记录自动化证据。

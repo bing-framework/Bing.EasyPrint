@@ -4,7 +4,11 @@
 - [DataBar 补齐阶段验收](databar-completion-verification-2026-10-22.md)
 
 - [EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)
+- [EAN/UPC Composite 附加码使用说明](gs1-composite-ean-upc-addons.md)
 - [EAN/UPC Composite 阶段验收](ean-upc-composite-verification-2026-10-22.md)
+- [EAN/UPC Composite 附加码阶段验收](ean-upc-addons-verification-2026-10-22.md)
+- [ExpandedStacked 列数配置与 Host 协商](expanded-stacked-columns.md)
+- [ExpandedStacked 列数配置阶段验收](expanded-stacked-columns-verification-2026-10-23.md)
 
 本目录是项目当前功能的开发者入口。代码是最终依据；带 `Rxx` 标题的文档记录历史迭代与验证证据，不应替代当前模块说明。
 
@@ -41,7 +45,8 @@
 
 - [协议详细说明](protocols.md)：协议选项、Profile、条码、裁切、Raw 校验和设备边界的详细记录。
 - [模板详细说明](templates.md)：模板版本、元素、布局、字体校准和历史兼容细节。
-- [ExpandedStacked 普通条码与 Composite](gs1-composite-expanded-stacked.md)：固定两列布局、每行高度、A/B 及旧 Host 协商。
+- [ExpandedStacked 普通条码与 Composite](gs1-composite-expanded-stacked.md)：输入、每行高度、A/B 与基础能力协商。
+- [ExpandedStacked 列数配置](expanded-stacked-columns.md)：默认列数、普通/Composite 范围、模板字段和新 Host 协商。
 - [ExpandedStacked 阶段验收](expanded-stacked-verification-2026-10-22.md)：功能矩阵、运行时及浏览器验证记录。
 - [GS1-128 CC-A/CC-B Composite](gs1-composite-gs1-128-ab.md)：显式 A/B、兼容 Auto/CC-C 与旧 Host 协商。
 - [单行 Expanded Composite](gs1-composite-expanded.md)：Expanded + CC-A/CC-B 的输入、尺寸、模板与能力协商。

@@ -2,9 +2,9 @@
 
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
 
-EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。该阶段验证见[EAN/UPC 阶段报告](ean-upc-composite-verification-2026-10-22.md)。
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；三条分隔行各为 2X，主码校验规则保持原样。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)及[附加码使用说明](gs1-composite-ean-upc-addons.md)。基础阶段与附加码阶段报告分别见[基础报告](ean-upc-composite-verification-2026-10-22.md)和[附加码报告](ean-upc-addons-verification-2026-10-22.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)，该阶段验证见[ExpandedStacked 阶段报告](expanded-stacked-verification-2026-10-22.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列，Composite 可配置 2–11 列。显式配置需要 `gs1-databar-expanded-stacked-columns` 和 Host 声明的范围。完整契约与示例见 [列数配置指南](expanded-stacked-columns.md)，基础编码范围见[ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 当前 GS1-128 Composite 支持显式 CC-A/CC-B，Auto 仍选择 CC-C；旧 Host 缺少 `gs1-composite-gs1-128-ab` 时仍可使用已声明的 Auto/CC-C。接口和协商细节见[GS1-128 A/B 使用说明](gs1-composite-gs1-128-ab.md)。下文各历史阶段的计数保留原日期与范围。
 
@@ -16,7 +16,7 @@ ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A
 
 ### 后续软件能力
 
-EAN/UPC 的四种基本 Composite 组合及剩余两种 DataBar Composite 已完成。后续独立阶段包括 EAN/UPC 的 2/5 位附加码、ExpandedStacked 自定义列数、设计器真实条码位图预览、完整 GS1 AI 字典和复杂字体排版。各项为 `DEFERRED`，不作为当前阶段未修复缺陷。实机验收按本轮用户指令为 `NOT_APPLICABLE`。
+EAN/UPC 的四种基本 Composite 组合及 2/5 位附加码、DataBar Composite 和 ExpandedStacked 自定义列数已接入。后续独立工作包括设计器真实条码位图预览、完整 GS1 AI 字典和复杂字体排版，仍为 `DEFERRED`。目标打印机兼容性和扫码结果需要实际设备验收；软件向量及自动化测试不替代实机结果。
 
 ### 打印传输与设备管理
 

@@ -2,9 +2,9 @@
 
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
 
-EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验位规则不变。固定值和动态绑定的能力协商、预检差异见[附加码使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 ## 2026-10-22 CC-C 集成前修复验收记录
 
@@ -257,7 +257,9 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 ### GS1 Composite
 
-“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。DataBar Omnidirectional/Limited、单行 GS1 DataBar Expanded、GS1 DataBar Stacked 和 GS1 DataBar ExpandedStacked 支持 Auto、CC-A、CC-B；GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C。Expanded 主数据和次数据均使用括号式 GS1 AI；Stacked 主数据使用 GTIN，次数据使用共享解析器当前支持的括号式 AI 子集。切换线性制式会保留已有主数据绑定和值；主字段为空时，Expanded 填入默认 `(01)09506000134352(10)LOT-A`，GS1-128 填入 `(01)12345678901231`。已有非空裸 GTIN 不会自动转换，使用 Expanded 时需手动输入括号式 AI 主数据。非法组合在导入校验和 Host 预览/渲染预检时被明确拒绝。GS1-128 主数据使用括号式 AI，共享解析器规范化后最多 48 个字符；Expanded 的 AI 格式和编码容量由编码器校验；这些检查不替业务层校验 AI 关系；Expanded 开头 `(01)` 的 GTIN 校验位会校验，GS1-128 不额外保证 GTIN 校验位。Stacked 的线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；`LinearBarHeight` 是上下数据行总高，必须至少为模块宽的 12 倍。默认模块宽 2、条高 40 可用。模块宽度、线性条高、旋转和静区沿用既有属性；Composite 不内置 HRI。Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。
+ExpandedStacked 的属性面板仅在线性组件为 ExpandedStacked 时显示列数选项：普通 ESC/POS Raster 为 1–11，Composite 为 2–11，默认两列。显式设置（包括 2）要求 Host 协商 `gs1-databar-expanded-stacked-columns` 并声明相应范围；旧 Host 对省略或 `null` 继续使用默认值，对显式配置会保留字段、显示缺失原因并阻止预览/导出。导入只接受规范属性名 `ExpandedStackedColumns`，大小写别名和重复字段会报错。选项和往返细节见[列数配置指南](expanded-stacked-columns.md)。
+
+“组件与表格”工具栏中的 GS1 Composite 创建 Type 11 元素，要求模板为 V2 或 V3。EAN-8/EAN-13/UPC-A/UPC-E 支持 Auto、CC-A、CC-B，并可在零售主码后追加严格 2/5 位 ASCII 附加码，不支持 CC-C；DataBar Omnidirectional/Limited、单行 GS1 DataBar Expanded、GS1 DataBar Stacked 和 GS1 DataBar ExpandedStacked 支持 Auto、CC-A、CC-B；GS1-128 (`UccEan128`) 支持 Auto/CC-A/CC-B/CC-C，Auto 直接选择 CC-C。Expanded 主数据和次数据均使用括号式 GS1 AI；Stacked 主数据使用 GTIN，次数据使用共享解析器当前支持的括号式 AI 子集。切换线性制式会保留已有主数据绑定和值；主字段为空时，Expanded 填入默认 `(01)09506000134352(10)LOT-A`，GS1-128 填入 `(01)12345678901231`。EAN/UPC 附加码格式是主码加一个 `+` 及 2/5 位数字，其他主码校验约束保持不变。固定 `Field.Value` 附加码由设计器请求独立必需特性并校验 Host 响应；动态 `Field.Name` 在 Host 绑定后严格验证，浏览器不会提前推断其值；旧 Host 仍接受纯数字主码，动态带加号值会由其纯数字校验明确拒绝。非法组合在导入校验和 Host 预览/渲染预检时被明确拒绝。GS1-128 主数据使用括号式 AI，共享解析器规范化后最多 48 个字符；Expanded 的 AI 格式和编码容量由编码器校验；这些检查不替业务层校验 AI 关系；Expanded 开头 `(01)` 的 GTIN 校验位会校验，GS1-128 不额外保证 GTIN 校验位。Stacked 的线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；`LinearBarHeight` 是上下数据行总高，必须至少为模块宽的 12 倍。默认模块宽 2、条高 40 可用。模块宽度、线性条高、旋转和静区沿用既有属性；Composite 不内置 HRI。Host 在线预览返回编码后的实际尺寸，离线及在线画布均用不可扫描的布局占位，不绘制实际编码位图。保存项目、导出 JSON、重载和导入保留字段与参数。
 
 能力响应须声明基础 `gs1-composite` 并提供对应线性制式和模式，才开放基础组合；GS1-128 Auto/CC-C 还要求 `gs1-composite-cc-c`，显式 GS1-128 CC-A/CC-B 还要求 `gs1-composite-gs1-128-ab`，以及 `UccEan128`、`CcA`、`CcB` 能力；Expanded、Stacked 分别还要求 `gs1-composite-expanded`、`gs1-composite-stacked`。新 Host 在原能力数组末尾追加 `Gs1DataBarExpandedStacked`，`modes` 不变；旧 Host 缺少相应特性或类型能力时，设计器禁用选项并提示，强制提交的请求由 Host 拒绝。完整配置见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C 使用说明](gs1-composite-cc-c.md)、[Expanded 使用说明](gs1-composite-expanded.md)和[Stacked 使用说明](gs1-composite-stacked.md)。这里的 Stacked 指 `Gs1DataBarStacked` 线性组件；`ExpandedStacked` 现由[独立使用说明](gs1-composite-expanded-stacked.md)描述，条高为每条数据行高度。CPCL 导出使用 CG 二进制图形数据，不能按文本 `EG` 十六进制行读取。ZPL 整页方向仅支持默认、`None` 和 `Down`；导入旧项目中的 `Left`/`Right` 时会明确报错，不会改写成其他方向。
 

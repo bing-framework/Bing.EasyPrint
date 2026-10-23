@@ -6,7 +6,7 @@
 
 普通条码沿用 [Expanded 输入规则](gs1-composite-expanded.md)对应的现有普通条码规范化入口；Composite 主数据必须使用圆括号或方括号 AI，例如 `(01)09501101530003(17)140704(10)AB-123`。Composite 开头 `(01)` 的 GTIN 校验位会校验；未知 AI、混合括号及容量超限会被拒绝。共享 AI 解析器仍是已声明的子集，不保证完整 AI 字典或字段间业务关系。
 
-布局固定为每行两个字符对，即最多四个符号字符。编码器根据内容生成 1–6 条数据行，完整线性宽度为 102 模块；每两条数据行之间有三个 1X 分隔行。最后一行不足一对时按标准补位；反向行、短末行、保护条及定位符分隔规则在编码器内处理。当前不提供列数或最大行数配置。
+默认布局为每行两个字符对，即最多四个符号字符。模板和统一模型可通过 `ExpandedStackedColumns` 调整每行字符对上限：普通 ESC/POS Raster 允许 1–11，Composite 允许 2–11；省略或 `null` 使用默认两列。编码器按内容和列数生成数据行；每两条数据行之间有三个 1X 分隔行。最后一行不足一对时按标准补位；反向行、短末行、保护条及定位符分隔规则在编码器内处理。列数与尺寸细节见[列数配置指南](expanded-stacked-columns.md)。
 
 新类型的普通 `BarHeight`/模板 `Height` 和 Composite `LinearBarHeight` **均为每条数据行的高度，单位为 dot**，至少为模块宽度 1X，建议至少 34X。行间分隔行不包含在该高度内。现有 `Gs1DataBarStacked` 的上下行总高语义保持不变。
 
@@ -42,8 +42,8 @@ dotnet run --project samples/Templates/Templates.csproj -c Release -- artifacts/
 
 ## Host 与设计器
 
-Host 在原有 Composite 线性能力数组末尾追加 `Gs1DataBarExpandedStacked`，并声明 `gs1-composite-expanded-stacked`。设计器要求基础 `gs1-composite`、该新特性、对应线性能力和 A/B 模式能力；旧 Host 缺少特性时明确禁用该 Composite 选项。普通条码按 `barcodeTypes` 的真实能力开放。
+Host 在原有 Composite 线性能力数组末尾追加 `Gs1DataBarExpandedStacked`，并声明 `gs1-composite-expanded-stacked`。显式配置列数还要求 `gs1-databar-expanded-stacked-columns`：普通 ESC/POS Raster 的顶层 `expandedStackedColumns` 范围为 1–11，Composite 的 `gs1Composite.expandedStackedColumns` 范围为 2–11，默认均为 2。设计器按 Host 返回的范围启用选项；省略或 `null` 可继续用于未声明新特性的旧 Host，显式配置会在能力缺失时保留并提示，阻止预览和导出。
 
-选择新制式后可以编辑模块宽度、每行条高、主次数据、旋转和静区，并保存、重载或导出。切换制式保留非空原数据，不会将裸 GTIN 静默转换为括号 AI。在线预览使用 Host 返回的真实尺寸；当前画布仍显示不可扫描的布局占位，实际条码位图预览属于后续阶段。
+选择新制式后可以编辑列数、模块宽度、每行条高、主次数据、旋转和静区，并保存、重载或导出。切换制式保留非空原数据，不会将裸 GTIN 静默转换为括号 AI。在线预览使用 Host 返回的真实尺寸；当前画布仍显示不可扫描的布局占位，实际条码位图预览属于后续阶段。
 
 布局和固定矩阵来源为 [Zint 2.15.0 rss.c](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/rss.c)、[普通条码向量](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_rss.c)和 [Composite 向量](https://github.com/zint/zint/blob/4896136bdbebb1a0908a5cc419513efa5bf4bf70/backend/tests/test_composite.c)。许可保留在源码与包中；本阶段按用户要求不执行实机验收。

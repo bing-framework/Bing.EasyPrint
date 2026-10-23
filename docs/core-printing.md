@@ -2,9 +2,9 @@
 
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。
 
-EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B；三条分隔行各为 2X，主数据为数字，旧 Host 通过 `gs1-composite-ean-upc` 协商降级。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)。
+EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；三条分隔行各为 2X，主码校验位沿用原规则。旧 Host 通过 `gs1-composite-ean-upc` 保留纯数字输入；带附加码的完整契约见[EAN/UPC 附加码使用说明](gs1-composite-ean-upc-addons.md)。
 
-ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；固定每行两个字符对，条高表示每条数据行高度，行间另加三个 1X 分隔行。Host 使用新增 `gs1-composite-expanded-stacked` 特性协商。详细契约与示例见 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
+ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数需 `gs1-databar-expanded-stacked-columns`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
 ## 功能说明
 
@@ -43,6 +43,8 @@ var bytes = new EscPosPrintCommand(Encoding.GetEncoding("gbk"))
 ## 协议无关模型
 
 `PrintDocument` 包含一个或多个 `PrintPage`；页面可加入文字、线、矩形、条码、二维码和图片元素。Provider 在输出前调用同一套能力和边界校验。
+
+普通 ESC/POS Raster `BarcodeType.Gs1DataBarExpandedStacked` 和 `PrintGs1CompositeElement` 可通过 `WithExpandedStackedColumns(columns)` 选择每行字符对数；普通条码范围为 1–11，Composite 为 2–11，省略配置默认两列。配置字段、尺寸与 Host 协商见[ExpandedStacked 列数指南](expanded-stacked-columns.md)。
 
 ```csharp
 using System.Text;
