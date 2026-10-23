@@ -213,6 +213,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
             element.Rotation, element.QuietZone);
         if (element.ExpandedStackedColumns.HasValue) copy = copy.WithExpandedStackedColumns(element.ExpandedStackedColumns.Value);
         if (element.ExpandedStackedRows.HasValue) copy = copy.WithExpandedStackedRows(element.ExpandedStackedRows.Value);
+        copy.UseMergedAssociationScope = element.UseMergedAssociationScope;
         Add(copy);
     }
 

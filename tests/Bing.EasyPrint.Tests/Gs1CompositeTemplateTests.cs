@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Bing.EasyPrint;
 using Bing.EasyPrint.Elements;
 using Bing.EasyPrint.Model;
 using Bing.EasyPrint.Printing;
@@ -162,6 +163,73 @@ public sealed class Gs1CompositeTemplateTests
         var trace = Assert.Single(actual.Pages[0].Elements.Where(value => value.Type == 11));
         var size = Gs1CompositeEncoder.Measure(Gs1CompositeGs1128AbTests.Element(mode));
         Assert.Equal((size.Width, size.Height), (trace.Width, trace.Height));
+    }
+
+    [Theory]
+    [InlineData(PrintProtocol.Cpcl, EscPosLayoutMode.Raster)]
+    [InlineData(PrintProtocol.Tspl, EscPosLayoutMode.Raster)]
+    [InlineData(PrintProtocol.Zpl, EscPosLayoutMode.Raster)]
+    [InlineData(PrintProtocol.EscPos, EscPosLayoutMode.Raster)]
+    public void Split_gs1_128_carriers_render_through_the_template_pipeline(
+        PrintProtocol protocol, EscPosLayoutMode layout)
+    {
+        foreach (var (primary, secondary) in new[]
+        {
+            ("(00)123456789012345675", "(4300)ACME"),
+            ("(414)1234567890128", "(254)EXT")
+        })
+        {
+            var element = Composite(BarcodeType.UccEan128, Gs1CompositeMode.CcC,
+                moduleWidth: 1, linearBarHeight: 40);
+            element.Field = new BgField { Value = primary };
+            element.SecondaryField = new BgField { Value = secondary };
+            var options = new TemplateRenderOptions
+            {
+                Protocol = protocol,
+                EscPosLayout = layout,
+                Encoding = Encoding.ASCII,
+                FeedLines = 0,
+                CutAfterPrint = false,
+                ValidateGs1Associations = true
+            };
+            var result = new TemplateRenderer().RenderWithLayout(
+                SingleComposite(3, element, width: 400, height: 500), null, options: options);
+            Assert.Single(result.Pages);
+            Assert.NotEmpty(result.Pages[0].Data);
+            var trace = Assert.Single(result.Pages[0].Elements.Where(value => value.Type == 11));
+            Assert.True(trace.Width > 0);
+            Assert.True(trace.Height > 0);
+        }
+    }
+
+    [Fact]
+    public void Invalid_merged_composite_relation_is_rejected_in_the_template_pipeline()
+    {
+        var element = Composite(BarcodeType.UccEan128, Gs1CompositeMode.CcC,
+            moduleWidth: 1, linearBarHeight: 40);
+        element.Field = new BgField { Value = "(00)123456789012345675" };
+        element.SecondaryField = new BgField { Value = "(02)12345678901231" };
+        var error = Assert.Throws<TemplateRenderException>(() =>
+            new TemplateRenderer().RenderWithLayout(SingleComposite(3, element, width: 400, height: 500),
+                null, options: new TemplateRenderOptions
+                {
+                    Protocol = PrintProtocol.Cpcl,
+                    Encoding = Encoding.ASCII,
+                    FeedLines = 0,
+                    CutAfterPrint = false,
+                    ValidateGs1Associations = true
+                }));
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.SourcePath);
+        Assert.Contains("02", error.Message);
+        Assert.Contains("37", error.Message);
+    }
+
+    [Fact]
+    public void Standalone_composite_keeps_legacy_independent_carrier_checks_by_default()
+    {
+        var element = new PrintGs1CompositeElement(0, 0, BarcodeType.UccEan128,
+            "(00)123456789012345675", "(4300)ACME", 40, moduleWidth: 1, mode: Gs1CompositeMode.CcC);
+        Assert.Throws<ArgumentException>(() => Gs1CompositeEncoder.Encode(element));
     }
 
     [Theory]

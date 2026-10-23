@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace Bing.EasyPrint.Elements
 {
     /// <summary>
@@ -17,6 +19,12 @@ namespace Bing.EasyPrint.Elements
         /// 支持 <c>DataMatrix</c> 和 <c>PDF417</c>。
         /// </remarks>
         public string Format { get; set; } = "DataMatrix";
+
+        /// <summary>获取或设置是否输出 GS1 DataMatrix；默认 <see langword="false"/> 保持普通模式。</summary>
+        /// <remarks>仅 DataMatrix 支持 GS1 模式；PDF417 必须为 false。GS1 模式使用共享二维编码路径。</remarks>
+        [System.ComponentModel.DefaultValue(false)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Gs1 { get; set; }
 
         /// <summary>
         /// 获取或设置生成图像的宽度，单位为打印点，默认值为 96。

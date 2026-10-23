@@ -55,6 +55,10 @@ public sealed class TemplateRenderOptions
     /// 未显式指定设备字体的文字使用键 "0"。
     /// </summary>
     public Dictionary<string, DeviceFontCalibration> DeviceFontCalibrations { get; set; }
+    /// <summary>获取或设置是否对 GS1 元素显式执行固定字典 req/ex 关联校验；默认 <see langword="false"/> 保持旧语法校验行为。</summary>
+    /// <remarks>启用时 Composite 合并主次数据后校验；普通独立元素只校验自身，不自动合并整页条码。</remarks>
+    public bool ValidateGs1Associations { get; set; }
+
     /// <summary>要求 TSPL/ZPL 模板明确声明设备文字度量和原生条码宽度；默认关闭以兼容旧模板。</summary>
     public bool RequireDeclaredNativeBounds { get; set; }
     /// <summary>

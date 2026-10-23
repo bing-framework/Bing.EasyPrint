@@ -951,6 +951,7 @@ public sealed class TemplateRenderer
             }
             else if (element is BpQrCodeElement qr)
             {
+                if (qr.Gs1) return Gs1Qr(qr, text, width, sourcePath, binding);
                 if (qr.UnitWidth < 1 || qr.UnitWidth > 32 || !new[] { "L", "M", "Q", "H" }.Contains(qr.ErrorLevel)) throw new ArgumentException("二维码参数无效。");
                 var size = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster
                     ? QrMetrics.RasterExtent(text, qr.ErrorLevel, qr.UnitWidth, cancellation)
@@ -980,6 +981,11 @@ public sealed class TemplateRenderer
             }
             else if (element is BpBarcodeElement barcode)
             {
+                if (options.ValidateGs1Associations)
+                {
+                    try { Gs1AssociationValidator.ValidateBarcodeData(text, barcode.BarcodeType); }
+                    catch (ArgumentException error) { throw new TemplateRenderException(sourcePath, error.Message, error); }
+                }
                 if (options.RequireDeclaredNativeBounds && barcode.Width <= 0)
                     throw new TemplateRenderException(sourcePath,
                         $"协议 {options.Protocol} 的严格设备边界校验要求声明条码 Width 预留宽度。",
@@ -1064,12 +1070,18 @@ public sealed class TemplateRenderer
         {
             var primary = binding.Text(element.Field);
             var secondary = binding.Text(element.SecondaryField);
+            if (options.ValidateGs1Associations)
+            {
+                try { Gs1AssociationValidator.ValidateComposite(primary, secondary, element.LinearType); }
+                catch (ArgumentException error) { throw new TemplateRenderException(sourcePath, error.Message, error); }
+            }
             payloadBytes = checked(payloadBytes + encoding.GetByteCount(primary) + encoding.GetByteCount(secondary));
             if (payloadBytes > options.MaxOutputBytes) throw new ArgumentException("字段数据超过输出预算。");
             var model = new PrintGs1CompositeElement(0, 0, element.LinearType, primary, secondary,
                 element.LinearBarHeight, element.ModuleWidth, element.Mode, element.Rotation, element.QuietZone);
             if (element.ExpandedStackedColumns.HasValue) model = model.WithExpandedStackedColumns(element.ExpandedStackedColumns.Value);
             if (element.ExpandedStackedRows.HasValue) model = model.WithExpandedStackedRows(element.ExpandedStackedRows.Value);
+            model.UseMergedAssociationScope = options.ValidateGs1Associations;
             int occupiedWidth, occupiedHeight;
             using (var measurement = PrintResourceScope.BeginTemporary())
             {
@@ -1098,24 +1110,121 @@ public sealed class TemplateRenderer
             return result;
         }
 
-        /// <summary>生成二维点阵码的黑白图片布局。</summary>
+        /// <summary>生成 GS1 QR 的共享图片块；所有图片协议复用同一编码结果。</summary>
+        private Block Gs1Qr(BpQrCodeElement qr, string text, int available, string sourcePath, Binding binding)
+        {
+            if (string.IsNullOrEmpty(text)) throw new ArgumentException("二维码数据不能为空。");
+            if (qr.UnitWidth < 1 || qr.UnitWidth > 32 || !new[] { "L", "M", "Q", "H" }.Contains(qr.ErrorLevel))
+                throw new ArgumentException("二维码参数无效。");
+            ValidateGs1Association(text, sourcePath);
+            var unit = qr.UnitWidth;
+            var bits = Gs1TwoDimensionalEncoder.EncodeQr(text, qr.ErrorLevel, true, cancellation);
+            cancellation.ThrowIfCancellationRequested();
+            var quietZone = qr.QuietZone;
+            var left = quietZone == null ? 4 * unit : quietZone.Left;
+            var top = quietZone == null ? 4 * unit : quietZone.Top;
+            var right = quietZone == null ? 4 * unit : quietZone.Right;
+            var bottom = quietZone == null ? 4 * unit : quietZone.Bottom;
+            var symbolWidth = checked(bits.Width * unit);
+            var symbolHeight = checked(bits.Height * unit);
+            var requiredWidth = checked(symbolWidth + left + right);
+            var requiredHeight = checked(symbolHeight + top + bottom);
+            var w = qr.Width == 0 ? requiredWidth : qr.Width;
+            var h = qr.Height == 0 ? requiredHeight : qr.Height;
+            var quarterTurn = qr.Rotation == RotationAngle.Rotate90 || qr.Rotation == RotationAngle.Rotate270;
+            var occupiedWidth = quarterTurn ? h : w;
+            if (w < requiredWidth || h < requiredHeight || occupiedWidth > available)
+                throw new ArgumentException("GS1 QR 预留尺寸不足以容纳符号和静区。");
+            if ((long)w * h > options.MaxImagePixels) throw new ArgumentException("GS1 QR 超过图片像素上限。");
+            var cacheKey = ("\0gs1qr\0" + qr.ErrorLevel + "\0" + unit + "\0" + text, w, h, left, top, right, bottom);
+            Image<Rgba32> image = null;
+            if (images.TryGetValue(cacheKey, out var cached))
+            {
+                image = cached as Image<Rgba32> ?? throw new InvalidOperationException("GS1 QR 缓存图片类型不一致。");
+            }
+            else
+            {
+                imagePixels = checked(imagePixels + (long)w * h);
+                if (imagePixels > (long)options.MaxOutputBytes * 8) throw new ArgumentException("GS1 QR 编码缓冲超过渲染预算。");
+                var imageLease = PrintResourceScope.Reserve(checked((long)w * h * 4), "Template.Gs1QrRgba");
+                try
+                {
+                    image = new Image<Rgba32>(w, h, new Rgba32(255, 255, 255));
+                    for (var y = 0; y < bits.Height; y++)
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        for (var x = 0; x < bits.Width; x++)
+                        {
+                            if (!bits[x, y]) continue;
+                            for (var dy = 0; dy < unit; dy++)
+                            for (var dx = 0; dx < unit; dx++)
+                                image[left + x * unit + dx, top + y * unit + dy] = new Rgba32(0, 0, 0);
+                        }
+                    }
+                    images.Add(cacheKey, image);
+                    try
+                    {
+                        imageLeases.Add(cacheKey, imageLease);
+                        imageLease = null;
+                    }
+                    catch
+                    {
+                        images.Remove(cacheKey);
+                        throw;
+                    }
+                }
+                catch
+                {
+                    image?.Dispose();
+                    imageLease?.Dispose();
+                    throw;
+                }
+            }
+            var imageOptions = new ImageProcessingOptions { MaxEncodedBytes = options.MaxImageBytes, MaxPixels = options.MaxImagePixels };
+            var result = new Block(storage) { Height = quarterTurn ? w : h };
+            result.Atoms.Add(new Atom
+            {
+                Width = quarterTurn ? h : w, Height = result.Height, Rotation = qr.Rotation,
+                SourcePath = sourcePath, Type = qr.Type, Text = text, InstanceIndices = binding.InstanceIndices,
+                Draw = (cmd, x, y) => cmd.DrawImage(x, y, image, imageOptions, qr.Rotation)
+            });
+            return result;
+        }
+
+        private void ValidateGs1Association(string text, string sourcePath)
+        {
+            if (!options.ValidateGs1Associations) return;
+            try { Gs1AssociationValidator.Validate(text); }
+            catch (ArgumentException error) { throw new TemplateRenderException(sourcePath, error.Message, error); }
+        }
+
         private Block MatrixCode(BpMatrixCodeElement element, string text, int available, string sourcePath, Binding binding)
         {
             if (string.IsNullOrEmpty(text)) throw new ArgumentException("二维点阵码内容不能为空。");
             if (element.Width > available) throw new ArgumentException("二维点阵码宽度超出单元格。");
+            if (element.Gs1 && !string.Equals(element.Format, "DataMatrix", StringComparison.Ordinal))
+                throw new NotSupportedException("GS1 模式仅支持 DataMatrix，PDF417 不能启用 Gs1。");
             var format = element.Format == "PDF417" ? BarcodeFormat.PDF_417 : BarcodeFormat.DATA_MATRIX;
             cancellation.ThrowIfCancellationRequested();
-            using var matrixLease = PrintResourceScope.Reserve(
-                PrintMatrixBudget.MatrixCodeBytes(element.Width, element.Height, format == BarcodeFormat.PDF_417),
-                "Template.MatrixEncoding");
             BitMatrix bits;
-            try
+            if (element.Gs1)
             {
-                bits = new MultiFormatWriter().encode(text, format, element.Width, element.Height,
-                    new Dictionary<EncodeHintType, object> { [EncodeHintType.CHARACTER_SET] = "UTF-8", [EncodeHintType.MARGIN] = 2 });
+                ValidateGs1Association(text, sourcePath);
+                bits = Gs1TwoDimensionalEncoder.EncodeDataMatrix(text, element.Width, element.Height, true, cancellation);
             }
-            catch (Exception error) when (error is ArgumentException || error is InvalidOperationException)
-            { throw new ArgumentException("二维点阵码内容无法编码：" + error.Message, error); }
+            else
+            {
+                using var matrixLease = PrintResourceScope.Reserve(
+                    PrintMatrixBudget.MatrixCodeBytes(element.Width, element.Height, format == BarcodeFormat.PDF_417),
+                    "Template.MatrixEncoding");
+                try
+                {
+                    bits = new MultiFormatWriter().encode(text, format, element.Width, element.Height,
+                        new Dictionary<EncodeHintType, object> { [EncodeHintType.CHARACTER_SET] = "UTF-8", [EncodeHintType.MARGIN] = 2 });
+                }
+                catch (Exception error) when (error is ArgumentException || error is InvalidOperationException)
+                { throw new ArgumentException("二维点阵数据无法编码：" + error.Message, error); }
+            }
             cancellation.ThrowIfCancellationRequested();
             if (bits.Width > element.Width || bits.Height > element.Height || (long)bits.Width * bits.Height > options.MaxImagePixels)
                 throw new ArgumentException($"二维点阵码实际尺寸 {bits.Width}×{bits.Height} 超过预留尺寸 {element.Width}×{element.Height} 或像素限制。");

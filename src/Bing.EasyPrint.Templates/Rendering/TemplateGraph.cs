@@ -114,6 +114,21 @@ internal static class TemplateGraph
                 Capability(path, "目标机型的位图绘图；水平/垂直线和 info 图标仍可使用原生命令。");
             var native = options.Protocol == PrintProtocol.EscPos &&
                          options.EscPosLayout == EscPosLayoutMode.Native;
+            if (element is BpQrCodeElement gs1Qr && gs1Qr.Gs1)
+            {
+                if (native) Capability(path, "GS1 QR Code（Native 不支持图片路径）");
+                if (capabilities.DeviceProfileName != null && !capabilities.SupportsElementType(2))
+                    Capability(path, "GS1 QR Code 的图片路径");
+            }
+            if (element is BpMatrixCodeElement gs1Matrix && gs1Matrix.Gs1)
+            {
+                if (!string.Equals(gs1Matrix.Format, "DataMatrix", StringComparison.Ordinal))
+                    throw new TemplateRenderException(path, "GS1 模式仅支持 DataMatrix，PDF417 不能启用 Gs1。",
+                        new NotSupportedException("GS1 DataMatrix 仅支持 DataMatrix 格式。"));
+                if (native) Capability(path, "GS1 DataMatrix（Native 不支持图片路径）");
+                if (capabilities.DeviceProfileName != null && !capabilities.SupportsElementType(2))
+                    Capability(path, "GS1 DataMatrix 的图片路径");
+            }
             if (element is BpRectangleElement filledRectangle && filledRectangle.Filled &&
                 !capabilities.SupportsFilledRectangles)
                 Capability(path, "此模式的填充矩形。");

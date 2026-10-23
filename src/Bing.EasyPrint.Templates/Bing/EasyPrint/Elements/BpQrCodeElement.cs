@@ -1,4 +1,6 @@
-﻿namespace Bing.EasyPrint.Elements
+﻿using Newtonsoft.Json;
+
+namespace Bing.EasyPrint.Elements
 {
     /// <summary>
     /// 用于输出二维码的统一模板元素。
@@ -25,6 +27,11 @@
         /// 支持 <c>L</c>、<c>M</c>、<c>Q</c> 和 <c>H</c>。
         /// </remarks>
         public string ErrorLevel { get; set; } = "M";
+        /// <summary>获取或设置是否输出 GS1 QR Code；默认 <see langword="false"/> 保持普通 QR Code。</summary>
+        /// <remarks>GS1 模式使用首位 FNC1 和 ASCII 29 分隔符，仅通过共享 GS1 二维编码路径生成；Native 不支持。</remarks>
+        [System.ComponentModel.DefaultValue(false)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Gs1 { get; set; }
         /// <summary>获取或设置二维码的顺时针旋转角度；默认不旋转。</summary>
         /// <remarks>二维码为正方形，旋转不会改变编码区尺寸；目标协议仍须声明对应能力。</remarks>
         public RotationAngle Rotation { get; set; }

@@ -216,6 +216,17 @@ public sealed class TemplateLoader
                     (token["FontFamily"].Type != JTokenType.String || token.Value<string>("FontFamily") != ""))
                     throw new JsonSerializationException("Font 不能同时指定旧版字体字段。");
             }
+            if (token.GetValue("Gs1", StringComparison.OrdinalIgnoreCase) is JToken gs1Token)
+            {
+                var type = token.Value<int>("Type");
+                if (gs1Token.Type != JTokenType.Boolean || type != 3 && type != 10)
+                    throw new JsonSerializationException("Gs1 仅支持二维码或二维点阵元素，且必须为布尔值。");
+                var format = token.Value<string>("Format");
+                if (type == 10 && gs1Token.Value<bool>() && format != null &&
+                    !string.Equals(format, "DataMatrix", StringComparison.Ordinal))
+                    throw new JsonSerializationException("GS1 模式仅支持 DataMatrix，PDF417 不能启用 Gs1。");
+            }
+
             if (token["Filled"] is JToken filled &&
                 (filled.Type != JTokenType.Boolean || token.Value<int>("Type") != 7 && filled.Value<bool>()))
                 throw new JsonSerializationException("Filled 必须为布尔值，且仅矩形元素支持填充。");
