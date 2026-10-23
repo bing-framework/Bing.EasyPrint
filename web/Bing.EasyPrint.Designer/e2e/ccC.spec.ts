@@ -130,14 +130,16 @@ test('旧 Host 保留 DataBar Composite 并明确拒绝 CC-C', async ({ page }) 
     const response = await route.fetch()
     const headers = response.headers()
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-databar-expanded-stacked-columns').join(',')
+      .filter(feature => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows'].includes(feature.trim())).join(',')
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
       .filter(feature => !['gs1-composite-cc-c', 'gs1-composite-ean-upc', 'gs1-composite-ean-upc-addons',
         'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
     if (route.request().url().includes('/capabilities')) {
       const json = await response.json()
       delete json.expandedStackedColumns
+      delete json.expandedStackedRows
       if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
+      if (json.gs1Composite) delete json.gs1Composite.expandedStackedRows
       if (json.gs1Composite) {
         json.gs1Composite.modes = ['Auto', 'CcA', 'CcB']
         json.gs1Composite.linearTypes = ['Gs1DataBarOmnidirectional', 'Gs1DataBarLimited']
@@ -170,14 +172,16 @@ test('缺少 GS1-128 CC-A/CC-B 特性时保留导入模式并拒绝预览', asyn
     const response = await route.fetch()
     const headers = response.headers()
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-databar-expanded-stacked-columns').join(',')
+      .filter(feature => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows'].includes(feature.trim())).join(',')
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
       .filter(feature => !['gs1-composite-gs1-128-ab', 'gs1-composite-ean-upc', 'gs1-composite-ean-upc-addons',
         'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
     if (route.request().url().includes('/capabilities')) {
       const json = await response.json()
       delete json.expandedStackedColumns
+      delete json.expandedStackedRows
       if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
+      if (json.gs1Composite) delete json.gs1Composite.expandedStackedRows
       if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
         .filter((type: string) => !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated',
           'Gs1DataBarStackedOmnidirectional'].includes(type))

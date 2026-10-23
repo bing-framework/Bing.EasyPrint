@@ -307,6 +307,7 @@ const GS1_COMPOSITE_EAN_UPC_FEATURE = 'gs1-composite-ean-upc'
 const GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE_NAME = GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE
 const GS1_COMPOSITE_TRUNCATED_FEATURE_NAME = GS1_COMPOSITE_TRUNCATED_FEATURE
 const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME = GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE
+const GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE = 'gs1-databar-expanded-stacked-rows'
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
 
 function clientValidationError(message: string, code: string, phase: string): DesignerValidationError {
@@ -374,6 +375,10 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
       const message = '打印服务缺少 GS1 DataBar Expanded Stacked 自定义列数功能，请更新 Host。'
       throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
     }
+    if (missingFeatures.includes(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE)) {
+      const message = '打印服务缺少 GS1 DataBar Expanded Stacked 最大行数功能，请更新 Host。'
+      throw clientValidationError(message, 'ContractFeatureUnavailable', 'Contract')
+    }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
       'ContractFeatureUnavailable', 'Contract')
   }
@@ -395,7 +400,8 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
       throw clientValidationError(message, 'InvalidExpandedStackedColumns', 'Validation')
     }
     if (node.Type === 4 || node.Type === 11) {
-      const element = node as { Type: number; BarcodeType?: number; LinearType?: number; ExpandedStackedColumns?: number | null }
+      const element = node as { Type: number; BarcodeType?: number; LinearType?: number; ExpandedStackedColumns?: number | null;
+        ExpandedStackedRows?: number | null }
       if (element.ExpandedStackedColumns !== undefined && element.ExpandedStackedColumns !== null) {
         const minimum = element.Type === 4 && element.BarcodeType === 31 ? 1
           : element.Type === 11 && element.LinearType === 31 ? 2 : undefined
@@ -410,6 +416,34 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
         }
         if (!requiredFeatures.includes(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE))
           requiredFeatures.push(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)
+      }
+      const rowAliases = Object.keys(rawNode).filter((key) =>
+        key.toLowerCase() === 'expandedstackedrows' && key !== 'ExpandedStackedRows')
+      if (rowAliases.length) {
+        const duplicate = Object.hasOwn(rawNode, 'ExpandedStackedRows')
+        const message = `${context.path}.ExpandedStackedRows 属性名必须为 ExpandedStackedRows${
+          duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`
+        throw clientValidationError(message, 'InvalidExpandedStackedRows', 'Validation')
+      }
+      if (element.ExpandedStackedRows !== undefined && element.ExpandedStackedRows !== null) {
+        const supported = element.Type === 4 && element.BarcodeType === 31 || element.Type === 11 && element.LinearType === 31
+        if (!supported || !Number.isInteger(element.ExpandedStackedRows) ||
+          element.ExpandedStackedRows < 2 || element.ExpandedStackedRows > 11) {
+          throw clientValidationError(
+            `${context.path}.ExpandedStackedRows 必须用于 Expanded Stacked 且为 2–11 的整数数据行上限。`,
+            'InvalidExpandedStackedRows', 'Validation')
+        }
+        if (element.Type === 4 && (requestContract.protocol !== 'EscPos' || requestContract.escPosLayoutMode !== 'Raster')) {
+          throw clientValidationError('Expanded Stacked 普通条码最大行数配置仅支持 ESC/POS Raster。',
+            'UnsupportedBarcodeType', 'Validation')
+        }
+        if (!requiredFeatures.includes(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE))
+          requiredFeatures.push(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE)
+      }
+      if (element.ExpandedStackedColumns != null && element.ExpandedStackedRows != null) {
+        throw clientValidationError(
+          `${context.path}.ExpandedStackedColumns 与 ExpandedStackedRows 互斥，不能同时指定。`,
+          'InvalidExpandedStackedLayout', 'Validation')
       }
     }
     if (node.Type === 4 && (node as { BarcodeType?: number }).BarcodeType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE &&
@@ -568,6 +602,7 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   capabilities.gs1CompositeTruncatedFeature = features.has(GS1_COMPOSITE_TRUNCATED_FEATURE_NAME)
   capabilities.gs1CompositeStackedOmnidirectionalFeature = features.has(GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME)
   capabilities.expandedStackedColumnsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE)
+  capabilities.expandedStackedRowsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE)
   return capabilities
 }
 

@@ -81,11 +81,13 @@ test('GS1 Composite 在旧 Host 缺少协商特性时禁用并说明原因', asy
     const response = await route.fetch()
     const body = await response.json()
     delete body.expandedStackedColumns
+    delete body.expandedStackedRows
     if (body.gs1Composite) delete body.gs1Composite.expandedStackedColumns
+    if (body.gs1Composite) delete body.gs1Composite.expandedStackedRows
     expect(body.elementTypes).toContain(11)
     const headers = response.headers()
     headers['x-easyprint-features'] = headers['x-easyprint-features']!.split(',')
-      .filter((feature) => !['gs1-databar-expanded-stacked-columns', 'gs1-composite', 'gs1-composite-cc-c', 'gs1-composite-expanded',
+      .filter((feature) => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows', 'gs1-composite', 'gs1-composite-cc-c', 'gs1-composite-expanded',
         'gs1-composite-stacked', 'gs1-composite-expanded-stacked', 'gs1-composite-ean-upc',
         'gs1-composite-ean-upc-addons', 'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'].includes(feature.trim())).join(',')
     if (body.gs1Composite) {

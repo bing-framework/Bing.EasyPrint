@@ -491,6 +491,60 @@ public sealed class Gs1CompositeHostTests
     [InlineData("EscPos", "Raster", true, true)]
     [InlineData("Tspl", "", false, true)]
     [InlineData("Zpl", "", false, true)]
+    public async Task Expanded_stacked_row_ranges_match_all_five_modes(string protocol, string layout,
+        bool ordinary, bool composite)
+    {
+        var context = CreateContext(BuildRequest(protocol, layout), "gs1-databar-expanded-stacked-rows");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Capabilities);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Contains("gs1-databar-expanded-stacked-rows", context.Response.Headers[FeaturesHeader].ToString());
+        using var response = ReadJson(context);
+        var range = response.RootElement.GetProperty("expandedStackedRows");
+        Assert.Equal(ordinary, range.ValueKind != JsonValueKind.Null);
+        if (ordinary)
+        {
+            Assert.Equal(2, range.GetProperty("minimum").GetInt32());
+            Assert.Equal(11, range.GetProperty("maximum").GetInt32());
+            Assert.Equal(JsonValueKind.Null, range.GetProperty("default").ValueKind);
+        }
+        var gs1 = response.RootElement.GetProperty("gs1Composite");
+        Assert.Equal(composite, gs1.ValueKind != JsonValueKind.Null);
+        if (composite)
+        {
+            range = gs1.GetProperty("expandedStackedRows");
+            Assert.Equal(2, range.GetProperty("minimum").GetInt32());
+            Assert.Equal(11, range.GetProperty("maximum").GetInt32());
+            Assert.Equal(JsonValueKind.Null, range.GetProperty("default").ValueKind);
+        }
+    }
+
+    [Theory]
+    [InlineData(2, 302, 90)]
+    [InlineData(3, 204, 131)]
+    [InlineData(4, 204, 131)]
+    public async Task Expanded_stacked_rows_preview_uses_actual_encoded_dimensions(int maximumRows, int width, int height)
+    {
+        var template = CompositeTemplate.Replace("\"LinearType\":25", "\"LinearType\":31,\"ExpandedStackedRows\":" + maximumRows)
+            .Replace("\"LinearBarHeight\":20", "\"LinearBarHeight\":35").Replace("\"Rotation\":90", "\"Rotation\":0")
+            .Replace("\"Width\":500", "\"Width\":1200");
+        var context = CreateContext(BuildRequest("EscPos", "Raster", template,
+            "{\"Primary\":\"[91]1234567890123456789012345678901234\",\"Secondary\":\"[20]12\"}"),
+            "gs1-databar-expanded-stacked-rows");
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        using var response = ReadJson(context);
+        var element = response.RootElement.GetProperty("pages")[0].GetProperty("elements")[0];
+        Assert.Equal(11, element.GetProperty("type").GetInt32());
+        Assert.Equal(width, element.GetProperty("width").GetInt32());
+        Assert.Equal(height, element.GetProperty("height").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("Cpcl", "", false, true)]
+    [InlineData("EscPos", "Native", false, false)]
+    [InlineData("EscPos", "Raster", true, true)]
+    [InlineData("Tspl", "", false, true)]
+    [InlineData("Zpl", "", false, true)]
     public async Task Expanded_stacked_column_ranges_match_all_five_modes(string protocol, string layout,
         bool ordinary, bool composite)
     {

@@ -94,6 +94,7 @@ export type BarcodeElement = BaseElement & {
   Type: 4
   BarcodeType?: number
   ExpandedStackedColumns?: number | null
+  ExpandedStackedRows?: number | null
   LineWidth?: number
   Ratio?: number
   NarrowModuleWidth?: number
@@ -130,6 +131,7 @@ export type Gs1CompositeElement = BaseElement & {
   SecondaryField: Field
   LinearType?: 4 | 5 | 6 | 7 | 11 | 25 | 26 | 27 | 28 | 30 | 31 | 32
   ExpandedStackedColumns?: number | null
+  ExpandedStackedRows?: number | null
   Mode?: 0 | 1 | 2 | 3
   ModuleWidth?: number
   LinearBarHeight?: number
@@ -385,6 +387,13 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
       throw new Error(`${context.path}.ExpandedStackedColumns 属性名必须为 ExpandedStackedColumns${
         duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`)
     }
+    const rowAliases = Object.keys(rawElement).filter((key) =>
+      key.toLowerCase() === 'expandedstackedrows' && key !== 'ExpandedStackedRows')
+    if (rowAliases.length) {
+      const duplicate = own(rawElement, 'ExpandedStackedRows')
+      throw new Error(`${context.path}.ExpandedStackedRows 属性名必须为 ExpandedStackedRows${
+        duplicate ? '，不能同时包含大小写不同的重复字段' : ''}。`)
+    }
     const expandedStackedColumns = rawElement.ExpandedStackedColumns
     if (expandedStackedColumns !== undefined && expandedStackedColumns !== null) {
       const minimum = element.Type === 4 && rawElement.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE
@@ -396,6 +405,18 @@ export function assertTemplate(value: unknown): asserts value is BpTemplate {
         (expandedStackedColumns as number) > 11)
         throw new Error(`${context.path}.ExpandedStackedColumns 必须为 ${minimum}–11 的整数列数。`)
     }
+    const expandedStackedRows = rawElement.ExpandedStackedRows
+    if (expandedStackedRows !== undefined && expandedStackedRows !== null) {
+      const supported = element.Type === 4 && rawElement.BarcodeType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ||
+        element.Type === 11 && rawElement.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE
+      if (!supported) throw new Error(`${context.path}.ExpandedStackedRows 仅支持 Expanded Stacked 条码或 Composite。`)
+      if (!Number.isInteger(expandedStackedRows) || (expandedStackedRows as number) < 2 ||
+        (expandedStackedRows as number) > 11)
+        throw new Error(`${context.path}.ExpandedStackedRows 必须为 2–11 的整数数据行上限。`)
+    }
+    if (expandedStackedColumns !== undefined && expandedStackedColumns !== null &&
+      expandedStackedRows !== undefined && expandedStackedRows !== null)
+      throw new Error(`${context.path}.ExpandedStackedColumns 与 ExpandedStackedRows 互斥，不能同时指定。`)
     if (own(rawElement, 'Filled')) {
       if (typeof rawElement.Filled !== 'boolean') throw new Error(`${context.path}.Filled 必须为布尔值。`)
       if (element.Type !== 7 && rawElement.Filled === true) throw new Error(`${context.path}.Filled 仅支持矩形元素。`)

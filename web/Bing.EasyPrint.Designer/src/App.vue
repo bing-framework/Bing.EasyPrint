@@ -23,6 +23,7 @@ import { DesignerValidationError, loadDesignerSamples, previewTemplate, renderTe
   defaultEscPosPrinterProfile } from './api'
 import { canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, elementTypeReason,
   expandedStackedColumnsIssue,
+  expandedStackedRowsIssue,
   type CapabilitiesState, type CapabilityQuery, type DesignerCapabilities } from './capabilities'
 import { collectResourceKeys, createComponentTemplate, exportTemplateBundle, importTemplateBundle, MAX_TEMPLATE_JSON_BYTES, resourceForImage } from './archive'
 import { buildLocalLayout } from './layout'
@@ -1466,6 +1467,10 @@ function expandedStackedColumnsConfigurationIssue(): string | undefined {
       issue = expandedStackedColumnsIssue(capabilities.value, 'ordinary', node.ExpandedStackedColumns)
     else if (node.Type === 11 && node.LinearType === 31 && node.ExpandedStackedColumns != null)
       issue = expandedStackedColumnsIssue(capabilities.value, 'composite', node.ExpandedStackedColumns)
+    else if (node.Type === 4 && node.BarcodeType === 31 && node.ExpandedStackedRows != null)
+      issue = expandedStackedRowsIssue(capabilities.value, 'ordinary', node.ExpandedStackedRows)
+    else if (node.Type === 11 && node.LinearType === 31 && node.ExpandedStackedRows != null)
+      issue = expandedStackedRowsIssue(capabilities.value, 'composite', node.ExpandedStackedRows)
   })
   return issue
 }

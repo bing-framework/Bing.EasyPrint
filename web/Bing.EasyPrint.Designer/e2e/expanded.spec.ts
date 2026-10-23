@@ -69,7 +69,7 @@ test('缺少 Expanded 协商特性时禁用选项并明确显示降级原因', a
     const response = await route.fetch()
     const headers = response.headers()
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-databar-expanded-stacked-columns').join(',')
+      .filter(feature => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows'].includes(feature.trim())).join(',')
     headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
       .filter(feature => feature.trim() !== 'gs1-composite-expanded' && feature.trim() !== 'gs1-composite-stacked' &&
         feature.trim() !== 'gs1-composite-expanded-stacked' && feature.trim() !== 'gs1-composite-ean-upc' &&
@@ -78,7 +78,9 @@ test('缺少 Expanded 协商特性时禁用选项并明确显示降级原因', a
     if (route.request().url().includes('/capabilities')) {
       const json = await response.json()
       delete json.expandedStackedColumns
+      delete json.expandedStackedRows
       if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
+      if (json.gs1Composite) delete json.gs1Composite.expandedStackedRows
       if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
         .filter((type: string) => type !== 'Gs1DataBarExpanded' && type !== 'Gs1DataBarStacked' &&
           type !== 'Gs1DataBarExpandedStacked' && !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated',

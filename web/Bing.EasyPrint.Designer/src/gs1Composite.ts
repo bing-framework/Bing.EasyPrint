@@ -17,6 +17,7 @@ export const GS1_COMPOSITE_CC_C_MODE = 3 as const
 export const GS1_COMPOSITE_GS1_128_CC_AB_FEATURE = 'gs1-composite-gs1-128-ab' as const
 export const GS1_COMPOSITE_EXPANDED_STACKED_FEATURE = 'gs1-composite-expanded-stacked' as const
 export const GS1_DATABAR_EXPANDED_STACKED_COLUMNS_FEATURE = 'gs1-databar-expanded-stacked-columns' as const
+export const GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE = 'gs1-databar-expanded-stacked-rows' as const
 export const GS1_COMPOSITE_EAN_UPC_FEATURE = 'gs1-composite-ean-upc' as const
 export const GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE = 'gs1-composite-ean-upc-addons' as const
 export const GS1_COMPOSITE_TRUNCATED_FEATURE = 'gs1-composite-truncated' as const

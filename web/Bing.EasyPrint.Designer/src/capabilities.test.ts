@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import {
   barcodeTypeSupported, canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, filledRectangleSupported, legacyDeviceFontSupported, normalizeDesignerCapabilities,
   expandedStackedColumnsIssue, expandedStackedColumnsSupported, rotationSupported, textSizeSupported,
+  expandedStackedRowsIssue, expandedStackedRowsSupported,
   valueInRange, type DesignerCapabilities,
 } from './capabilities'
 import type { FontElement } from './model'
@@ -72,6 +73,36 @@ describe('designer capabilities rules', () => {
     expect(barcodeTypeSupported(capabilities({ protocol: 'Cpcl', barcodeTypes: [] }), 31)).toBe(false)
   })
 
+  it('validates ordinary and Composite Expanded Stacked row capability ranges and legacy Host degradation', () => {
+    const ordinaryRange = { minimum: 2, maximum: 11, default: null }
+    const raster = normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',
+      barcodeTypes: [31], expandedStackedRows: ordinaryRange }))
+    raster.expandedStackedRowsFeature = true
+    expect(raster.expandedStackedRows).toEqual(ordinaryRange)
+    expect(expandedStackedRowsSupported(raster, 'ordinary')).toBe(true)
+    expect(expandedStackedRowsIssue(raster, 'ordinary', 2)).toBeUndefined()
+    expect(expandedStackedRowsIssue(raster, 'ordinary', 12)).toContain('Host 声明的 2–11')
+
+    const legacy = normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31] }))
+    expect(legacy.expandedStackedRows).toBeUndefined()
+    expect(expandedStackedRowsIssue(legacy, 'ordinary', 2)).toContain('未协商')
+    expect(expandedStackedRowsIssue(legacy, 'ordinary', null)).toBeUndefined()
+    expect(normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',
+      barcodeTypes: [31], expandedStackedRows: null })).expandedStackedRows).toBeNull()
+
+    for (const invalid of [
+      { minimum: 1, maximum: 11, default: null }, { minimum: 2, maximum: 12, default: null },
+      { minimum: 2, maximum: 11, default: 1 }, { minimum: 2, maximum: 11, default: 2.5 },
+      { minimum: 2, maximum: 11 },
+    ]) {
+      const invalidResponse = capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster', barcodeTypes: [31] }) as unknown as Record<string, unknown>
+      invalidResponse.expandedStackedRows = invalid
+      expect(() => normalizeDesignerCapabilities(invalidResponse)).toThrow('expandedStackedRows')
+    }
+    expect(() => normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Native',
+      nativeFlow: 'Rows', imageRotations: [0], barcodeTypes: [31], expandedStackedRows: ordinaryRange })))
+      .toThrow('仅能用于支持 Expanded Stacked 的 ESC/POS Raster')
+  })
   it('validates ordinary and Composite Expanded Stacked column capability ranges and defaults', () => {
     const ordinaryRange = { minimum: 1, maximum: 11, default: 2 }
     const raster = normalizeDesignerCapabilities(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',

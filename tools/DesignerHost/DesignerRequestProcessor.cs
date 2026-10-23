@@ -81,6 +81,9 @@ internal static class DesignerRequestProcessor
                 expandedStackedColumns = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster
                     && capabilities.BarcodeTypes.Contains(BarcodeType.Gs1DataBarExpandedStacked)
                     ? new { minimum = 1, maximum = 11, @default = 2 } : null,
+                expandedStackedRows = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster
+                    && capabilities.BarcodeTypes.Contains(BarcodeType.Gs1DataBarExpandedStacked)
+                    ? new { minimum = 2, maximum = 11, @default = (int?)null } : null,
                 gs1Composite = capabilities.SupportsGs1Composite ? new
                 {
                     elementType = 11,
@@ -91,7 +94,8 @@ internal static class DesignerRequestProcessor
                     secondaryFormat = "bracketed-gs1-ai",
                     includesHumanReadable = false,
                     dimensionsFromEncoding = true,
-                    expandedStackedColumns = new { minimum = 2, maximum = 11, @default = 2 }
+                    expandedStackedColumns = new { minimum = 2, maximum = 11, @default = 2 },
+                    expandedStackedRows = new { minimum = 2, maximum = 11, @default = (int?)null }
                 } : null,
                 capabilities.FontKinds,
                 capabilities.DeviceFonts,

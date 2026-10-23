@@ -94,6 +94,51 @@ describe('template validation', () => {
     expect(() => assertTemplate(unrelated)).toThrow('仅支持 Expanded Stacked')
   })
 
+  it('validates Expanded Stacked row limits by element type and never accepts both layout modes', () => {
+    const template: BpTemplate = { Version: 3, Width: 300, Height: 300, Rows: [{ Cells: [{ Elements: [
+      { Type: 4, BarcodeType: 31, ExpandedStackedRows: 2, Height: 34, Field: { Value: '(01)09506000134352' } },
+      { Type: 11, LinearType: 31, ExpandedStackedRows: 3, Mode: 2, ModuleWidth: 2, LinearBarHeight: 34,
+        Field: { Value: '(01)09506000134352' }, SecondaryField: { Value: '(10)LOT-A' } },
+    ] }] }] }
+    expect(() => assertTemplate(template)).not.toThrow()
+    const restored = parseDesignerProject(JSON.parse(serializeDesignerProject(template))).template
+    expect(restored.Rows[0]!.Cells![0]!.Elements).toEqual(template.Rows[0]!.Cells![0]!.Elements)
+
+    const ordinary = template.Rows[0]!.Cells![0]!.Elements![0] as Extract<TemplateElement, { Type: 4 }>
+    const composite = template.Rows[0]!.Cells![0]!.Elements![1] as Extract<TemplateElement, { Type: 11 }>
+    for (const rows of [0, 1, 1.5, 12, '3']) {
+      ordinary.ExpandedStackedRows = rows as number
+      expect(() => assertTemplate(template)).toThrow('ExpandedStackedRows')
+    }
+    ordinary.ExpandedStackedRows = 3
+    ordinary.ExpandedStackedColumns = 3
+    expect(() => assertTemplate(template)).toThrow('互斥')
+    delete ordinary.ExpandedStackedColumns
+    ordinary.BarcodeType = 30
+    expect(() => assertTemplate(template)).toThrow('仅支持 Expanded Stacked')
+    ordinary.BarcodeType = 31
+    composite.LinearType = 30
+    expect(() => assertTemplate(template)).toThrow('仅支持 Expanded Stacked')
+
+    const unrelated: BpTemplate = { ...baseTemplate(), Rows: [{ Cells: [{ Elements: [
+      { Type: 1, ExpandedStackedRows: 2 } as unknown as TemplateElement,
+    ] }] }] }
+    expect(() => assertTemplate(unrelated)).toThrow('仅支持 Expanded Stacked')
+  })
+
+  it('rejects noncanonical Expanded Stacked row property casing and duplicate aliases', () => {
+    const template = baseTemplate() as BpTemplate & Record<string, unknown>
+    template.Version = 2
+    template.Rows = [{ Cells: [{ Elements: [{ Type: 4, BarcodeType: 31, ExpandedStackedRows: 3,
+      expandedStackedRows: 4, Height: 34, Field: { Value: '(01)09506000134352' } } as never] }] }]
+    expect(() => assertTemplate(template)).toThrow('不能同时包含大小写不同的重复字段')
+
+    const lowercase = JSON.parse(JSON.stringify(template)) as Record<string, any>
+    const element = lowercase.Rows[0].Cells[0].Elements[0]
+    delete element.ExpandedStackedRows
+    expect(() => assertTemplate(lowercase)).toThrow('属性名必须为 ExpandedStackedRows')
+  })
+
   it('rejects noncanonical Expanded Stacked column property casing and duplicate aliases', () => {
     const template = baseTemplate() as BpTemplate & Record<string, unknown>
     template.Version = 2
