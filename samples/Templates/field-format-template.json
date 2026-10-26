@@ -1,0 +1,78 @@
+{
+  "Version": 2,
+  "Width": 420,
+  "Height": 160,
+  "Rows": [
+    {
+      "Height": 40,
+      "Cells": [
+        {
+          "Width": 420,
+          "Elements": [
+            {
+              "Type": 1,
+              "FontSize": 24,
+              "Field": {
+                "Name": "Amount",
+                "Format": {
+                  "Kind": "Currency",
+                  "Pattern": "C2",
+                  "Culture": "en-US",
+                  "Prefix": "USD ",
+                  "PadLength": 12,
+                  "PadCharacter": " "
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Height": 40,
+      "Cells": [
+        {
+          "Width": 420,
+          "Elements": [
+            {
+              "Type": 1,
+              "FontSize": 24,
+              "Field": {
+                "Name": "When",
+                "Format": {
+                  "Kind": "Date",
+                  "Pattern": "yyyy-MM-dd HH:mm zzz",
+                  "Culture": "en-US"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Height": 40,
+      "Cells": [
+        {
+          "Width": 420,
+          "Elements": [
+            {
+              "Type": 1,
+              "FontSize": 24,
+              "Field": {
+                "Name": "Status",
+                "Format": {
+                  "Kind": "Enum",
+                  "Map": {
+                    "A": "Available",
+                    "D": "Disabled"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "format": "Bing.EasyPrint.DesignerProject",
+  "version": 2,
+  "template": {
+    "Version": 2,
+    "Width": 400,
+    "Height": 400,
+    "Rows": [
+      {
+        "Height": 400,
+        "Cells": [
+          {
+            "Width": 400,
+            "Elements": [
+              {
+                "Type": 1,
+                "FontSize": 24,
+                "Field": {
+                  "Value": "Phase 5 export sample"
+                },
+                "StartCoordinate": {
+                  "X": 20,
+                  "Y": 20
+                }
+              },
+              {
+                "Type": 4,
+                "BarcodeType": 0,
+                "Height": 48,
+                "NarrowModuleWidth": 2,
+                "Rotation": 0,
+                "HumanReadable": true,
+                "HumanReadableReserveHeight": 12,
+                "QuietZone": {
+                  "Left": 8,
+                  "Top": 4,
+                  "Right": 8,
+                  "Bottom": 4
+                },
+                "Field": {
+                  "Name": "Code"
+                },
+                "StartCoordinate": {
+                  "X": 20,
+                  "Y": 80
+                }
+              },
+              {
+                "Type": 3,
+                "UnitWidth": 2,
+                "ErrorLevel": "M",
+                "Gs1": false,
+                "Field": {
+                  "Name": "DigitalLink"
+                },
+                "StartCoordinate": {
+              "X": 20,
+              "Y": 180
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "outputSettings": {
+    "outputTarget": "EscPosRaster",
+    "allowRasterizedLines": false,
+    "imageThreshold": 128,
+    "deviceFontCalibrations": {
+      "Tspl": {},
+      "Zpl": {}
+    },
+    "requireDeclaredNativeBounds": false,
+    "validateGs1Associations": false,
+    "copies": 1,
+    "escPosDevice": {
+      "dpi": 203
+    },
+    "tsplMedia": {},
+    "zplMedia": {}
+  },
+  "editorState": {
+    "unit": "pt",
+    "selectedPath": "Rows[0].Cells[0].Elements[1]",
+    "selectedPaths": [
+      "Rows[0].Cells[0].Elements[1]"
+    ],
+    "templateName": "Phase 5 export sample",
+    "sampleId": "phase5-export",
+    "nodeStates": {
+      "Rows[0]": {
+        "id": "phase5-row-main",
+        "locked": false
+      },
+      "Rows[0].Cells[0]": {
+        "id": "phase5-cell-main",
+        "locked": false
+      },
+      "Rows[0].Cells[0].Elements[0]": {
+        "id": "phase5-heading",
+        "locked": true
+      },
+      "Rows[0].Cells[0].Elements[1]": {
+        "id": "phase5-code128",
+        "locked": false
+      },
+      "Rows[0].Cells[0].Elements[2]": {
+        "id": "phase5-digital-link-qr",
+        "locked": false
+      }
+    }
+  }
+}

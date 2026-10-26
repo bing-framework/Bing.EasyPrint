@@ -1,0 +1,36 @@
+{
+  "Version": 2,
+  "Width": 320,
+  "Height": 240,
+  "Rows": [
+    {
+      "Cells": [
+        {
+          "Elements": [
+            {
+              "Type": 3,
+              "UnitWidth": 4,
+              "ErrorLevel": "M",
+              "Gs1": false,
+              "Field": {
+                "Gs1Input": {
+                  "Mode": 1,
+                  "BaseUri": "https://id.gs1.org",
+                  "Fragment": "product-label",
+                  "Items": [
+                    { "Ai": "01", "Name": "Product.Gtin" },
+                    { "Ai": "10", "Value": "LOT-A", "Placement": 2 }
+                  ],
+                  "QueryParameters": [
+                    { "Key": "source", "Value": "print" },
+                    { "Key": "source", "Value": "batch-7" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

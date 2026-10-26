@@ -1,0 +1,5 @@
+[
+  { "Amount": "1234.5", "When": "2024-01-02T03:04:05+08:00", "Status": "A", "Copies": 1 },
+  { "Amount": "9.95", "When": "2024-01-03T10:00:00+08:00", "Status": "D", "Copies": 2 },
+  { "Amount": null, "When": "2024-01-04T00:00:00+08:00", "Status": "A", "Copies": 1 }
+]
