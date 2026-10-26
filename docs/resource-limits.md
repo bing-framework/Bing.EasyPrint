@@ -43,7 +43,7 @@ Console.WriteLine(scope.PeakBytes);
 
 ## DesignerHost 限制与准入
 
-Host 的固定请求体上限为 44 MiB；业务 `data` JSON 上限为 1 MiB，普通资源最多 64 个、合计最多 32 MiB。固定 Raster 字体还有独立数量和总字节限制。
+Host 的固定请求体上限为 44 MiB；业务 `data` JSON 上限为 1 MiB，普通资源最多 64 个、合计最多 32 MiB。固定 Raster 字体还有独立数量和总字节限制。预览包的布局/图片清单元数据和序列化 scratch 计入 `Host.PreviewBundleMetadata`，实际 manifest JSON 缓冲计入 `Host.PreviewBundleManifestBuffer`，PNG、RGBA、ZIP 和临时流继续使用现有 Host 资源作用域。
 
 以下环境变量控制服务器额度：
 

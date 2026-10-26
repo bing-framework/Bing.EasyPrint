@@ -4,6 +4,8 @@ DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B
 
 Type 3 QR 和 Type 10 DataMatrix 现有 `Gs1` 选项，默认 `false`/缺省保持普通码；严格字典关联校验默认关闭，可由 `TemplateRenderOptions.ValidateGs1Associations` 显式开启。GS1 QR/DataMatrix 使用共享编码器并以图片路径覆盖 CPCL、ESC/POS Raster、TSPL、ZPL，Native 明确拒绝。详见[GS1 关联与二维条码](gs1-associations-2d.md)。
 
+共享 `BgField.Gs1Input` 可按 AI 逐项提供静态值或字段绑定，并选择现有 Elements 编码路径或 Digital Link URI。未设置该属性的旧模板保持原有行为；QR/DataMatrix 的 Digital Link 必须为普通码，PDF417 与 Composite 拒绝 Digital Link。完整模板形状、GTIN、query 保留及绑定限制见[GS1 Digital Link 与结构化 AI](gs1-digital-link.md)。
+
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验位仍按原规则处理。旧 Host 保留纯数字输入，附加码模板格式与协商见[使用说明](gs1-composite-ean-upc-addons.md)。
 
 ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列，也可配置 2–11 条数据行上限（与列数互斥）。显式配置列数/行数需 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)、[最大行数与 GS1 AI 字典](expanded-stacked-rows-and-gs1-ai.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
@@ -80,7 +82,7 @@ Composite 的主数据使用继承的 `Field`，次数据必须提供 `Secondary
 
 ## 价签与示例
 
-`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出、TSPL/ZPL 切刀和 GS1-128/CC-A/CC-B/CC-C、Expanded/Stacked CC-A/B Composite 案例；见 [C# 案例](../samples/Templates/Gs1CompositeSamples.cs)、[GS1-128 CC-A 模板 JSON](../samples/Templates/gs1-composite-gs1-128-cc-a.json)、[GS1-128 CC-B 模板 JSON](../samples/Templates/gs1-composite-gs1-128-cc-b.json)、[CC-C 模板 JSON](../samples/Templates/gs1-composite-cc-c.json)、[Expanded 模板 JSON](../samples/Templates/gs1-composite-expanded.json)和[Stacked 模板 JSON](../samples/Templates/gs1-composite-stacked.json)。
+`PriceLabelTemplateFactory` 提供 15/70/90 mm 价签预设，`PriceLabelRenderer` 负责价签数据适配与渲染。可执行示例位于 `samples/Templates`，包含固定标签、分页小票、V3 流式模板、任务输出、TSPL/ZPL 切刀和 GS1 案例；Digital Link C#/JSON 对照见 [C# 示例](../samples/Templates/Gs1DigitalLinkSamples.cs)与[模板 JSON](../samples/Templates/gs1-digital-link-template.json)。其他 GS1 Composite 案例见 [GS1 Composite 示例](../samples/Templates/Gs1CompositeSamples.cs)。
 
 ```powershell
 dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples

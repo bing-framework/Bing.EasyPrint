@@ -86,7 +86,7 @@ Host 新增两个加法路由，旧 `/preview` 几何 JSON 语义保持不变：
 ## 验证入口
 
 - 官方 FNC1 全表：`dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --filter FullyQualifiedName~Gs1SyntaxDictionaryTests`
-- Host PNG 与 ZXing 解码：`dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net8.0 --filter FullyQualifiedName~RasterPreviewHostTests`
+- Host PNG 与 ZXing 解码：`dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net10.0 --filter FullyQualifiedName~RasterPreviewHostTests`
 - 前端单元：`npm test`
 - 浏览器真实 Host：`npx playwright test e2e/rasterPreviewPng.spec.ts --workers=1 --retries=0`
 - 完整门禁和原始证据见[本轮验收报告](fnc1-preview-png-verification-2026-10-23.md)。

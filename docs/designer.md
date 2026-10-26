@@ -6,6 +6,8 @@ EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和
 
 ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A/CC-B；省略或 `null` 默认每行两个字符对，普通条码可配置 1–11 列、Composite 可配置 2–11 列。显式配置列数/行数需 `gs1-databar-expanded-stacked-columns` / `gs1-databar-expanded-stacked-rows`，Host 同时声明对应范围。详细契约见[列数配置指南](expanded-stacked-columns.md)和 [ExpandedStacked 使用说明](gs1-composite-expanded-stacked.md)。
 
+QR、DataMatrix、支持的 GS1 线性码与 Composite 属性面板可启用可视化 GS1 AI 编辑器。编辑器从 Host 目录搜索 AI、显示固定规则说明、配置静态值或字段绑定、排序及删除；QR/DataMatrix 可在 Elements 与 Digital Link 间切换。Host 对当前模板和业务数据做权威校验，数据变化会重新验证；转换失败会保留当前配置并显示具体诊断。旧 Host 缺少目录、结构化来源或 Digital Link 特性时，入口会禁用。详见[GS1 Digital Link 与结构化 AI](gs1-digital-link.md)。
+
 ## 2026-10-22 CC-C 集成前修复验收记录
 
 QR 和二维点阵属性面板提供 GS1 QR Code / GS1 DataMatrix 选项，默认关闭；旧 Host 无 `gs1-two-dimensional` 时禁用并说明，Native 不可用。输出设置提供显式“严格 GS1 关联”开关。完整契约见[GS1 关联与二维条码](gs1-associations-2d.md)。
@@ -114,7 +116,7 @@ ESC/POS Native 可选择旧文字行或显式 Sequential 混合收据。请求�
 
 ## 本地运行
 
-需要 .NET 8 SDK、Node.js 和 npm。在两个终端分别运行：
+需要 .NET 10 SDK、Node.js 和 npm。在两个终端分别运行：
 
 ```powershell
 dotnet run --project tools/DesignerHost/DesignerHost.csproj
@@ -213,7 +215,7 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 设计器在输出协议、布局或机型配置改变后重新查询能力，工具栏、快捷键和拖入入口据此控制新增元素，属性面板禁用不支持的选项并说明原因。已有不支持值仍保留并显示，允许用户清除或改选；能力查询和过滤不会为消除不支持值而自动改写模板或输出设置。非 CPCL 的可缩放字号使用整数输入，固定字库和 CPCL 字体按各自范围或离散字号约束。查询尚未完成或失败时，新增入口暂停使用；旧查询响应不会覆盖新配置的能力。能力查询不能替代后端的严格内容与布局校验。
 
-`POST /api/designer/preview` 返回实际分页结果和布局节点。`sourcePath` 使用 `Rows[0].Cells[0].Elements[0]` 格式，可直接映射到模板结构树；重复模板行由 `instanceIndices` 标识当前数据项。V3 组合片段还返回 `definitionPath`、`componentInstancePath` 和 `fragmentIndex`，分别定位共享定义、当前实例和所在页。错误响应的 `errors` 尽可能包含可定位的 `sourcePath`；共享组件错误还会返回 `definitionPath`、`componentInstancePath` 和 `instanceIndices`，其中嵌套组件保留最内层归属。Provider 阶段还返回实际输出页面及页内打印元素的 `pageIndex`、`elementIndex`，均从零开始；静态预检尚未展开实例时这些字段为空。页面整体尺寸、JSON 语法等没有具体节点的错误仍显示为全局错误。
+`POST /api/designer/preview` 返回实际分页结果和布局节点。新 Host 同时提供 `POST /api/designer/preview-bundle`：每个当前页请求只渲染一次模板，ZIP 的 `manifest.json` 包含完整布局、当前页元素 PNG 清单和逐元素诊断；设计器协商到 `preview-bundle` 后优先使用该入口，切换页面只请求目标页图片，旧 Host 仍回退到预览加元素 PNG 链路。`sourcePath` 使用 `Rows[0].Cells[0].Elements[0]` 格式，可直接映射到模板结构树；重复模板行由 `instanceIndices` 标识当前数据项。V3 组合片段还返回 `definitionPath`、`componentInstancePath` 和 `fragmentIndex`，分别定位共享定义、当前实例和所在页。错误响应的 `errors` 尽可能包含可定位的 `sourcePath`；共享组件错误还会返回 `definitionPath`、`componentInstancePath` 和 `instanceIndices`，其中嵌套组件保留最内层归属。Provider 阶段还返回实际输出页面及页内打印元素的 `pageIndex`、`elementIndex`，均从零开始；静态预检尚未展开实例时这些字段为空。页面整体尺寸、JSON 语法等没有具体节点的错误仍显示为全局错误。
 
 设计器的打印诊断面板保留预览与导出的同一错误结构，显示组件定义、触发实例、各层重复项及已知页号。可分别定位节点、共享定义或组件实例；字段错误定位到最近的可编辑祖先。重复项及页号在界面上从 1 开始显示。静态定义错误不会猜测第一个引用实例，无法确认对应页面时不会跳到某个近似页面，渲染失败也不保留部分打印页。
 
@@ -233,7 +235,7 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 请求 `Content-Type` 为 JSON 时，未声明 `charset` 按 UTF-8 处理；声明的字符集必须是 .NET 可识别的编码，服务会按声明解码并转换为 UTF-8 后再解析 JSON。未知字符集或非 JSON 媒体类型返回 HTTP 415；声明编码下的非法字节返回 HTTP 400。原始 JSON 输入和转换后的 UTF-8 表示都受 44 MiB 上限约束。HTTP JSON 的 `charset` 只负责请求输入，根对象的 `encoding`、ESC/POS 设备代码页和其他 Host 绑定只负责打印输出编码，二者不是同一个设置。
 
-`DesignerHost.Tests` 是独立的 net8.0 测试项目，不会由现有解决方案隐式执行。需要验证 DesignerHost 时，在仓库根目录运行：
+`DesignerHost.Tests` 是独立的 net10.0 测试项目，不会由现有解决方案隐式执行。需要验证 DesignerHost 时，在仓库根目录运行：
 
 ```powershell
 .\tools\Verify-DesignerHost.ps1
@@ -255,6 +257,14 @@ ESC/POS Native 的可选 `escPosDevice.profile.text` 声明编码代码页、设
 
 模板包包含 `template.json`、`manifest.json` 和 `resources/` 下的资源；资源在模板中以资源键引用。导入会检查版本、模板结构、JSON 字节数、ZIP 条目路径、文件数量和展开数据量。设计器不会把资源键解释为磁盘路径或网络地址。
 
+## 新协议目录与项目 v2
+
+设计器启动时读取 `/api/designer/protocol-registry`。目录中的非内置协议会出现在“输出协议”选择器；选择后从 `configSchema` 生成基础字段，允许高级 JSON 编辑，并把 `protocolId`/`protocolConfig` 传入能力、预览、预览包、元素 PNG 和导出请求。目录失败或旧 Host 缺少 `protocol-registry` 时不显示扩展协议，内置协议不受影响。
+
+项目文件升级为 version 2 envelope，保存 `outputSettings.protocolId` 和 `protocolConfig`，同时继续读取 v1 和裸模板。未知协议或目录缺失时保留原 ID/配置、在选择器显示“未知协议”，并禁用预览、导出和下载；不会回退为内置协议。协议配置会参与撤销/重做和重新加载。F6 锁定/排列能力不在本阶段。
+
+示例 `demo.protocol` 支持文字、线段、矩形、一维码和 QR；其能力声明 QR/条码元素软件位图，因此受支持元素 PNG 可用，完整页面 PNG 仍明确不可用。若能力声明收尾，输出设置可编辑进纸、切纸和 JobEnd/PageEnd；收尾文件在导出 ZIP 中独立保存。新增协议需要可信程序集和 Host 启动注册，不允许上传可执行插件。完整接入步骤见[新打印协议扩展指南](protocol-extension-guide.md)。
+
 ## 当前边界
 
 ### GS1 Composite
@@ -272,3 +282,9 @@ ExpandedStacked 的属性面板仅在线性组件为 ExpandedStacked 时显示�
 - 小票分页由 `TemplateRenderer` 计算；浏览器预览不代替实机校准。
 - 设计器只生成协议字节，不负责端口、驱动、打印机控制或真实打印；目标设备的代码页、字体字距、标签介质和裁切行为仍需实机校准。
 - ERP 集成仍由 ERP 选择和保存模板，并提供实际商品数据及图片资源。
+
+## 字段格式与批量生成
+
+字段属性面板的“字段格式”可配置文本、数字/金额、日期和枚举映射；Host 预览使用服务端 `displayText` 作为权威显示值，设计器只保存配置。旧 Host 缺少 `field-format` 时保留配置并明确拒绝渲染。
+
+工具栏“批量”打开批量面板：导入 UTF-8 CSV、JSON 对象数组或 JSONL，编辑 CSV 字段映射，选择记录和份数字段，逐条真实预览，按 25 条分块生成。整批上限 1000 条、1000 实际物理页、32 MiB；部分完成和全部失败分开显示，取消不会自动下载。详细契约见[批量生成](batch-generation.md)。

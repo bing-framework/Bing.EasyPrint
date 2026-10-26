@@ -76,8 +76,7 @@ byte[] firstPage = pages[0];
 
 `PrintGs1CompositeElement` 将 GS1 线性组件和 CC-A、CC-B 或 CC-C 次码作为一个不可拆分符号处理，尺寸由编码结果确定。组合受限：DataBar Omnidirectional/Truncated/Limited/单行 Expanded/Stacked/StackedOmnidirectional/ExpandedStacked 支持 Auto、CC-A、CC-B；GS1-128 (`BarcodeType.UccEan128`) 支持 Auto、CC-A、CC-B 和 CC-C，且 Auto 直接选择 CC-C。其他配对会被拒绝。Stacked 的线性 DataBar 宽 50 模块，完整 Composite 固定宽 56 模块（55 模块二维组件加 1 模块横向对齐，不含显式静区），模式和次数据只改变高度；条高是上下数据行总高且至少为模块宽的 12 倍。该功能只在能力同时声明图片和坐标时可用；ESC/POS Native 不支持，调用方应先检查 `PrintCapabilities.SupportsGs1Composite`。完整输入、模式和 Host 协商说明见 [GS1-128 + CC-A/CC-B 使用说明](gs1-composite-gs1-128-ab.md)、[GS1-128 + CC-C Composite 使用说明](gs1-composite-cc-c.md)、[单行 Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)。标签介质方向遵循各协议自身规则：`ZplMediaOptions.Orientation` 省略时沿用打印机当前方向，显式 `None` 输出 `^PON`，`Down` 输出 `^POI`；ZPL 整页方向不接受 `Left`/`Right`，但字段元素的旋转角度仍由各自命令处理。
 
-应用可以直接向统一模型提供自定义 `IPrintProtocolProvider`；静态 `PrintProtocolProviderFactory` 只创建内置四协议 Provider。`TemplateRenderer` 目前固定使用该内置工厂，`TemplateRenderOptions` 没有 Provider/工厂注入点。自定义 Provider 也不能直接复用内置任务收尾与部分切纸编码；请求这些功能时会按不支持处理。实现接口本身不会自动把新协议接入模板或 Host。
-
+新协议通过字符串标识和冻结注册表接入：应用可注册 `PrintProtocolRegistration`，用 `IPrintProtocolBackend` 接收统一 `PrintDocument` 并返回有序 `PrintPageOutput`；可选 `IPrintProtocolFinishingBackend` 声明任务收尾。`PrintProtocolOutputComposer` 负责预检、字节预算、页面/控制文件顺序和重复插入；注册表冻结后拒绝重复或新增 ID。模板层通过 `ITemplateProtocolAdapter` 参与布局，Host 通过 `DesignerProtocolRegistry` 显式注册可信程序集，旧内置 Provider 路径和输出字节不变。完整示例见[新打印协议扩展指南](protocol-extension-guide.md)。
 ## 打印任务与输出段
 
 `PrintJobOptions` 描述整份文档的份数、Collated/Uncollated 顺序、进纸单位和执行范围、裁切范围及显式裁切参数。`PrintJobRenderer` 输出带源页、份数和收尾标志的结果。页面级份数/进纸/裁切不能与任务策略叠加。

@@ -10,13 +10,15 @@ ExpandedStacked 已支持普通 ESC/POS Raster 条码及四协议 Composite CC-A
 
 2026-10-22 新增单行 DataBar Expanded 与 DataBar Stacked + CC-A/CC-B Composite。使用和输入限制见[Expanded 使用说明](gs1-composite-expanded.md)及[Stacked 使用说明](gs1-composite-stacked.md)，阶段验证分别记录在[Expanded 报告](gs1-composite-expanded-verification-2026-10-22.md)和[Stacked 报告](gs1-stacked-verification-2026-10-22.md)。下文较早轮次结果保留其当时范围。
 
+GTIN Digital Link、Host GS1 AI 目录/验证/转换和结构化 AI 编辑器使用固定 GS1 Syntax Dictionary，不更新版本或默认模板行为。核心/模板/Host 的定向验证类为 `Gs1DigitalLinkTests`、`Gs1StructuredTemplateTests`、`Gs1DigitalLinkHostTests`；浏览器用例位于 `e2e/gs1AiEditor.spec.ts`。完整契约与 C#/JSON 案例见[GS1 Digital Link 与结构化 AI](gs1-digital-link.md)。
+
 ## 项目与依赖
 
 | 项目 | 目标框架 | 主要依赖 |
 | --- | --- | --- |
 | `src/Bing.EasyPrint` | net7.0、net6.0、netcoreapp3.1、netstandard2.0、netstandard2.1 | ImageSharp、ImageSharp.Drawing、ZXing.Net |
 | `src/Bing.EasyPrint.Templates` | 同核心库 | 核心库、Newtonsoft.Json、ZXing.Net |
-| `tools/DesignerHost` | net8.0 | Templates、ASP.NET Core |
+| `tools/DesignerHost` | net10.0 | Templates、ASP.NET Core |
 | `web/Bing.EasyPrint.Designer` | Node/Vite | Vue、Konva、JSZip、Lucide |
 
 测试项目位于 `tests/Bing.EasyPrint.Tests`、`tests/DesignerHost.Tests` 和 `tests/PackageConsumer`；性能/资源探针位于 `tools/PerformanceProbe`。
@@ -30,6 +32,9 @@ dotnet build src/Bing.EasyPrint/Bing.EasyPrint.csproj
 dotnet build src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj
 dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0
 ./tools/Verify-DesignerHost.ps1
+./tools/Verify-SystemFonts.ps1
+dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0
+./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0
 ./tools/Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1
 ./tools/Verify-XmlDocumentation.ps1
 dotnet run --project samples/Templates/Templates.csproj -- artifacts/template-samples
@@ -48,11 +53,15 @@ npm run test:e2e
 
 `Verify-DesignerHost.ps1` 将 Host 测试输出和 TRX 写入独立的 `artifacts` 目录，并串行执行构建。Host 项目已将项目目录内的 `artifacts/**` 与 `output/**` 追加到 `DefaultItemExcludesInProjectFolder`；四个示例 JSON 仍由显式 `Content` 项加入，因此默认脚本可在保留生成物时运行。首次运行浏览器验收前执行 `npm ci` 和 `npx playwright install chromium`。
 
-GS1 关联与 GS1 二维编码定向验证：`dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --filter "FullyQualifiedName~Gs1AssociationValidatorTests|FullyQualifiedName~Gs1TwoDimensionalEncoderTests|FullyQualifiedName~Gs1TwoDimensionalTemplateTests|FullyQualifiedName~Gs1CompositeTemplateTests"`；Host：`dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net8.0 --filter "FullyQualifiedName~Gs1TwoDimensionalHostTests|FullyQualifiedName~Gs1CompositeHostTests"`；浏览器：`npx playwright test e2e/gs1TwoDimensional.spec.ts e2e/ccC.spec.ts --workers=1 --retries=0`。过滤表达式的引号用于防止 PowerShell 将 `|` 解释为管道。
+GS1 关联与 GS1 二维编码定向验证：`dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --filter "FullyQualifiedName~Gs1AssociationValidatorTests|FullyQualifiedName~Gs1TwoDimensionalEncoderTests|FullyQualifiedName~Gs1TwoDimensionalTemplateTests|FullyQualifiedName~Gs1CompositeTemplateTests"`；Host：`dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net10.0 --filter "FullyQualifiedName~Gs1TwoDimensionalHostTests|FullyQualifiedName~Gs1CompositeHostTests"`；浏览器：`npx playwright test e2e/gs1TwoDimensional.spec.ts e2e/ccC.spec.ts --workers=1 --retries=0`。过滤表达式的引号用于防止 PowerShell 将 `|` 解释为管道。
 
-FNC1 官方对照使用离线夹具，不联网下载：`dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --filter FullyQualifiedName~Gs1SyntaxDictionaryTests`。真实码图和 PNG 导出使用 `dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net8.0 --filter FullyQualifiedName~RasterPreviewHostTests`，其中用 ZXing 独立解码 Code128、EAN13、QR、DataMatrix 和 PDF417，用 Composite 外部向量核对尺寸。浏览器定向用例为 `npx playwright test e2e/rasterPreviewPng.spec.ts --workers=1 --retries=0`；完整计数和已知限制见[FNC1 与预览导出验收](fnc1-preview-png-verification-2026-10-23.md)。
+FNC1 官方对照使用离线夹具，不联网下载：`dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net6.0 --filter FullyQualifiedName~Gs1SyntaxDictionaryTests`。真实码图和 PNG 导出使用 `dotnet test tests/DesignerHost.Tests/DesignerHost.Tests.csproj -f net10.0 --filter FullyQualifiedName~RasterPreviewHostTests`，其中用 ZXing 独立解码 Code128、EAN13、QR、DataMatrix 和 PDF417，用 Composite 外部向量核对尺寸。浏览器定向用例为 `npx playwright test e2e/rasterPreviewPng.spec.ts --workers=1 --retries=0`；完整计数和已知限制见[FNC1 与预览导出验收](fnc1-preview-png-verification-2026-10-23.md)。
 
-`Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1` 会分别执行完整 Core 测试并从 testhost 诊断日志确认实际加载的运行时；报告和日志保存在 `artifacts/protocol-runtime-verification/<run-id>/`。只有实际运行时与目标框架匹配且全部测试通过才记为通过，缺少旧运行时不能用其他运行时替代。
+`Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1` 会分别执行完整 Core 测试并从 testhost 诊断日志确认实际加载的运行时；报告和日志保存在 `artifacts/protocol-runtime-verification/<run-id>/`。只有实际运行时与目标框架匹配且全部测试通过才记为通过，缺少旧运行时不能用其他运行时替代。需要固定运行时目录时加 `-PreferPortableRuntimes`，脚本只使用 `-RuntimeDirectory` 中已准备的官方 Windows x64 运行时 ZIP，不下载也不安装。
+
+系统字体门禁先运行 `./tools/Verify-SystemFonts.ps1`：Windows 检查常规、粗体和 CJK 字体文件，Linux/macOS 通过 `fc-match` 确认 DejaVu Sans 常规/粗体及 Noto Sans CJK；缺失时立即失败，不跳过系统字体用例。CI 在 Linux 使用 `fonts-dejavu-core` 和 `fonts-noto-cjk`。
+
+现代包消费使用 `./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0 -ResultsDirectory <证据目录>`。脚本在短临时工作目录中打包当前源码、重定向 XML 文档输出并运行 `net10.0` 消费者，避免 Windows 长路径和覆盖跟踪 XML；通过后把消费者证据复制到指定证据目录。跨平台工作流为 `.github/workflows/designer-cross-platform.yml`，Windows 额外运行真实 `net6.0`/`netcoreapp3.1` 运行时验证，Linux 只运行现代运行时，不把本机结果冒充远端 CI 结果。两平台 E2E 固定 `--workers=1 --retries=0`；build、Vitest、Playwright JSON/附件和现代消费 stdout/stderr 均写入 always 上传的证据目录。现代消费汇总分别记录 pwsh 与实际 consumer 运行时。
 
 ### 本地候选包消费
 

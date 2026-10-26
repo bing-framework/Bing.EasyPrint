@@ -1,5 +1,11 @@
 # Bing.EasyPrint 文档索引
 
+- [新打印协议扩展指南](protocol-extension-guide.md)
+- [字段格式化](field-formatting.md)
+- [批量生成](batch-generation.md)
+- [GS1 Digital Link 与结构化 AI 编辑](gs1-digital-link.md)
+- [第四阶段 F3/F4 实施报告](optimization-expansion-phase4-2026-10-26.md)
+- [第二阶段 O4 实施报告](optimization-expansion-phase2-2026-10-25.md)
 - [Truncated / Stacked Omnidirectional 使用说明](gs1-composite-databar-completion.md)
 - [DataBar 补齐阶段验收](databar-completion-verification-2026-10-22.md)
 
@@ -41,6 +47,14 @@
 | [设计器与 Host](designer-host.md) | 运行浏览器设计器、调用预览/导出 API、配置资源限制 | `web/Bing.EasyPrint.Designer`、`tools/DesignerHost` |
 | [资源限制与错误处理](resource-limits.md) | 配置 Core、模板与 Host 的资源边界 | `PrintResourceScope`、模板限制和 Host 准入 |
 | [开发与验证](development.md) | 构建、测试、示例和依赖说明 | `tests/`、`samples/`、`tools/PerformanceProbe` |
+| [新打印协议扩展指南](protocol-extension-guide.md) | 注册新协议、模板适配、Host 目录、项目 v2 和示例程序集 | `PrintProtocolRegistry`、`ITemplateProtocolAdapter`、`DesignerProtocolRegistry` |
+| [字段格式化](field-formatting.md) | 数字/金额/日期/枚举、空值、补齐和前后缀 | `BgField.Format`、`BgFieldFormatter` |
+| [批量生成](batch-generation.md) | CSV/JSON/JSONL 导入、25 条分块、1000 条/页/32 MiB 和结果 ZIP | `DesignerRequestProcessor.BatchRender`、`BatchPanel` |
+| [GS1 Digital Link 与结构化 AI](gs1-digital-link.md) | GTIN Digital Link、Host AI 目录、结构化模板来源和可视化编辑器 | `Gs1DigitalLink`、`BgField.Gs1Input`、`Gs1AiEditor` |
+| [第四阶段 F3/F4 实施报告](optimization-expansion-phase4-2026-10-26.md) | GTIN Digital Link 与可视化 AI 编辑器实现、测试和证据 | `Gs1DigitalLink`、`DesignerRequestProcessor.Gs1`、`Gs1AiEditor` |
+| [第一阶段实施报告](optimization-expansion-phase1-2026-10-25.md) | .NET 10 Host、预览包、跨平台验证与证据索引 | `tools/DesignerHost`、`.github/workflows/designer-cross-platform.yml` |
+| [第三阶段 F1/F2 实施报告](optimization-expansion-phase3-2026-10-25.md) | 字段格式化、批量导入/分块、结果 ZIP 与验收证据 | `BgField.Format`、`DesignerRequestProcessor.BatchRender`、`BatchPanel` |
+| [第二阶段 O4 实施报告](optimization-expansion-phase2-2026-10-25.md) | 完整新协议注册、示例、设计器与验收证据 | `samples/Protocols/DemoProtocol`、`tools/DesignerHost`、`web/Bing.EasyPrint.Designer` |
 | [待实现与待确认](status.md) | 查看尚未落地或必须由设备验证的事项 | 全项目 |
 | [文档与代码对照清单](documentation-audit.md) | 查看本次盘点结论和文档时效 | 全项目 |
 

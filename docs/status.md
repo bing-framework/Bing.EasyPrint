@@ -1,5 +1,7 @@
 # 待实现与待确认
 
+2026-10-25 O4 已建立新协议注册、模板适配、Host 目录和设计器 v2 接入，独立示例为 `demo.protocol`。它不是新增内置设备协议，也不改变 `PrintProtocol` 枚举；示例不提供像素级软件位图，未知协议和旧 Host 会保留配置并禁用对应输出。当前阶段报告见[第二阶段 O4 实施报告](optimization-expansion-phase2-2026-10-25.md)，接入步骤见[新打印协议扩展指南](protocol-extension-guide.md)。
+
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；三条分隔行各为 2X，主码校验规则保持原样。输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)及[附加码使用说明](gs1-composite-ean-upc-addons.md)。基础阶段与附加码阶段报告分别见[基础报告](ean-upc-composite-verification-2026-10-22.md)和[附加码报告](ean-upc-addons-verification-2026-10-22.md)。
