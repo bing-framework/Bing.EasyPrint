@@ -1,0 +1,177 @@
+name: designer-cross-platform
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  CI: 'true'
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+      - name: Verify system fonts
+        shell: pwsh
+        run: ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/fonts
+      - name: Prepare portable legacy runtimes
+        shell: pwsh
+        run: |
+          $root = Join-Path $PWD 'artifacts/test-runtimes'
+          $runtimes = @{
+            '6.0.36' = 'https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-win-x64.zip'
+            '3.1.32' = 'https://builds.dotnet.microsoft.com/dotnet/Runtime/3.1.32/dotnet-runtime-3.1.32-win-x64.zip'
+          }
+          foreach ($entry in $runtimes.GetEnumerator()) {
+            $destination = Join-Path $root $entry.Key
+            if (-not (Test-Path -LiteralPath (Join-Path $destination 'dotnet.exe'))) {
+              New-Item -ItemType Directory -Path $destination -Force | Out-Null
+              $archive = Join-Path $root ($entry.Key + '.zip')
+              Invoke-WebRequest -Uri $entry.Value -OutFile $archive
+              Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
+            }
+          }
+      - name: Core net10.0 tests
+        shell: pwsh
+        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/optimization-expansion-20261025/phase1/ci-windows/core
+      - name: Core legacy runtime tests
+        shell: pwsh
+        run: ./tools/Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1 -RuntimeDirectory artifacts/test-runtimes -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/legacy-runtimes -PreferPortableRuntimes
+      - name: DesignerHost net10.0 tests
+        shell: pwsh
+        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/host-bin -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/host-tests
+      - name: Modern package consumption
+        shell: pwsh
+        run: |
+          $root = 'artifacts/optimization-expansion-20261025/phase1/ci-windows'
+          $log = Join-Path $root 'modern-consumer.log'
+          New-Item -ItemType Directory -Path $root -Force | Out-Null
+          ./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0 -ResultsDirectory (Join-Path $root 'modern-consumer') 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          Set-Content -LiteralPath (Join-Path $root 'modern-consumer.exit-code.txt') -Value $code -Encoding utf8
+          if ($code -ne 0) { exit $code }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install frontend dependencies
+        working-directory: web/Bing.EasyPrint.Designer
+        run: npm ci
+      - name: Install Chromium
+        working-directory: web/Bing.EasyPrint.Designer
+        run: npx playwright install chromium
+      - name: Frontend build
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        run: |
+          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows/frontend-build.log'
+          New-Item -ItemType Directory -Path (Split-Path -Parent $log) -Force | Out-Null
+          npm run build 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Frontend Vitest
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        run: |
+          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows/vitest.log'
+          npm run test 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Chromium E2E
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/optimization-expansion-20261025/phase1/ci-windows/playwright.json
+        run: |
+          $root = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows'
+          $log = Join-Path $root 'playwright.log'
+          New-Item -ItemType Directory -Path $root -Force | Out-Null
+          npx playwright test --workers=1 --retries=0 --reporter=list,json 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-evidence
+          path: |
+            artifacts/optimization-expansion-20261025/phase1/ci-windows
+            web/Bing.EasyPrint.Designer/test-results
+          if-no-files-found: ignore
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+      - name: Install and verify system fonts
+        shell: pwsh
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fontconfig fonts-dejavu-core fonts-noto-cjk
+          ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/fonts
+      - name: Core net10.0 tests
+        shell: pwsh
+        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/optimization-expansion-20261025/phase1/ci-linux/core
+      - name: DesignerHost net10.0 tests
+        shell: pwsh
+        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/host-bin -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/host-tests
+      - name: Modern package consumption
+        shell: pwsh
+        run: |
+          $root = 'artifacts/optimization-expansion-20261025/phase1/ci-linux'
+          $log = Join-Path $root 'modern-consumer.log'
+          New-Item -ItemType Directory -Path $root -Force | Out-Null
+          ./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0 -ResultsDirectory (Join-Path $root 'modern-consumer') 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          Set-Content -LiteralPath (Join-Path $root 'modern-consumer.exit-code.txt') -Value $code -Encoding utf8
+          if ($code -ne 0) { exit $code }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install frontend dependencies
+        working-directory: web/Bing.EasyPrint.Designer
+        run: npm ci
+      - name: Install Chromium
+        working-directory: web/Bing.EasyPrint.Designer
+        run: npx playwright install --with-deps chromium
+      - name: Frontend build
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        run: |
+          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux/frontend-build.log'
+          New-Item -ItemType Directory -Path (Split-Path -Parent $log) -Force | Out-Null
+          npm run build 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Frontend Vitest
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        run: |
+          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux/vitest.log'
+          npm run test 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Chromium E2E
+        shell: pwsh
+        working-directory: web/Bing.EasyPrint.Designer
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/optimization-expansion-20261025/phase1/ci-linux/playwright.json
+        run: |
+          $root = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux'
+          $log = Join-Path $root 'playwright.log'
+          New-Item -ItemType Directory -Path $root -Force | Out-Null
+          npx playwright test --workers=1 --retries=0 --reporter=list,json 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-evidence
+          path: |
+            artifacts/optimization-expansion-20261025/phase1/ci-linux
+            web/Bing.EasyPrint.Designer/test-results
+          if-no-files-found: ignore

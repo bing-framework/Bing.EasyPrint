@@ -2,6 +2,7 @@
 param(
     [string] $OutputDirectory = 'artifacts/designer-host-verification-bin',
     [string] $ResultsDirectory = 'artifacts/designer-host-verification-tests',
+    [string] $DiagnosticPath,
     [switch] $NoRestore
 )
 
@@ -30,18 +31,31 @@ $resultsPath = if ([IO.Path]::IsPathRooted($ResultsDirectory)) {
 else {
     [IO.Path]::GetFullPath((Join-Path $repositoryRoot $ResultsDirectory))
 }
+$diagnosticPath = if ([string]::IsNullOrWhiteSpace($DiagnosticPath)) {
+    Join-Path $resultsPath 'designer-host-net10.diag.log'
+}
+elseif ([IO.Path]::IsPathRooted($DiagnosticPath)) {
+    [IO.Path]::GetFullPath($DiagnosticPath)
+}
+else {
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $DiagnosticPath))
+}
+New-Item -ItemType Directory -Path $resultsPath -Force | Out-Null
+New-Item -ItemType Directory -Path (Split-Path -Parent $diagnosticPath) -Force | Out-Null
 
 $arguments = @(
     'test'
     $projectPath
     '--framework'
-    'net8.0'
+    'net10.0'
     '--output'
     $outputPath
     '--results-directory'
     $resultsPath
     '--logger'
-    'trx;LogFileName=designer-host-net8.trx'
+    'trx;LogFileName=designer-host-net10.trx'
+    '--diag'
+    $diagnosticPath
     '-m:1'
     '/p:BuildInParallel=false'
 )

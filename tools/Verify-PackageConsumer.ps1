@@ -20,6 +20,7 @@ Set-StrictMode -Version Latest
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repositoryRoot 'tests/PackageConsumer/PackageConsumer.csproj'
 $frameworkAliases = @{
+    'net10' = 'net10.0'
     'net7' = 'net7.0'
     'net6' = 'net6.0'
     'net5' = 'net5.0'
@@ -29,7 +30,7 @@ $frameworkAliases = @{
 if ($frameworkAliases.ContainsKey($TargetFramework)) {
     $TargetFramework = $frameworkAliases[$TargetFramework]
 }
-$supportedFrameworks = @('net7.0', 'net6.0', 'net5.0', 'netcoreapp3.1', 'netcoreapp2.2')
+$supportedFrameworks = @('net10.0', 'net7.0', 'net6.0', 'net5.0', 'netcoreapp3.1', 'netcoreapp2.2')
 if ($supportedFrameworks -notcontains $TargetFramework) {
     throw "Unsupported TargetFramework '$TargetFramework'. Supported values: $($supportedFrameworks -join ', ')"
 }
@@ -53,7 +54,13 @@ function Resolve-DotNet([string] $path) {
     }
     $candidate = [IO.Path]::GetFullPath($path)
     if (Test-Path -LiteralPath $candidate -PathType Container) {
-        $candidate = Join-Path $candidate 'dotnet.exe'
+        $dotnetExecutable = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+            'dotnet.exe'
+        }
+        else {
+            'dotnet'
+        }
+        $candidate = Join-Path $candidate $dotnetExecutable
     }
     if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
         throw "dotnet executable was not found: $candidate"
@@ -164,7 +171,13 @@ $fontPathFull = Resolve-FullPath $FontPath $repositoryRoot
 $resultsPath = Resolve-FullPath $ResultsDirectory $repositoryRoot
 $transitivePath = if ([string]::IsNullOrWhiteSpace($TransitivePackagesDirectory)) {
     if ([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
-        Resolve-FullPath (Join-Path $env:USERPROFILE '.nuget/packages') $repositoryRoot
+        $homeDirectory = if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+            $env:USERPROFILE
+        }
+        else {
+            $env:HOME
+        }
+        Resolve-FullPath (Join-Path $homeDirectory '.nuget/packages') $repositoryRoot
     }
     else {
         Resolve-FullPath $env:NUGET_PACKAGES $repositoryRoot
@@ -270,7 +283,7 @@ $commonArguments = @(
     "/p:EasyPrintPackageVersion=$PackageVersion"
     "/p:RestorePackagesPath=$restorePackagesPath"
     "/p:RestoreConfigFile=$nugetConfigPath"
-    "/p:BaseIntermediateOutputPath=$($intermediatePath.TrimEnd('\'))\"
+    "/p:BaseIntermediateOutputPath=$($intermediatePath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar))$([IO.Path]::DirectorySeparatorChar)"
 )
 if (-not [string]::IsNullOrEmpty($PackageAssetFramework)) {
     $commonArguments += "/p:ConsumerPackageAsset=$PackageAssetFramework"
