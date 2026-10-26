@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { AlignCenter, AlignLeft, AlignRight, Braces, ChevronDown, FileText, Layers3, Ruler, Type } from '@lucide/vue'
-import type { BarcodeElement, BpTemplate, Cell, ComponentDefinition, Condition, FontElement, Gs1CompositeElement, ImageCrop, ImageElement, QuietZone, QrElement, RotationAngle, Row, TemplateElement } from '../model'
+import type { BarcodeElement, BpTemplate, Cell, ComponentDefinition, Condition, FieldFormat, FontElement, Gs1CompositeElement, Gs1Input, Gs1InputMode, ImageCrop, ImageElement, QuietZone, QrElement, RotationAngle, Row, TemplateElement } from '../model'
 import { MAX_QUIET_ZONE_DOTS } from '../model'
 import {
   applyDeclaredBarcodeEndCoordinate, applyEndCoordinateDelta, barcodeOccupiedSize, barcodeQuietZoneOccupiedDelta, barcodeRawSizeFromOccupied,
@@ -36,6 +36,8 @@ import {
   tsplVariableBarcodeRatios, type TsplBarcodeRatioKey,
 } from '../barcodeOptions'
 import ConditionEditor from './ConditionEditor.vue'
+import FieldFormatEditor from './FieldFormatEditor.vue'
+import Gs1AiEditor from './Gs1AiEditor.vue'
 
 const props = defineProps<{
   template: BpTemplate
@@ -50,6 +52,8 @@ const props = defineProps<{
   capabilitiesState: CapabilitiesState
   resources: Array<{ key: string; fileName: string }>
   fieldPaths: string[]
+  data: unknown
+  locked?: boolean
 }>()
 const emit = defineEmits<{ 'toggle-condition': [value: boolean]; 'update-condition': [value: Condition | undefined]; 'set-position': [axis: 'X' | 'Y', value: number]; 'add-row': []; 'add-column': []; 'add-nested-row': []; remove: [] }>()
 const typeName: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '一维条码', 5: '线段', 6: '组合', 7: '矩形', 8: '椭圆', 9: '图标', 10: '二维点阵码', 11: 'GS1 Composite' }
@@ -333,7 +337,7 @@ function barcodeQuietZoneContext(element: BarcodeElement, preserveExistingHri = 
     barcodeType: element.BarcodeType,
     lineWidth: element.LineWidth,
     narrowModuleWidth: element.NarrowModuleWidth,
-    protocol: props.capabilities?.protocol,
+    protocol: props.capabilities?.protocol ?? undefined,
     reserveHeight: element.HumanReadableReserveHeight ?? 0,
     preserveExistingHri,
   }
@@ -762,6 +766,42 @@ function setFieldMode(mode: 'bind' | 'static') {
   }
 }
 
+function structuredGs1Modes(element: TemplateElement): Gs1InputMode[] {
+  if (element.Type === 3 || element.Type === 10) return [0, 1]
+  if (element.Type === 11) return [0]
+  const gs1BarcodeTypes: number[] = [GS1_128_LINEAR_TYPE, DATABAR_TRUNCATED_LINEAR_TYPE,
+    DATABAR_EXPANDED_LINEAR_TYPE, DATABAR_STACKED_LINEAR_TYPE,
+    DATABAR_EXPANDED_STACKED_LINEAR_TYPE, DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE]
+  if (element.Type === 4 && gs1BarcodeTypes.includes(element.BarcodeType ?? -1))
+    return [0]
+  return []
+}
+
+function setPrimaryGs1Input(value: Gs1Input | undefined) {
+  const element = props.element
+  if (!element) return
+  element.Field ??= {}
+  if (!value) {
+    delete element.Field.Gs1Input
+    return
+  }
+  delete element.Field.Name
+  delete element.Field.Value
+  element.Field.Gs1Input = value
+  if (element.Type === 3 || element.Type === 10) element.Gs1 = value.Mode === 0
+}
+
+function setSecondaryGs1Input(value: Gs1Input | undefined) {
+  if (props.element?.Type !== 11) return
+  if (!value) {
+    delete props.element.SecondaryField.Gs1Input
+    return
+  }
+  delete props.element.SecondaryField.Name
+  delete props.element.SecondaryField.Value
+  props.element.SecondaryField.Gs1Input = value
+}
+
 function updateBorder(key: string, event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)
   if (value !== 0 && (!capabilitiesReady.value || !props.capabilities?.elementTypes.includes(5))) return
@@ -951,6 +991,21 @@ function updateFieldName(event: Event) {
   if (props.element?.Field) props.element.Field.Name = (event.target as HTMLInputElement).value
 }
 
+function updateFieldFormat(format: FieldFormat | undefined) {
+  if (!props.element) return
+  props.element.Field ??= {}
+  if (format) props.element.Field.Format = format
+  else delete props.element.Field.Format
+}
+
+function updateSecondaryFieldFormat(format: FieldFormat | undefined) {
+  if (props.element?.Type !== 11) return
+  const element = props.element as Gs1CompositeElement
+  element.SecondaryField ??= {}
+  if (format) element.SecondaryField.Format = format
+  else delete element.SecondaryField.Format
+}
+
 function setSecondaryMode(element: Gs1CompositeElement, bound: boolean) {
   element.SecondaryField = bound ? { Name: '' } : { Value: '' }
 }
@@ -1104,6 +1159,8 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
         <div class="selection-icon"><Type v-if="element?.Type === 1" :size="16" /><FileText v-else-if="isPage" :size="16" /><Layers3 v-else :size="16" /></div>
         <div><strong>{{ title }}</strong><small>{{ selectedPath || `Version ${template.Version} 模板` }}</small></div>
       </div>
+      <p v-if="locked" class="field-note capability-warning">此节点或其父级已锁定；请在结构树中解锁后编辑。</p>
+      <fieldset class="inspector-edit-scope" :disabled="locked">
 
       <template v-if="isPage">
         <section class="inspector-section">
@@ -1161,7 +1218,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
       </template>
 
       <template v-else-if="element">
-        <section v-if="[1, 2, 3, 4, 10, 11].includes(element.Type)" class="inspector-section">
+        <section v-if="[1, 2, 3, 4, 10, 11].includes(element.Type) && !element.Field?.Gs1Input" class="inspector-section">
           <div class="section-title"><span>内容绑定</span><span class="section-kicker">Field</span></div>
           <div class="segmented-control">
             <button type="button" :class="{ active: Boolean(element.Field?.Name) }" @click="setFieldMode('bind')">字段</button>
@@ -1169,6 +1226,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           </div>
           <label v-if="element.Field?.Name !== undefined" class="field-label">字段路径<input class="field-input" list="business-field-paths" :value="element.Field.Name" placeholder="例如 Product.Name" @input="updateFieldName" /><datalist id="business-field-paths"><option v-for="path in fieldPaths" :key="path" :value="path" /></datalist></label>
           <label v-else class="field-label">显示内容<textarea class="field-input field-textarea" :value="element.Field?.Value ?? ''" rows="3" placeholder="输入打印内容" @input="updateFieldValue" /></label>
+          <FieldFormatEditor :format="element.Field?.Format" @update:format="updateFieldFormat" />
           <template v-if="element.Type === 1">
             <label class="toggle-row"><span>文字换行</span><input type="checkbox" :checked="element.Field?.NeedFeedLine !== false" @change="element.Field ??= {}; element.Field.NeedFeedLine = ($event.target as HTMLInputElement).checked" /></label>
             <label class="toggle-row"><span>适配可用宽度</span><input type="checkbox" :checked="element.Field?.Fit" @change="element.Field ??= {}; element.Field.Fit = ($event.target as HTMLInputElement).checked" /></label>
@@ -1177,6 +1235,10 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <div v-if="selectedImageMissing" class="resource-missing">当前资源键尚未导入</div>
           <p v-if="element.Type === 2 && capabilitiesReady && !elementTypeSupported(capabilities, 2)" class="field-note capability-warning">{{ capabilityReason('图片元素') }}</p>
         </section>
+        <Gs1AiEditor v-if="structuredGs1Modes(element).length" :template="template" :data="data" :element="element"
+          :model-value="element.Field?.Gs1Input" :field-path="`${selectedPath}.Field.Gs1Input`"
+          :field-paths="fieldPaths" :allowed-modes="structuredGs1Modes(element)" :enabled="true"
+          support-reason="当前元素不支持 GS1 结构化来源。" @update:model-value="setPrimaryGs1Input" />
 
         <section class="inspector-section">
           <div class="section-title"><span>位置与尺寸</span><span class="section-kicker">{{ unit }}</span></div>
@@ -1386,10 +1448,17 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
           <label class="field-label">二维模式<select aria-label="Composite 二维模式" class="field-input" :value="element.Mode ?? 0" @change="setCompositeMode(element, $event)"><option v-for="mode in gs1CompositeModeOptions" :key="mode.value" :value="mode.value" :disabled="mode.disabled" :title="mode.reason">{{ mode.label }}</option></select></label>
           <label class="field-label">模块宽度（点）<input class="field-input" type="number" min="1" step="1" aria-label="Composite 模块宽度" :value="element.ModuleWidth ?? 2" @input="setCompositeSize(element, 'ModuleWidth', $event)" /></label>
           <label class="field-label">线性条高（点）<input class="field-input" type="number" :min="compositeLinearBarHeightMin(element)" step="1" aria-label="Composite 线性条高" :value="element.LinearBarHeight ?? 40" @input="setCompositeSize(element, 'LinearBarHeight', $event)" /></label>
-          <div class="section-title"><span>次数据绑定</span><span class="section-kicker">SecondaryField</span></div>
-          <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
-          <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
-          <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
+          <template v-if="!element.SecondaryField.Gs1Input">
+            <div class="section-title"><span>次数据绑定</span><span class="section-kicker">SecondaryField</span></div>
+            <div class="segmented-control"><button type="button" :class="{ active: element.SecondaryField.Name !== undefined }" @click="setSecondaryMode(element, true)">字段</button><button type="button" :class="{ active: element.SecondaryField.Name === undefined }" @click="setSecondaryMode(element, false)">固定文字</button></div>
+            <label v-if="element.SecondaryField.Name !== undefined" class="field-label">次字段路径<input class="field-input" aria-label="Composite 次字段路径" list="business-field-paths" :value="element.SecondaryField.Name" @input="element.SecondaryField.Name = ($event.target as HTMLInputElement).value" /></label>
+            <label v-else class="field-label">括号式 GS1 AI<textarea class="field-input field-textarea" aria-label="Composite 次数据" :value="element.SecondaryField.Value ?? ''" @input="element.SecondaryField.Value = ($event.target as HTMLTextAreaElement).value" /></label>
+            <FieldFormatEditor :format="element.SecondaryField.Format" title="次字段格式" @update:format="updateSecondaryFieldFormat" />
+          </template>
+          <Gs1AiEditor :template="template" :data="data" :element="element"
+            :model-value="element.SecondaryField.Gs1Input" :field-path="`${selectedPath}.SecondaryField.Gs1Input`"
+            :field-paths="fieldPaths" :allowed-modes="[0]" :enabled="true"
+            support-reason="Composite 次数据仅支持 GS1 Elements。" @update:model-value="setSecondaryGs1Input" />
           <p class="field-note">{{ element.LinearType === GS1_128_LINEAR_TYPE ? '上方内容绑定为括号式 GS1 AI 主数据，例如 (01)12345678901231，规范化后最多 48 字符。' : isGs1CompositeRetailLinearType(element.LinearType) ? 'EAN/UPC 主码只接受 ASCII 数字，可选用单个 + 添加 2 或 5 位 ASCII 数字，例如 12345670+12、1234567890128+51234；附加码不补零、不修剪。UPC-E 支持 6、7 或 8 位，6 位输入默认号码系统 0。' : element.LinearType === DATABAR_EXPANDED_LINEAR_TYPE || element.LinearType === DATABAR_EXPANDED_STACKED_LINEAR_TYPE ? 'Expanded 主数据使用括号式 GS1 AI，例如 (01)09506000134352(10)LOT-A；上方默认值可按业务数据修改。' : element.LinearType === DATABAR_TRUNCATED_LINEAR_TYPE || element.LinearType === DATABAR_STACKED_OMNIDIRECTIONAL_LINEAR_TYPE ? '主数据与 Omnidirectional 相同：13 位 payload，或有效 14 位 GTIN/括号式 (01) AI。' : '上方内容绑定为主 GTIN。' }}次数据使用括号式 GS1 AI。完整符号与静区一起旋转，尺寸以 Host 编码为准；可读文字请添加独立文字元素。</p>
           <p v-if="isGs1CompositeRetailLinearType(element.LinearType) && !supportsGs1CompositeEanUpc(capabilities)" class="field-note capability-warning">当前 Host 未协商 EAN/UPC Composite；请更新 Host 后再预览或输出。</p>
           <p v-if="isGs1CompositeRetailLinearType(element.LinearType) && element.Field !== undefined && element.Field.Name === undefined && gs1CompositeRetailHasAddon(element.Field.Value) && !supportsGs1CompositeEanUpcAddons(capabilities)" class="field-note capability-warning">当前 Host 未协商 EAN/UPC Composite 附加码；原输入会保留，但带附加码的预览与输出不可用。</p>
@@ -1465,6 +1534,7 @@ function setParameterMode(binding: { Path?: string; Value?: unknown }, mode: 'pa
         </section>
       </template>
       <div v-else class="empty-hint inspector-empty">从结构树或画布中选择一项</div>
+      </fieldset>
     </div>
   </aside>
 </template>

@@ -93,6 +93,12 @@ button:disabled { opacity: .42; cursor: not-allowed !important; }
 .tree-icon { flex: 0 0 auto; color: #869497; }
 .tree-row.selected .tree-icon, .tree-row.selected .tree-caret { color: var(--accent); }
 .tree-select { display: flex; flex: 1 1 auto; align-items: center; justify-content: space-between; min-width: 0; height: 100%; padding: 0 0 0 7px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.tree-lock { display: grid; flex: 0 0 24px; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: 3px; background: transparent; color: #687c7e; cursor: pointer; }
+.tree-lock:hover { background: #e5efed; color: #286b64; }
+.tree-lock:disabled { cursor: default; opacity: .55; }
+.inspector-edit-scope { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+.inspector-edit-scope:disabled { opacity: .72; }
+.arrangement-tools select { max-width: 116px; height: 28px; padding: 0 5px; border: 1px solid #dbe2e2; border-radius: 3px; background: #fff; color: var(--ink); font-size: 10px; }
 .tree-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-meta { flex: 0 0 auto; margin-left: 6px; color: #99a5a8; font-family: var(--mono); font-size: 9px; }
 .tree-tools { flex: 0 0 auto; max-height: min(58vh, 540px); overflow: auto; border-top: 1px solid var(--line); padding: 10px 10px 8px; }

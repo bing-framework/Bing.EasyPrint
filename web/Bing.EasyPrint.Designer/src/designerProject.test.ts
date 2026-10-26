@@ -9,8 +9,27 @@ import {
   validateDesignerOutputSettings,
   type DesignerOutputSettings,
 } from './designerProject'
+import { NodeIdentityStore } from './editorIdentity'
 
 describe('designer project serialization', () => {
+  it('round-trips stable node identities and explicit locks in editorState', () => {
+    const template = createProductSample()
+    let nextId = 0
+    const identities = new NodeIdentityStore(() => `project-${++nextId}`)
+    const nodeStates = identities.reconcile(template)
+    identities.setLocked(template, 'Rows[0].Cells[0].Elements[0]', true)
+    const serialized = serializeDesignerProject(template, defaultDesignerOutputSettings(), {
+      unit: 'mm', selectedPath: 'Rows[0].Cells[0].Elements[0]', selectedPaths: [],
+      templateName: '商品', sampleId: 'product', nodeStates: identities.snapshot(),
+    })
+
+    const imported = parseDesignerProject(JSON.parse(serialized) as unknown)
+    const restored = new NodeIdentityStore().restore(imported.template, imported.editorState?.nodeStates)
+    expect(restored).toEqual(identities.snapshot())
+    expect(restored['Rows[0].Cells[0].Elements[0]']!.id).toBe(nodeStates['Rows[0].Cells[0].Elements[0]']!.id)
+    expect(restored['Rows[0].Cells[0].Elements[0]']!.locked).toBe(true)
+  })
+
   it.each(['Left', 'Right'])('rejects unsupported legacy ZPL orientation %s on project import', (orientation) => {
     const project = JSON.parse(serializeDesignerProject(createProductSample(), defaultDesignerOutputSettings()))
     project.outputSettings.zplMedia = { orientation }
@@ -67,7 +86,7 @@ describe('designer project serialization', () => {
     const serialized = serializeDesignerProject(template, settings)
     const envelope = JSON.parse(serialized) as Record<string, unknown>
     expect(envelope.format).toBe('Bing.EasyPrint.DesignerProject')
-    expect(envelope.version).toBe(1)
+    expect(envelope.version).toBe(2)
 
     const parsed = parseDesignerProject(envelope)
     expect(parsed.template).toEqual(template)
@@ -81,6 +100,39 @@ describe('designer project serialization', () => {
       .not.toBe(settings.escPosDevice.profile?.text?.characterRanges)
   })
 
+  it('round-trips a custom protocol selection and keeps v1 projects readable', () => {
+    const template = createProductSample()
+    const settings = {
+      ...defaultDesignerOutputSettings(),
+      protocolId: 'demo.protocol',
+      protocolConfig: { characterWidth: 8, lineHeight: 30, maxPageHeight: 900 },
+    }
+    const serialized = JSON.parse(serializeDesignerProject(template, settings)) as Record<string, unknown>
+    expect(serialized.version).toBe(2)
+    const parsed = parseDesignerProject(serialized)
+    expect(parsed.outputSettings?.protocolId).toBe('demo.protocol')
+    expect(parsed.outputSettings?.protocolConfig).toEqual(settings.protocolConfig)
+    expect(parsed.outputSettings?.protocolConfig).not.toBe(settings.protocolConfig)
+
+    expect(() => validateDesignerOutputSettings({ ...defaultDesignerOutputSettings(), protocolConfig: {} }))
+      .toThrow('只有声明 protocolId')
+    expect(parseDesignerProject({
+      format: 'Bing.EasyPrint.DesignerProject', version: 1, template,
+      outputSettings: defaultDesignerOutputSettings(),
+    }).outputSettings?.protocolId).toBeUndefined()
+  })
+
+  it('round-trips the v2 editor state container without print metadata', () => {
+    const template = createProductSample()
+    const editorState = { unit: 'mm', selectedPath: 'Rows[0]', selectedPaths: ['Rows[0]'], templateName: 'demo', sampleId: '' }
+    const serialized = JSON.parse(serializeDesignerProject(template, defaultDesignerOutputSettings(), editorState)) as Record<string, unknown>
+    expect(serialized.version).toBe(2)
+    const parsed = parseDesignerProject(serialized)
+    expect(parsed.editorState).toEqual(editorState)
+    expect(parsed.editorState).not.toBe(editorState)
+    expect(parseDesignerProject({ format: 'Bing.EasyPrint.DesignerProject', version: 1, template }).editorState)
+      .toBeUndefined()
+  })
   it('accepts the historical bare template JSON without output settings', () => {
     const template = createProductSample()
     const parsed = parseDesignerProject(template)
@@ -94,7 +146,7 @@ describe('designer project serialization', () => {
     const template = createProductSample()
 
     expect(() => parseDesignerProject({
-      format: 'Bing.EasyPrint.DesignerProject', version: 2, template,
+      format: 'Bing.EasyPrint.DesignerProject', version: 3, template,
     })).toThrow('设计器项目版本不受支持')
     expect(() => parseDesignerProject({
       format: 'other', version: 1, template,
@@ -243,7 +295,7 @@ describe('designer project serialization', () => {
     expect(settings.tsplMedia.profile?.characterRanges?.[0].first).toBe(0x20)
 
     const serialized = JSON.parse(serializeDesignerProject(template, settings)) as Record<string, unknown>
-    expect(serialized.version).toBe(1)
+    expect(serialized.version).toBe(2)
     const parsed = parseDesignerProject(serialized)
     expect(parsed.outputSettings?.tsplMedia.profile).toEqual(settings.tsplMedia.profile)
     expect(parsed.outputSettings?.zplMedia.profile).toEqual(settings.zplMedia.profile)

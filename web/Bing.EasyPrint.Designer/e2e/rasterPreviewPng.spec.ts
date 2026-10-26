@@ -37,10 +37,10 @@ test('真实码图预览随参数更新，元素/页面 PNG 可解码且保存�
   })
   await expect(page.locator('.tree-row.tree-element').first()).toBeVisible()
   const firstImageResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/designer/element-png') && response.status() === 200)
+    response.url().includes('/api/designer/preview-bundle') && response.status() === 200)
   await page.getByRole('combobox', { name: '输出协议' }).selectOption('EscPosRaster')
   const firstImage = await firstImageResponse
-  expect(firstImage.request().headers()['x-easyprint-required-features']).toContain('raster-element-png')
+  expect(firstImage.request().headers()['x-easyprint-required-features']).toContain('preview-bundle')
   await page.locator('.tree-row.tree-element .tree-select').first().click()
   const firstSize = pngSize(await downloadElement(page))
   expect(firstSize.width).toBeGreaterThan(10)
@@ -52,7 +52,7 @@ test('真实码图预览随参数更新，元素/页面 PNG 可解码且保存�
   expect(pngSize(pageFile)).toEqual({ width: 400, height: 200 })
 
   const changedImageResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/designer/element-png') && response.status() === 200 &&
+    response.url().includes('/api/designer/preview-bundle') && response.status() === 200 &&
     response.request().postDataJSON()?.template?.Rows?.[0]?.Cells?.[0]?.Elements?.[0]?.Height === 60)
   await page.getByTestId('template-import').setInputFiles({
     name: 'raster-preview-tall.json', mimeType: 'application/json',
@@ -70,7 +70,7 @@ test('真实码图预览随参数更新，元素/页面 PNG 可解码且保存�
   await page.reload()
   await expect(page.locator('.capability-note')).toHaveClass(/ready/)
   const restoredImageResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/designer/element-png') && response.status() === 200)
+    response.url().includes('/api/designer/preview-bundle') && response.status() === 200)
   await page.getByTestId('template-import').setInputFiles({
     name: 'raster-preview-project.json', mimeType: 'application/json', buffer: project,
   })

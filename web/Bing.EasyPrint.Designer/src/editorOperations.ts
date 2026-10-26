@@ -26,7 +26,7 @@ export function groupRowsAtPaths(template: BpTemplate, paths: string[]): string 
   if (content.some((row) => row.IsHeader || row.Section && !['Body', 'TableHeader'].includes(row.Section)) ||
     content.at(-1)?.Section === 'TableHeader')
     throw new Error('页眉、页脚及孤立表头不能移入流式组合。')
-  const group: TemplateElement = { Type: 6, Rows: cloneTemplate(content), Pagination: 'Split' }
+  const group: TemplateElement = { Type: 6, Rows: content, Pagination: 'Split' }
   rows.splice(selected[0].index, selected.length, { Cells: [{ Elements: [group] }] })
   template.Version = 3
   return `${parentPath ? `${parentPath}.` : ''}Rows[${selected[0].index}].Cells[0].Elements[0]`

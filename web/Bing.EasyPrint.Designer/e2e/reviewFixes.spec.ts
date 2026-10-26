@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 test('五种输出模式接受真实 Host 的空 HRI 位置契约并启用编辑', async ({ page }) => {
   await page.goto('/')
@@ -30,7 +31,7 @@ test('GS1 Composite 真实 Host 编辑预览导出及项目往返保持编码参
   })
   await page.getByLabel('Composite 次数据').fill('(17)010615(10)A123456')
   await page.getByLabel('Composite 次数据').press('Tab')
-  const layout = await (await preview).json()
+  const layout = await readPreviewLayout(await preview)
   const encoded = layout.pages.flatMap((item: { elements: Array<{ type: number; width: number; height: number }> }) => item.elements)
     .find((item: { type: number }) => item.type === 11)
   expect(encoded).toBeDefined()
@@ -68,7 +69,7 @@ test('GS1 Composite 真实 Host 编辑预览导出及项目往返保持编码参
   const restoredPreview = page.waitForResponse((response) => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && JSON.stringify(response.request().postDataJSON()?.template).includes('(17)010615(10)A123456'))
   await page.getByTestId('template-import').setInputFiles({ name: 'composite-project.json', mimeType: 'application/json', buffer: saved })
-  const restored = await (await restoredPreview).json()
+  const restored = await readPreviewLayout(await restoredPreview)
   expect(restored.pages).toEqual(layout.pages)
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 模块宽度')).toHaveValue('3')

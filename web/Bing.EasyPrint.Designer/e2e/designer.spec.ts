@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 async function openBlankTemplate(page: import('@playwright/test').Page) {
   await page.goto('/')
@@ -4091,7 +4092,7 @@ test('条件编辑器创建 AND/OR 组合并让预览与 CPCL 跟随数据显隐
   const andData = { Enabled: true, Stock: 1 }
   const hiddenUpdate = page.waitForResponse((response) => response.url().includes('/api/designer/preview'))
   await page.getByRole('textbox', { name: '业务数据 JSON' }).fill(JSON.stringify(andData))
-  const hiddenPreview = await (await hiddenUpdate).json()
+  const hiddenPreview = await readPreviewLayout(await hiddenUpdate)
   expect(hiddenPreview.pages.flatMap((part: { elements: Array<{ text?: string }> }) => part.elements)
     .some((element: { text?: string }) => element.text === 'PROMOTION')).toBe(false)
   const savedAndBytes = await exportTemplateJson(page)

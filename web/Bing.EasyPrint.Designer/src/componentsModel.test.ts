@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { reactive, watch } from 'vue'
 import { appendComponent, appendDataTable, appendStaticTable, componentLibraryTargetVersion, defaultGroupPagination, detachComponent, groupCellElements, groupConsecutiveRows, removeComponent, renameComponent, saveGroupComponent, ungroupElement } from './componentsModel'
 import { resolvePath } from './binding'
 import { findElement, findRow, listTemplateTree } from './tree'
 import { assertTemplate, type BpTemplate } from './model'
+import { NodeIdentityStore } from './editorIdentity'
 
 function template(): BpTemplate {
   return { Version: 1, Width: 300, Height: 180, Rows: [{ Height: 180, Cells: [{ Width: 300, Elements: [
@@ -12,6 +14,24 @@ function template(): BpTemplate {
 }
 
 describe('V2 composition', () => {
+  it('preserves child identities through inline grouping and ungrouping', () => {
+    const value = template()
+    let nextId = 0
+    const identities = new NodeIdentityStore(() => `group-${++nextId}`)
+    const initial = identities.reconcile(value)
+    const childIds = [initial['Rows[0].Cells[0].Elements[0]']!.id, initial['Rows[0].Cells[0].Elements[1]']!.id]
+
+    const groupPath = groupCellElements(value, 'Rows[0].Cells[0]')
+    const grouped = identities.reconcile(value)
+    expect(grouped[`${groupPath}.Elements[0]`]!.id).toBe(childIds[0])
+    expect(grouped[`${groupPath}.Elements[1]`]!.id).toBe(childIds[1])
+
+    ungroupElement(value, groupPath)
+    const ungrouped = identities.reconcile(value)
+    expect(ungrouped['Rows[0].Cells[0].Elements[0]']!.id).toBe(childIds[0])
+    expect(ungrouped['Rows[0].Cells[0].Elements[1]']!.id).toBe(childIds[1])
+  })
+
   it('groups elements with relative coordinates and reuses a named definition', () => {
     const value = template()
     const groupPath = groupCellElements(value, 'Rows[0].Cells[0]')
@@ -250,6 +270,24 @@ describe('V2 composition', () => {
 })
 
 describe('V3 flowing composition', () => {
+  it('retains child identities under a synchronous Vue watcher when grouping rows', () => {
+    const value = reactive<BpTemplate>({ Version: 2, Width: 100, Height: 80, Rows: [
+      { Cells: [{ Elements: [{ Type: 1, Field: { Value: 'ROW-A' } }] }] },
+      { Cells: [{ Elements: [{ Type: 1, Field: { Value: 'ROW-B' } }] }] },
+    ] })
+    const identities = new NodeIdentityStore(() => `component-row-${Math.random()}`)
+    let states = identities.reconcile(value)
+    watch(value, () => { states = identities.reconcile(value) }, { deep: true, flush: 'sync' })
+    const rowIds = [states['Rows[0].Cells[0].Elements[0]']!.id, states['Rows[1].Cells[0].Elements[0]']!.id]
+
+    const finishStructureTransaction = identities.beginStructureTransaction()
+    try { groupConsecutiveRows(value, [0, 1]) }
+    finally { states = finishStructureTransaction(value) }
+
+    expect(states['Rows[0].Cells[0].Elements[0].Rows[0].Cells[0].Elements[0]']?.id).toBe(rowIds[0])
+    expect(states['Rows[0].Cells[0].Elements[0].Rows[1].Cells[0].Elements[0]']?.id).toBe(rowIds[1])
+  })
+
   it('groups adjacent table rows and keeps row content after detach', () => {
     const value = template()
     appendDataTable(value, 'Items', [{ title: 'Name', path: 'Name' }])

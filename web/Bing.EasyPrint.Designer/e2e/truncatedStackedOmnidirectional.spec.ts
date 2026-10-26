@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 const compositeCases = [
   { name: 'Truncated', type: 26, feature: 'gs1-composite-truncated', width: 300, minimumHeight: 39 },
@@ -33,7 +34,7 @@ for (const item of compositeCases) {
       Type: 11, LinearType: item.type, Mode: 2, ModuleWidth: 3, LinearBarHeight: item.minimumHeight,
       Field: { Value: '(01)09506000134352' }, SecondaryField: { Value: '(10)LOT-STACKED-OMNI' },
     }] }] }] })
-    const layout = await response.json()
+    const layout = await readPreviewLayout(response)
     const composite = layout.pages.flatMap((value: { elements: Array<Record<string, unknown>> }) => value.elements)
       .find((value: Record<string, unknown>) => value.type === 11)
     expect(composite).toMatchObject({ width: item.width, height: expect.any(Number) })
@@ -64,7 +65,7 @@ for (const item of compositeCases) {
     await page.getByTestId('template-import').setInputFiles({
       name: `${item.name.toLowerCase().replaceAll(' ', '-')}.json`, mimeType: 'application/json', buffer: saved,
     })
-    expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+    expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
     await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
     await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue(String(item.type))
     await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('2')
@@ -151,7 +152,7 @@ test('普通 Stacked Omnidirectional 只在 Raster 可用，并保持每行高�
   const requestElement = response.request().postDataJSON()?.template.Rows[0].Cells[0].Elements[0]
   expect(requestElement).toMatchObject({ BarcodeType: 32, NarrowModuleWidth: 2, Height: 66, HumanReadable: true,
     HumanReadableReserveHeight: 20, Field: { Value: '0950600013435' } })
-  const layout = await response.json()
+  const layout = await readPreviewLayout(response)
   const barcode = layout.pages.flatMap((value: { elements: Array<Record<string, unknown>> }) => value.elements)
     .find((value: Record<string, unknown>) => value.type === 4)
   expect(barcode).toMatchObject({ width: 140, height: 158 })
@@ -167,7 +168,7 @@ test('普通 Stacked Omnidirectional 只在 Raster 可用，并保持每行高�
     response.status() === 200 && response.request().postDataJSON()?.template.Rows[0].Cells[0].Elements[0].Height === 70)
   await dimensions.nth(3).fill('70')
   await expect(dimensions.nth(3)).toHaveValue('70')
-  const resizedLayout = await (await resizedPreview).json()
+  const resizedLayout = await readPreviewLayout(await resizedPreview)
   const resizedBarcode = resizedLayout.pages.flatMap((value: { elements: Array<Record<string, unknown>> }) => value.elements)
     .find((value: Record<string, unknown>) => value.type === 4)
   expect(resizedBarcode).toMatchObject({ width: 140, height: 166 })
@@ -187,7 +188,7 @@ test('普通 Stacked Omnidirectional 只在 Raster 可用，并保持每行高�
   // 原始模板 JSON 不携带输出协议；重新导入后恢复默认 CPCL，需显式选择 Raster。
   await expect(page.getByRole('combobox', { name: '输出协议' })).toHaveValue('Cpcl')
   await page.getByRole('combobox', { name: '输出协议' }).selectOption('EscPosRaster')
-  expect((await (await restoredPreview).json()).pages).toEqual(resizedLayout.pages)
+  expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(resizedLayout.pages)
   await page.locator('.tree-row.tree-element .tree-select').first().click()
   await expect(typeSelect).toHaveValue('32')
   await expect(dimensions.nth(3)).toHaveValue('70')

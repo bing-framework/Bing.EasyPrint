@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { isPreviewBundleResponse } from './previewResponse'
 
 const qrTemplate = {
   Version: 2, Width: 400, Height: 400,
@@ -18,7 +19,7 @@ test('GS1 QR 与 DataMatrix 可创建、预览、下载并保存项目', async (
   await qrRow.click()
   await page.getByLabel('显示内容').fill('(01)12345678901231(10)LOT%20A')
   const qrImage = page.waitForResponse((response) =>
-    response.url().includes('/api/designer/element-png') && response.status() === 200)
+    isPreviewBundleResponse(response) && response.status() === 200)
   await page.getByLabel('GS1 QR Code').check()
   await qrImage
 
@@ -28,7 +29,7 @@ test('GS1 QR 与 DataMatrix 可创建、预览、下载并保存项目', async (
   await matrixRow.click()
   await page.getByLabel('显示内容').fill('(01)12345678901231(10)LOT%20A')
   const matrixImage = page.waitForResponse((response) =>
-    response.url().includes('/api/designer/element-png') && response.status() === 200)
+    isPreviewBundleResponse(response) && response.status() === 200)
   await page.getByLabel('GS1 DataMatrix').check()
   await matrixImage
   await expect(page.getByLabel('GS1 DataMatrix')).toBeChecked()

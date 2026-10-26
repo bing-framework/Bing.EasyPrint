@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronDown, ChevronRight, FileText, Layers3, Rows3, Type } from '@lucide/vue'
+import { ChevronDown, ChevronRight, FileText, Layers3, Lock, Rows3, Type, Unlock } from '@lucide/vue'
 import { listTemplateTree, type TreeEntry } from '../tree'
 import type { BpTemplate } from '../model'
+import type { NodeIdentityMap } from '../editorIdentity'
 
-const props = defineProps<{ template: BpTemplate; selectedPath: string; selectedPaths?: string[]; collapsed: boolean; query?: string }>()
-const emit = defineEmits<{ select: [path: string, additive?: boolean, occurrencePath?: string]; toggle: [] }>()
+const props = defineProps<{ template: BpTemplate; selectedPath: string; selectedPaths?: string[]; collapsed: boolean; query?: string; nodeStates: NodeIdentityMap; isLocked: (path: string, occurrencePath?: string) => boolean }>()
+const emit = defineEmits<{ select: [path: string, additive?: boolean, occurrencePath?: string]; toggle: []; 'toggle-lock': [path: string] }>()
 const entries = computed(() => {
   const all = listTemplateTree(props.template)
   const query = props.query?.trim().toLocaleLowerCase()
-  return query ? all.filter((entry) => entry.label.toLocaleLowerCase().includes(query)) : all
+  return (query ? all.filter((entry) => entry.label.toLocaleLowerCase().includes(query)) : all).map((entry) => ({
+    ...entry,
+    ownLocked: props.nodeStates[entry.sourcePath]?.locked ?? false,
+    locked: props.isLocked(entry.sourcePath, entry.path),
+  }))
 })
 const typeLabel: Record<number, string> = { 1: '文字', 2: '图片', 3: '二维码', 4: '条码', 5: '线段' }
 
@@ -39,6 +44,12 @@ function iconFor(entry: TreeEntry) {
         <button class="tree-select" type="button" :title="entry.path !== entry.sourcePath ? `编辑共享定义 ${entry.sourcePath}` : entry.path" @click="emit('select', entry.sourcePath, $event.ctrlKey || $event.metaKey || $event.shiftKey, entry.path)">
           <span class="tree-label">{{ entry.label }}</span>
           <span v-if="entry.type" class="tree-meta">{{ typeLabel[entry.type] }}</span>
+        </button>
+        <button class="tree-lock" type="button" :disabled="entry.locked && !entry.ownLocked"
+          :title="entry.ownLocked ? '解锁节点' : entry.locked ? '节点继承了父级锁定' : '锁定节点'"
+          :aria-label="entry.ownLocked ? `解锁 ${entry.label}` : `锁定 ${entry.label}`"
+          @click.stop="emit('toggle-lock', entry.sourcePath)">
+          <Lock v-if="entry.locked" :size="13" /><Unlock v-else :size="13" />
         </button>
       </div>
       <div v-if="entries.length === 0" class="empty-hint">模板还没有行或元素</div>

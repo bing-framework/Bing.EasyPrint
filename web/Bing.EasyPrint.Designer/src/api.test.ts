@@ -1,5 +1,7 @@
+import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defaultEscPosPrinterProfile, DesignerValidationError, loadDesignerCapabilities, previewTemplate, previewWithImages, renderTemplate } from './api'
+import { defaultEscPosPrinterProfile, DesignerValidationError, loadDesignerCapabilities, loadProtocolRegistry,
+  elementSvg, pagePdf, previewTemplate, previewWithImages, renderBatchChunk, renderTemplate } from './api'
 import { createBlankSample } from './samples'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -54,6 +56,50 @@ function validTsplCutterCapabilitiesResponse(overrides: Record<string, unknown> 
   })
 }
 
+describe('custom protocol requests', () => {
+  it('reads the frozen protocol registry and requires the registry feature', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',protocol-registry'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      contract: '1',
+      protocols: [{ id: 'demo.protocol', displayName: 'Demo', isBuiltIn: false, configSchema: {}, constraints: {},
+        capabilities: { dpi: 203 } }],
+    }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const catalog = await loadProtocolRegistry()
+    expect(catalog[0]?.id).toBe('demo.protocol')
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/designer/protocol-registry')
+  })
+
+  it('sends only protocolId and protocolConfig for custom capabilities and previews', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',protocol-registry'
+    const capabilities = validEscPosCapabilitiesResponse({
+      protocol: 'Cpcl', escPosLayoutMode: null, nativeFlow: null, cutModes: [], cutFeedUnits: [],
+      cutFeedMotionUnits: null, cutFeedDots: null, jobFeedUnits: [],
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(capabilities), { headers }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ protocolId: 'demo.protocol', pages: [] }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await loadDesignerCapabilities({ protocolId: 'demo.protocol', protocolConfig: { lineHeight: 24 } })
+    const capabilityBody = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as Record<string, unknown>
+    expect(capabilityBody).toEqual({ protocolId: 'demo.protocol', protocolConfig: { lineHeight: 24 } })
+    expect((fetchMock.mock.calls[0]![1]!.headers as Record<string, string>)['X-EasyPrint-Required-Features'])
+      .toContain('protocol-registry')
+
+    await previewTemplate(createBlankSample(), {}, [], undefined, 'Cpcl', 'Native', false,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, false,
+      { id: 'demo.protocol', config: { lineHeight: 24 } })
+    const previewBody = JSON.parse(fetchMock.mock.calls[1]![1]!.body as string) as Record<string, unknown>
+    expect(previewBody.protocolId).toBe('demo.protocol')
+    expect(previewBody.protocolConfig).toEqual({ lineHeight: 24 })
+    expect(previewBody).not.toHaveProperty('protocol')
+  })
+})
+
 describe('raster preview images', () => {
   it('loads real element PNGs only after the raster preview feature is negotiated', async () => {
     const headers = validContractHeaders()
@@ -74,6 +120,92 @@ describe('raster preview images', () => {
     const headersSent = fetchMock.mock.calls[1]![1]!.headers as Record<string, string>
     expect(headersSent['X-EasyPrint-Required-Features']).toContain('raster-element-png')
     expect(fetchMock.mock.calls[1]![1]!.body as string).toContain('"elementIndex":0')
+  })
+
+  it('uses one preview-bundle request for the current page when the feature is negotiated', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',raster-element-png,preview-bundle'
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const zip = new JSZip()
+    const key = '1:Rows[0].Cells[0].Elements[0]:::0:4'
+    zip.file('manifest.json', JSON.stringify({
+      contract: { version: 1 },
+      layout: {
+        pageIndex: 1, pageCount: 2, pages: [
+          { width: 100, height: 50, elements: [] },
+          { width: 100, height: 50, elements: [
+            { type: 4, sourcePath: 'Rows[0].Cells[0].Elements[0]', fragmentIndex: 0,
+              x: 0, y: 0, width: 80, height: 40 },
+          ] },
+        ],
+      },
+      images: [{ key, file: 'images/0001.png', pageIndex: 1,
+        elementIndex: 0, type: 4, sourcePath: 'Rows[0].Cells[0].Elements[0]', width: 80, height: 40 }],
+      diagnostics: [{ pageIndex: 1, elementIndex: 0, type: 4, code: 'UnsupportedCapability',
+        phase: 'PreviewImage', message: '元素码图不可用。' }],
+    }))
+    zip.file('images/0001.png', png)
+    const archiveBytes = await zip.generateAsync({ type: 'uint8array' })
+    const archiveBuffer = archiveBytes.buffer.slice(archiveBytes.byteOffset,
+      archiveBytes.byteOffset + archiveBytes.byteLength) as ArrayBuffer
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(archiveBuffer, { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:bundle')
+    const result = await previewWithImages(createBlankSample(), {}, [], undefined, 'EscPos', 'Raster', false,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, [4], false, 1, true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/designer/preview-bundle')
+    const sentHeaders = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(sentHeaders['X-EasyPrint-Required-Features']).toContain('preview-bundle')
+    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as Record<string, unknown>
+    expect(body.pageIndex).toBe(1)
+    expect(body.imageTypes).toEqual([4])
+    expect(result.pages).toHaveLength(2)
+    expect(result.images[key]).toBe('blob:bundle')
+    expect(result.imageDiagnostics).toEqual([expect.objectContaining({ code: 'UnsupportedCapability' })])
+    createObjectURL.mockRestore()
+  })
+
+  it('falls back to element-png for only the requested page when preview-bundle is unavailable', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',raster-element-png'
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const pages = [0, 1].map((index) => ({ width: 100, height: 50, elements: [
+      { type: 4, sourcePath: `Rows[0].Cells[0].Elements[${index}]`, fragmentIndex: 0,
+        x: 0, y: 0, width: 80, height: 40 },
+    ] }))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pages }), { headers }))
+      .mockResolvedValueOnce(new Response(new Blob([png], { type: 'image/png' }),
+        { headers: { ...headers, 'Content-Type': 'image/png' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fallback')
+    const result = await previewWithImages(createBlankSample(), {}, [], undefined, 'EscPos', 'Raster', false,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, [4], false, 1, false)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/designer/preview')
+    expect(fetchMock.mock.calls[1]![0]).toBe('/api/designer/element-png')
+    expect(fetchMock.mock.calls[1]![1]!.body as string).toContain('"pageIndex":1')
+    expect(result.images).toEqual({ '1:Rows[0].Cells[0].Elements[1]:::0:4': 'blob:fallback' })
+  })
+
+  it('returns structured InvalidPageIndex when a legacy host shrinks the page count', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',raster-element-png'
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
+      pages: [{ width: 100, height: 50, elements: [] }],
+    }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(previewWithImages(createBlankSample(), {}, [], undefined, 'EscPos', 'Raster', false,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, [4], false, 1, false))
+      .rejects.toMatchObject({
+        name: 'DesignerValidationError',
+        diagnostics: [expect.objectContaining({ code: 'InvalidPageIndex' })],
+      })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -916,5 +1048,125 @@ describe('designer preview errors', () => {
     const result = await loadDesignerCapabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster' })
     expect(result.expandedStackedColumns).toEqual({ minimum: 1, maximum: 11, default: 2 })
     expect(result.expandedStackedColumnsFeature).toBe(true)
+  })
+})
+
+describe('phase 3 contracts', () => {
+  it('requires field-format negotiation when a BgField has a format', async () => {
+    const template = {
+      Version: 2, Width: 200, Height: 80,
+      Rows: [{ Height: 80, Cells: [{ Width: 200, Elements: [
+        { Type: 1, FontSize: 24, Field: { Name: 'Amount', Format: { Kind: 'Number', Pattern: 'N2' } } },
+      ] }] }],
+    } as never
+    const headers = validContractHeaders()
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: [] }), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(previewTemplate(template, {}, [])).rejects.toMatchObject({ message: expect.stringContaining('功能') })
+    const sent = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(sent['X-EasyPrint-Required-Features']).toContain('field-format')
+  })
+
+  it('requires batch-export and sends the bounded chunk contract', async () => {
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',batch-export'
+    headers['X-EasyPrint-Batch-Records'] = '1'
+    headers['X-EasyPrint-Batch-Pages'] = '2'
+    headers['X-EasyPrint-Batch-Bytes'] = '10'
+    headers['X-EasyPrint-Batch-Failed'] = '0'
+    headers['X-EasyPrint-Batch-Remaining-Pages'] = '998'
+    headers['X-EasyPrint-Batch-Remaining-Bytes'] = '100'
+    const fetchMock = vi.fn().mockImplementation(() => new Response(new Blob(['zip']), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await renderBatchChunk({ template: createBlankSample(), data: {}, protocol: 'Cpcl' }, {
+      records: [{ index: 7, data: { Name: 'A' } }], recordOffset: 0, totalRecords: 1,
+      remainingPages: 1000, remainingBytes: 110,
+    })
+    expect(result).toMatchObject({ records: 1, pages: 2, bytes: 10, failed: 0, remainingPages: 998, remainingBytes: 100 })
+    const sent = fetchMock.mock.calls[0]![1]!
+    expect((sent.headers as Record<string, string>)['X-EasyPrint-Required-Features']).toContain('batch-export')
+    expect(JSON.parse(sent.body as string)).toMatchObject({
+      records: [{ index: 7, data: { Name: 'A' } }], recordOffset: 0, totalRecords: 1,
+      remainingPages: 1000, remainingBytes: 110,
+    })
+  })
+})
+
+describe('phase 5 export contracts', () => {
+  it('negotiates page PDF and preserves single-page versus all-pages selection', async () => {
+    const headers = validContractHeaders('application/pdf')
+    headers['X-EasyPrint-Features'] += ',page-pdf-export'
+    const fetchMock = vi.fn().mockImplementation(() => new Response(new Blob(['pdf']), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await pagePdf({ template: { Width: 100 }, data: {} }, 2)
+    await pagePdf({ template: { Width: 100 }, data: {} })
+
+    const sent = fetchMock.mock.calls.map((call) => call[1]!)
+    expect((sent[0]!.headers as Record<string, string>)['X-EasyPrint-Required-Features']).toContain('page-pdf-export')
+    expect(JSON.parse(sent[0]!.body as string)).toMatchObject({ pageIndex: 2 })
+    expect(JSON.parse(sent[1]!.body as string)).not.toHaveProperty('pageIndex')
+  })
+
+  it('negotiates barcode SVG and binds the selected page element to its source path', async () => {
+    const headers = validContractHeaders('image/svg+xml')
+    headers['X-EasyPrint-Features'] += ',barcode-svg-export'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['<svg/>']), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await elementSvg({ template: { Width: 100 }, data: {} }, 1, 3, 'Rows[0].Cells[0].Elements[3]')
+
+    const sent = fetchMock.mock.calls[0]![1]!
+    expect((sent.headers as Record<string, string>)['X-EasyPrint-Required-Features']).toContain('barcode-svg-export')
+    expect(JSON.parse(sent.body as string)).toMatchObject({
+      pageIndex: 1, elementIndex: 3, sourcePath: 'Rows[0].Cells[0].Elements[3]',
+    })
+  })
+
+  it('maps export feature flags from Host headers and treats an old Host as unsupported', async () => {
+    const response = validEscPosCapabilitiesResponse({ escPosLayoutMode: 'Raster', nativeFlow: null })
+    const legacy = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { headers: validContractHeaders() }))
+    vi.stubGlobal('fetch', legacy)
+    const old = await loadDesignerCapabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster' })
+    expect(old.pagePdfExportFeature).toBe(false)
+    expect(old.barcodeSvgExportFeature).toBe(false)
+
+    const headers = validContractHeaders()
+    headers['X-EasyPrint-Features'] += ',page-pdf-export,barcode-svg-export'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { headers })))
+    const current = await loadDesignerCapabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster' })
+    expect(current.pagePdfExportFeature).toBe(true)
+    expect(current.barcodeSvgExportFeature).toBe(true)
+  })
+
+  it('sends optional batch export formats and requires their Host features only when selected', async () => {
+    const headers = validContractHeaders('application/zip')
+    headers['X-EasyPrint-Features'] += ',batch-export,page-pdf-export,barcode-svg-export'
+    headers['X-EasyPrint-Batch-Records'] = '1'
+    headers['X-EasyPrint-Batch-Pages'] = '1'
+    headers['X-EasyPrint-Batch-Bytes'] = '10'
+    headers['X-EasyPrint-Batch-Failed'] = '0'
+    headers['X-EasyPrint-Batch-Remaining-Pages'] = '999'
+    headers['X-EasyPrint-Batch-Remaining-Bytes'] = '100'
+    const fetchMock = vi.fn().mockImplementation(() => new Response(new Blob(['zip']), { headers }))
+    vi.stubGlobal('fetch', fetchMock)
+    const baseBody = { template: createBlankSample(), data: {}, protocol: 'EscPos' }
+
+    await renderBatchChunk(baseBody, {
+      records: [{ index: 0, data: {} }], recordOffset: 0, totalRecords: 1, remainingPages: 1000,
+      remainingBytes: 110,
+    })
+    await renderBatchChunk(baseBody, {
+      records: [{ index: 0, data: {} }], recordOffset: 0, totalRecords: 1, remainingPages: 1000,
+      remainingBytes: 110, exportFormats: ['pdf', 'svg'],
+    })
+
+    const sent = fetchMock.mock.calls.map((call) => call[1]!)
+    expect(JSON.parse(sent[0]!.body as string)).not.toHaveProperty('exportFormats')
+    expect((sent[0]!.headers as Record<string, string>)['X-EasyPrint-Required-Features'])
+      .not.toContain('page-pdf-export')
+    expect(JSON.parse(sent[1]!.body as string).exportFormats).toEqual(['pdf', 'svg'])
+    expect((sent[1]!.headers as Record<string, string>)['X-EasyPrint-Required-Features'])
+      .toContain('page-pdf-export,barcode-svg-export')
   })
 })

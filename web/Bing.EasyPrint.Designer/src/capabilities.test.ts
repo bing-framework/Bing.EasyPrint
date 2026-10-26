@@ -5,6 +5,7 @@ import {
   expandedStackedColumnsIssue, expandedStackedColumnsSupported, rotationSupported, textSizeSupported,
   expandedStackedRowsIssue, expandedStackedRowsSupported, rasterPreviewUnavailableReason,
   gs1TwoDimensionalSupported, gs1AssociationValidationSupported,
+  barcodeSvgExportSupported, pagePdfExportSupported,
   valueInRange, type DesignerCapabilities,
 } from './capabilities'
 import type { FontElement } from './model'
@@ -32,6 +33,20 @@ function capabilities(overrides: Partial<DesignerCapabilities> = {}): DesignerCa
 }
 
 describe('designer capabilities rules', () => {
+  it('enables page PDF only for negotiated ESC/POS Raster and SVG only for supported code elements', () => {
+    expect(pagePdfExportSupported(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster',
+      pagePdfExportFeature: true }))).toBe(true)
+    expect(pagePdfExportSupported(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Native',
+      pagePdfExportFeature: true }))).toBe(false)
+    expect(pagePdfExportSupported(capabilities({ protocol: 'EscPos', escPosLayoutMode: 'Raster' }))).toBe(false)
+    const svg = capabilities({ barcodeSvgExportFeature: true })
+    expect(barcodeSvgExportSupported(svg, 3)).toBe(true)
+    expect(barcodeSvgExportSupported(svg, 10)).toBe(true)
+    expect(barcodeSvgExportSupported(svg, 1)).toBe(false)
+    expect(barcodeSvgExportSupported(capabilities({ barcodeSvgExportFeature: true, protocolId: 'demo.protocol' }), 4))
+      .toBe(false)
+  })
+
   it('does not enable new entries until a confirmed snapshot exists, while keeping composites in the capability model', () => {
     const caps = capabilities({ elementTypes: [1, 6] })
     expect(canCreateElement(undefined, 'loading', 1)).toBe(false)

@@ -1,6 +1,9 @@
-import { previewElementKey, type BpTemplate, type DesignerDiagnostic, type Gs1CompositeElement, type PreviewResponse, type TemplateResource } from './model'
+import JSZip from 'jszip'
+import { previewElementKey, type BpTemplate, type DesignerDiagnostic, type Gs1CompositeElement,
+  type PreviewPage, type PreviewResponse, type TemplateResource } from './model'
 import { normalizeDesignerCapabilities, type DesignerCapabilities } from './capabilities'
 import { formatDesignerDiagnostic, normalizeDesignerDiagnostics } from './diagnostics'
+import { stringifyJsonPreservingPrecision } from './losslessJson'
 import {
   GS1_COMPOSITE_EAN_UPC_ADDONS_FEATURE, GS1_COMPOSITE_GS1_128_CC_AB_FEATURE, isGs1CompositeCcCCombination,
   isGs1CompositeExpandedCombination, isGs1CompositeExpandedStackedCombination, isGs1CompositeGs1128CcAbCombination,
@@ -200,7 +203,15 @@ export type ZplMediaRequest = {
   mediaTracking?: ZplMediaTracking; darkness?: number;
   profile?: ZplPrinterProfile
 }
+export type ProtocolFinishingRequest = {
+  feedAmount?: number
+  feedUnit?: 'Lines' | 'Dots' | 'MotionUnits'
+  cut?: boolean
+  placement?: 'JobEnd' | 'PageEnd'
+}
+export type CustomProtocolRequest = { id: string; config: unknown; finishing?: ProtocolFinishingRequest }
 export type PreviewRequest = { template: BpTemplate; data: unknown; resources?: Record<string, string>;
+  protocolId?: string; protocolConfig?: unknown;
   protocol?: PrintProtocol; escPosLayoutMode?: EscPosLayoutMode; allowRasterizedLines?: boolean;
   imageThreshold?: number; deviceHalfCellWidthAt24?: number; deviceFullCellWidthAt24?: number;
   deviceLineHeightAt24?: number; requireDeclaredNativeBounds?: boolean;
@@ -220,7 +231,9 @@ export type DesignerCapabilitiesRequest = {
   tsplMedia?: TsplMediaRequest
   zplMedia?: ZplMediaRequest
   allowRasterizedLines?: boolean
-  /** 仅供客户端要求新版 Host 能力字段，不会序列化到请求体。 */
+  protocolId?: string
+  protocolConfig?: unknown
+  /** 仅供客户端要求新的 Host 能力字段，不会序列化到请求体。 */
   requireCutContract?: boolean
 }
 
@@ -312,8 +325,17 @@ const GS1_COMPOSITE_STACKED_OMNIDIRECTIONAL_FEATURE_NAME = GS1_COMPOSITE_STACKED
 const GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE = 'gs1-databar-expanded-stacked-rows'
 const RASTER_ELEMENT_PNG_FEATURE = 'raster-element-png'
 const RASTER_PAGE_PNG_FEATURE = 'raster-page-png'
+const PAGE_PDF_EXPORT_FEATURE = 'page-pdf-export'
+const BARCODE_SVG_EXPORT_FEATURE = 'barcode-svg-export'
+const PREVIEW_BUNDLE_FEATURE = 'preview-bundle'
+const PROTOCOL_REGISTRY_FEATURE = 'protocol-registry'
 const GS1_TWO_DIMENSIONAL_FEATURE = 'gs1-two-dimensional'
 const GS1_ASSOCIATION_VALIDATION_FEATURE = 'gs1-association-validation'
+const FIELD_FORMAT_FEATURE = 'field-format'
+const BATCH_EXPORT_FEATURE = 'batch-export'
+const GS1_AI_CATALOG_FEATURE = 'gs1-ai-catalog'
+const GS1_STRUCTURED_INPUT_FEATURE = 'gs1-structured-input'
+const GS1_DIGITAL_LINK_FEATURE = 'gs1-digital-link'
 const DESIGNER_REQUIRED_FEATURES = ['structured-errors', 'strict-options', 'binding-diagnostics'] as const
 
 function clientValidationError(message: string, code: string, phase: string): DesignerValidationError {
@@ -393,6 +415,14 @@ function validateDesignerContract(response: Response, requiredFeatures: string[]
       throw clientValidationError('打印服务缺少完整页面 PNG 功能，请更新 Host。',
         'ContractFeatureUnavailable', 'Contract')
     }
+    if (missingFeatures.includes(PROTOCOL_REGISTRY_FEATURE)) {
+      throw clientValidationError('打印服务缺少新协议注册目录功能，请更新 Host。',
+        'ContractFeatureUnavailable', 'Contract')
+    }
+    if (missingFeatures.includes(PREVIEW_BUNDLE_FEATURE)) {
+      throw clientValidationError('打印服务缺少合并预览包功能，请更新 Host。',
+        'ContractFeatureUnavailable', 'Contract')
+    }
     throw clientValidationError('打印服务缺少所需功能，请更新 Host。',
       'ContractFeatureUnavailable', 'Contract')
   }
@@ -402,9 +432,32 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   additionalRequiredFeatures: string[] = []): Promise<Response> {
   const requiredFeatures: string[] = [...DESIGNER_REQUIRED_FEATURES]
   const template = (body as { template?: BpTemplate }).template
+  const protocolId = (body as { protocolId?: string }).protocolId
+  if (protocolId && !requiredFeatures.includes(PROTOCOL_REGISTRY_FEATURE))
+    requiredFeatures.push(PROTOCOL_REGISTRY_FEATURE)
   if ((body as { validateGs1Associations?: boolean }).validateGs1Associations && !requiredFeatures.includes(GS1_ASSOCIATION_VALIDATION_FEATURE))
     requiredFeatures.push(GS1_ASSOCIATION_VALIDATION_FEATURE)
-  if (template) walkTemplateNodes(template, (node, context) => {
+  if (template) walkTemplateNodes(template, (node) => {
+    if (!node || typeof node !== 'object') return
+    const source = node as { Field?: { Format?: unknown; Gs1Input?: { Mode?: number } };
+      SecondaryField?: { Format?: unknown; Gs1Input?: { Mode?: number } } }
+    if ((source.Field?.Format || source.SecondaryField?.Format) && !requiredFeatures.includes(FIELD_FORMAT_FEATURE))
+      requiredFeatures.push(FIELD_FORMAT_FEATURE)
+    const gs1Inputs = [source.Field?.Gs1Input, source.SecondaryField?.Gs1Input].filter(Boolean)
+    if (gs1Inputs.length) {
+      for (const feature of [GS1_AI_CATALOG_FEATURE, GS1_STRUCTURED_INPUT_FEATURE])
+        if (!requiredFeatures.includes(feature)) requiredFeatures.push(feature)
+      if (gs1Inputs.some(input => input?.Mode === 1) && !requiredFeatures.includes(GS1_DIGITAL_LINK_FEATURE))
+        requiredFeatures.push(GS1_DIGITAL_LINK_FEATURE)
+    }
+  })
+  if (template && !protocolId) walkTemplateNodes(template, (node, context) => {
+    if (node && typeof node === 'object') {
+      const source = node as { Field?: { Format?: unknown }; SecondaryField?: { Format?: unknown } }
+      if (source.Field?.Format || source.SecondaryField?.Format) {
+        if (!requiredFeatures.includes(FIELD_FORMAT_FEATURE)) requiredFeatures.push(FIELD_FORMAT_FEATURE)
+      }
+    }
     if (context.kind !== 'element' || !('Type' in node)) return
     const requestContract = body as { protocol?: PrintProtocol; escPosLayoutMode?: EscPosLayoutMode }
     const rawNode = node as Record<string, unknown>
@@ -525,7 +578,7 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   })
   for (const feature of additionalRequiredFeatures)
     if (!requiredFeatures.includes(feature)) requiredFeatures.push(feature)
-  const serializedBody = JSON.stringify(body)
+  const serializedBody = stringifyJsonPreservingPrecision(body)
   let response: Response
   try {
     response = await fetch(path, {
@@ -547,7 +600,134 @@ async function postDesignerJson(path: string, body: unknown, signal?: AbortSigna
   return response
 }
 
+export type DesignerProtocolDescriptor = {
+  id: string
+  displayName: string
+  isBuiltIn: boolean
+  configSchema?: unknown
+  constraints?: unknown
+  capabilities: Record<string, unknown>
+}
+
+export type Gs1AiCatalogEntry = {
+  ai: string
+  title: string
+  specification: string
+  attributes: string
+  predefinedLength: boolean
+  requiresSeparator: boolean
+  minimumLength: number
+  maximumLength: number
+  role: 'PrimaryKey' | 'KeyQualifier' | 'DataAttribute' | 'Unsupported'
+  branches: string[][]
+  components: Array<{ type: string; minimumLength: number; maximumLength: number; optional: boolean; linters: string[] }>
+  requirementRules: Array<{ kind: string; raw: string; alternatives: string[][] }>
+  exclusionRules: Array<{ kind: string; raw: string; alternatives: string[][] }>
+}
+
+export type Gs1AiCatalog = { dictionaryCommit: string; entries: Gs1AiCatalogEntry[] }
+export type Gs1ValidationItem = { path: string; mode: string; status: 'valid' | 'pending-data' | 'invalid';
+  output?: string; dynamic: boolean; instanceIndices?: number[] }
+export type Gs1ValidationResponse = {
+  status: 'valid' | 'pending' | 'invalid'
+  dataProvided: boolean
+  items: Gs1ValidationItem[]
+  errors: Array<DesignerDiagnostic & { ai?: string | null; itemIndex?: number | null }>
+}
+export type Gs1ConversionRequest = {
+  input: string
+  targetFormat: 'elements' | 'digital-link'
+  baseUri?: string
+  fragment?: string
+  validateAssociations?: boolean
+  queryParameters?: Array<{ key: string; value?: string }>
+}
+export type Gs1ConversionResponse = {
+  status: 'valid'
+  sourceFormat: 'elements' | 'digital-link'
+  targetFormat: 'elements' | 'digital-link'
+  output: string
+  structuredInput: {
+    mode: 0 | 1
+    baseUri?: string
+    fragment?: string
+    validateAssociations: boolean
+    items: Array<{ ai: string; value: string; placement: 0 | 1 | 2 }>
+    queryParameters: Array<{ key: string; value: string }>
+  }
+}
+
+/** 读取 Host 启动时冻结的协议目录；旧 Host 不含该端点时会明确失败。 */
+export async function loadProtocolRegistry(signal?: AbortSignal): Promise<DesignerProtocolDescriptor[]> {
+  const response = await fetch('/api/designer/protocol-registry', {
+    signal,
+    headers: { [DESIGNER_CONTRACT_VERSION_HEADER]: DESIGNER_CONTRACT_VERSION },
+  })
+  validateDesignerContract(response, [PROTOCOL_REGISTRY_FEATURE])
+  const result = await response.json() as { protocols?: unknown }
+  if (!Array.isArray(result.protocols))
+    throw new Error('协议目录服务返回的数据格式无效。')
+  return result.protocols as DesignerProtocolDescriptor[]
+}
+
+/** 读取 Host 固定版本的完整 GS1 AI 目录；旧 Host 会因缺少特性而明确失败。 */
+export async function loadGs1AiCatalog(signal?: AbortSignal): Promise<Gs1AiCatalog> {
+  const requiredFeatures = [GS1_AI_CATALOG_FEATURE, GS1_STRUCTURED_INPUT_FEATURE, GS1_DIGITAL_LINK_FEATURE]
+  const response = await fetch('/api/designer/gs1-catalog', {
+    signal,
+    headers: {
+      [DESIGNER_CONTRACT_VERSION_HEADER]: DESIGNER_CONTRACT_VERSION,
+      'X-EasyPrint-Required-Features': requiredFeatures.join(','),
+    },
+  })
+  if (!response.ok) throw await responseError(response)
+  validateDesignerContract(response, requiredFeatures)
+  const result = await response.json() as Partial<Gs1AiCatalog>
+  if (typeof result.dictionaryCommit !== 'string' || !Array.isArray(result.entries))
+    throw new Error('GS1 AI 目录服务返回的数据格式无效。')
+  return result as Gs1AiCatalog
+}
+
+/** 使用 Host 权威校验规则检查结构化 GS1 字段和当前绑定数据。 */
+export async function validateGs1Input(template: BpTemplate, data: unknown,
+  signal?: AbortSignal): Promise<Gs1ValidationResponse> {
+  const response = await postDesignerJson('/api/designer/gs1-validate', { template, data }, signal,
+    [GS1_AI_CATALOG_FEATURE, GS1_STRUCTURED_INPUT_FEATURE, GS1_DIGITAL_LINK_FEATURE])
+  return await response.json() as Gs1ValidationResponse
+}
+
+/** 在括号 AI 元素串与 Digital Link 之间转换并取得可写回模板的结构数据。 */
+export async function convertGs1Input(request: Gs1ConversionRequest,
+  signal?: AbortSignal): Promise<Gs1ConversionResponse> {
+  const response = await postDesignerJson('/api/designer/gs1-convert', { gs1Conversion: request }, signal,
+    [GS1_AI_CATALOG_FEATURE, GS1_STRUCTURED_INPUT_FEATURE, GS1_DIGITAL_LINK_FEATURE])
+  return await response.json() as Gs1ConversionResponse
+}
+
 export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequest, signal?: AbortSignal): Promise<DesignerCapabilities> {
+  if (request.protocolId) {
+    const response = await postDesignerJson('/api/designer/capabilities', {
+      protocolId: request.protocolId,
+      ...(request.protocolConfig === undefined ? {} : { protocolConfig: request.protocolConfig }),
+    } as DesignerCapabilitiesRequest, signal)
+    const customCapabilities = await response.json() as unknown
+    if (!customCapabilities || typeof customCapabilities !== 'object' || Array.isArray(customCapabilities))
+      throw new Error('能力服务返回的数据格式无效。')
+    const capabilities = normalizeDesignerCapabilities({
+      ...(customCapabilities as Record<string, unknown>), protocol: 'Cpcl',
+    })
+    capabilities.protocol = null
+    capabilities.protocolId = request.protocolId
+    capabilities.supportsFinishing = (customCapabilities as { supportsFinishing?: unknown }).supportsFinishing === true
+    const availableFeatures = new Set((response.headers.get(DESIGNER_FEATURES_HEADER) ?? '')
+      .split(',').map(feature => feature.trim()))
+    capabilities.rasterElementPngFeature = availableFeatures.has(RASTER_ELEMENT_PNG_FEATURE)
+    capabilities.rasterPagePngFeature = availableFeatures.has(RASTER_PAGE_PNG_FEATURE)
+    capabilities.pagePdfExportFeature = availableFeatures.has(PAGE_PDF_EXPORT_FEATURE)
+    capabilities.barcodeSvgExportFeature = availableFeatures.has(BARCODE_SVG_EXPORT_FEATURE)
+    capabilities.previewBundleFeature = availableFeatures.has(PREVIEW_BUNDLE_FEATURE)
+    return capabilities
+  }
   const body: DesignerCapabilitiesRequest = {
     ...(request.protocol === undefined ? {} : { protocol: request.protocol }),
     ...(request.escPosLayoutMode === undefined ? {} : { escPosLayoutMode: request.escPosLayoutMode }),
@@ -556,6 +736,8 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
     ...(compactOptions(request.escPosDevice) === undefined ? {} : { escPosDevice: compactOptions(request.escPosDevice) }),
     ...(compactOptions(request.tsplMedia) === undefined ? {} : { tsplMedia: compactOptions(request.tsplMedia) }),
     ...(compactOptions(request.zplMedia) === undefined ? {} : { zplMedia: compactOptions(request.zplMedia) }),
+    ...(request.protocolId === undefined ? {} : { protocolId: request.protocolId }),
+    ...(request.protocolConfig === undefined ? {} : { protocolConfig: request.protocolConfig }),
   }
   const response = await postDesignerJson('/api/designer/capabilities', body, signal)
   const rawCapabilities = await response.json() as unknown
@@ -629,6 +811,9 @@ export async function loadDesignerCapabilities(request: DesignerCapabilitiesRequ
   capabilities.expandedStackedRowsFeature = features.has(GS1_DATABAR_EXPANDED_STACKED_ROWS_FEATURE)
   capabilities.rasterElementPngFeature = features.has(RASTER_ELEMENT_PNG_FEATURE)
   capabilities.rasterPagePngFeature = features.has(RASTER_PAGE_PNG_FEATURE)
+  capabilities.pagePdfExportFeature = features.has(PAGE_PDF_EXPORT_FEATURE)
+  capabilities.barcodeSvgExportFeature = features.has(BARCODE_SVG_EXPORT_FEATURE)
+  capabilities.previewBundleFeature = features.has(PREVIEW_BUNDLE_FEATURE)
   capabilities.gs1TwoDimensionalFeature = features.has(GS1_TWO_DIMENSIONAL_FEATURE)
   capabilities.gs1AssociationValidationFeature = features.has(GS1_ASSOCIATION_VALIDATION_FEATURE)
   return capabilities
@@ -650,27 +835,40 @@ export async function previewTemplate(template: BpTemplate, data: unknown, resou
   encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
   deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
   deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
-  cutOptions?: PrintCutOptions, validateGs1Associations = false): Promise<PreviewResponse> {
-  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding, escPosDevice,
-    cutOptions, job, signal)
+  cutOptions?: PrintCutOptions, validateGs1Associations = false,
+  customProtocol?: CustomProtocolRequest): Promise<PreviewResponse> {
+  if (!customProtocol) await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia,
+    encoding, escPosDevice, cutOptions, job, signal)
   const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
     imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
     tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
-    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations, customProtocol)
   const response = await postDesignerJson('/api/designer/preview', body, signal)
   const result = await response.json() as PreviewResponse
   if (!Array.isArray(result.pages)) throw new Error('预览服务返回的数据格式无效。')
   return { ...result, errors: normalizeDesignerDiagnostics(result.errors) }
 }
 
-function buildPreviewBody(template: BpTemplate, data: unknown, resources: TemplateResource[],
+export function buildPreviewBody(template: BpTemplate, data: unknown, resources: TemplateResource[],
   protocol: PrintProtocol, escPosLayoutMode: EscPosLayoutMode, allowRasterizedLines: boolean,
   imageThreshold?: number, deviceHalfCellWidthAt24?: number, deviceFullCellWidthAt24?: number,
   copies?: number, feedLines?: number, cutAfterPrint?: boolean, tsplMedia?: TsplMediaRequest,
   zplMedia?: ZplMediaRequest, encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
   deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
   deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
-  cutOptions?: PrintCutOptions, validateGs1Associations = false): PreviewRequest {
+  cutOptions?: PrintCutOptions, validateGs1Associations = false,
+  customProtocol?: CustomProtocolRequest): PreviewRequest {
+  if (customProtocol) {
+    return {
+      template, data, resources: resourcesAsBase64(resources), protocolId: customProtocol.id,
+      protocolConfig: customProtocol.config,
+      ...(customProtocol.finishing === undefined ? {} : { finishing: customProtocol.finishing }),
+      ...(imageThreshold === undefined ? {} : { imageThreshold }),
+      ...(copies === undefined ? {} : { copies }),
+      ...(feedLines === undefined ? {} : { feedLines }),
+      ...(cutAfterPrint === undefined ? {} : { cutAfterPrint }),
+    }
+  }
   const compactTsplMedia = compactOptions(tsplMedia)
   const compactZplMedia = compactOptions(zplMedia)
   const compactEscPosDevice = compactOptions(escPosDevice)
@@ -704,15 +902,91 @@ export async function renderTemplate(template: BpTemplate, data: unknown, resour
   encoding?: PrintEncoding, escPosDevice?: EscPosDeviceRequest,
   deviceLineHeightAt24?: number, requireDeclaredNativeBounds?: boolean,
   deviceFontCalibrations?: DeviceFontCalibrationMap, job?: PrintJobOptions,
-  cutOptions?: PrintCutOptions, validateGs1Associations = false): Promise<Blob> {
-  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding, escPosDevice,
-    cutOptions, job)
+  cutOptions?: PrintCutOptions, validateGs1Associations = false,
+  customProtocol?: CustomProtocolRequest): Promise<Blob> {
+  if (!customProtocol) await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia,
+    encoding, escPosDevice, cutOptions, job)
   const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
     imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
     tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
-    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations, customProtocol)
   const response = await postDesignerJson('/api/designer/render', body)
   return response.blob()
+}
+
+type PreviewBundleImage = {
+  key: string
+  file: string
+  pageIndex: number
+  elementIndex: number
+  type: number
+  sourcePath: string
+  width: number
+  height: number
+}
+
+type PreviewBundleManifest = {
+  layout: { pageIndex: number; pageCount: number; pages: PreviewPage[] }
+  images: PreviewBundleImage[]
+  diagnostics?: unknown
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+}
+
+function isPreviewBundleManifest(value: unknown): value is PreviewBundleManifest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const manifest = value as Record<string, unknown>
+  if (!manifest.layout || typeof manifest.layout !== 'object' || Array.isArray(manifest.layout)) return false
+  const layout = manifest.layout as Record<string, unknown>
+  return Number.isInteger(layout.pageIndex) && Number.isInteger(layout.pageCount) &&
+    Array.isArray(layout.pages) && Array.isArray(manifest.images)
+}
+
+async function readPreviewBundle(response: Response, signal?: AbortSignal):
+  Promise<PreviewResponse & { images: Record<string, string>; imageDiagnostics: DesignerDiagnostic[] }> {
+  throwIfAborted(signal)
+  let archive: JSZip
+  try {
+    archive = await JSZip.loadAsync(await response.arrayBuffer(), { checkCRC32: false, createFolders: false })
+  } catch {
+    throw new Error('预览包不是有效的 ZIP 数据。')
+  }
+  throwIfAborted(signal)
+  const manifestEntry = archive.file('manifest.json')
+  if (!manifestEntry) throw new Error('预览包缺少 manifest.json。')
+  let manifest: unknown
+  try {
+    manifest = JSON.parse(await manifestEntry.async('string')) as unknown
+  } catch {
+    throw new Error('预览包 manifest.json 不是有效 JSON。')
+  }
+  if (!isPreviewBundleManifest(manifest)) throw new Error('预览包清单格式无效。')
+  const images: Record<string, string> = {}
+  try {
+    for (const image of manifest.images) {
+      throwIfAborted(signal)
+      if (!image || typeof image.key !== 'string' || typeof image.file !== 'string')
+        throw new Error('预览包图片清单格式无效。')
+      const entry = archive.file(image.file)
+      if (!entry) throw new Error(`预览包缺少图片 ${image.file}。`)
+      const bytes = await entry.async('uint8array')
+      throwIfAborted(signal)
+      const pngBytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+      images[image.key] = URL.createObjectURL(new Blob([pngBytes], { type: 'image/png' }))
+    }
+    throwIfAborted(signal)
+    return {
+      pages: manifest.layout.pages,
+      errors: [],
+      imageDiagnostics: normalizeDesignerDiagnostics(manifest.diagnostics),
+      images,
+    }
+  } catch (error) {
+    for (const url of Object.values(images)) URL.revokeObjectURL(url)
+    throw error
+  }
 }
 
 export async function previewWithImages(template: BpTemplate, data: unknown, resources: TemplateResource[],
@@ -723,30 +997,41 @@ export async function previewWithImages(template: BpTemplate, data: unknown, res
   escPosDevice?: EscPosDeviceRequest, deviceLineHeightAt24?: number,
   requireDeclaredNativeBounds?: boolean, deviceFontCalibrations?: DeviceFontCalibrationMap,
   job?: PrintJobOptions, cutOptions?: PrintCutOptions, imageElementTypes: number[] = [],
-  validateGs1Associations = false):
-  Promise<PreviewResponse & { images: Record<string, string> }> {
-  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
-    escPosDevice, cutOptions, job, signal)
+  validateGs1Associations = false, pageIndex?: number, previewBundleFeature = false,
+  customProtocol?: CustomProtocolRequest):
+  Promise<PreviewResponse & { images: Record<string, string>; imageDiagnostics?: DesignerDiagnostic[] }> {
+  if (!customProtocol) await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia,
+    encoding, escPosDevice, cutOptions, job, signal)
   const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
     imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
     tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
-    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations, customProtocol)
+  if (previewBundleFeature) {
+    const response = await postDesignerJson('/api/designer/preview-bundle',
+      { ...body, pageIndex: pageIndex ?? 0, imageTypes: imageElementTypes }, signal, [PREVIEW_BUNDLE_FEATURE])
+    return readPreviewBundle(response, signal)
+  }
   const response = await postDesignerJson('/api/designer/preview', body, signal)
   const result = await response.json() as PreviewResponse
   if (!Array.isArray(result.pages)) throw new Error('预览服务返回的数据格式无效。')
+  if (pageIndex !== undefined && (pageIndex < 0 || pageIndex >= result.pages.length)) {
+    const message = '预览服务返回的页面索引无效。'
+    throw new DesignerValidationError(message, [{ message, code: 'InvalidPageIndex', phase: 'Validation' }])
+  }
   const images: Record<string, string> = {}
   try {
-    for (let pageIndex = 0; pageIndex < result.pages.length; pageIndex++) {
-      const page = result.pages[pageIndex]!
+    const pageIndexes = pageIndex === undefined ? result.pages.map((_, index) => index) : [pageIndex]
+    for (const targetPageIndex of pageIndexes) {
+      const page = result.pages[targetPageIndex]!
       for (let elementIndex = 0; elementIndex < page.elements.length; elementIndex++) {
         const element = page.elements[elementIndex]!
         if (!imageElementTypes.includes(element.type)) continue
         try {
           const imageResponse = await postDesignerJson('/api/designer/element-png',
-            { ...body, pageIndex, elementIndex, sourcePath: element.sourcePath }, signal,
+            { ...body, pageIndex: targetPageIndex, elementIndex, sourcePath: element.sourcePath }, signal,
             [RASTER_ELEMENT_PNG_FEATURE])
           const blob = await imageResponse.blob()
-          images[previewElementKey(pageIndex, element)] = URL.createObjectURL(blob)
+          images[previewElementKey(targetPageIndex, element)] = URL.createObjectURL(blob)
         } catch (error) {
           if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
           // A single unsupported element must not blank the whole layout preview.
@@ -754,7 +1039,7 @@ export async function previewWithImages(template: BpTemplate, data: unknown, res
       }
     }
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    return { ...result, errors: normalizeDesignerDiagnostics(result.errors), images }
+    return { ...result, errors: normalizeDesignerDiagnostics(result.errors), images, imageDiagnostics: [] }
   } catch (error) {
     for (const url of Object.values(images)) URL.revokeObjectURL(url)
     throw error
@@ -771,13 +1056,14 @@ export async function elementPng(template: BpTemplate, data: unknown, resources:
   deviceLineHeightAt24: number | undefined, requireDeclaredNativeBounds: boolean | undefined,
   deviceFontCalibrations: DeviceFontCalibrationMap | undefined, job: PrintJobOptions | undefined,
   cutOptions: PrintCutOptions | undefined, pageIndex: number, elementIndex: number,
-  sourcePath?: string, validateGs1Associations = false): Promise<Blob> {
-  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
-    escPosDevice, cutOptions, job, signal)
+  sourcePath?: string, validateGs1Associations = false,
+  customProtocol?: CustomProtocolRequest): Promise<Blob> {
+  if (!customProtocol) await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia,
+    encoding, escPosDevice, cutOptions, job, signal)
   const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
     imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
     tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
-    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations, customProtocol)
   const response = await postDesignerJson('/api/designer/element-png',
     { ...body, pageIndex, elementIndex, ...(sourcePath === undefined ? {} : { sourcePath }) }, signal,
     [RASTER_ELEMENT_PNG_FEATURE])
@@ -793,14 +1079,73 @@ export async function pagePng(template: BpTemplate, data: unknown, resources: Te
   encoding: PrintEncoding | undefined, escPosDevice: EscPosDeviceRequest | undefined,
   deviceLineHeightAt24: number | undefined, requireDeclaredNativeBounds: boolean | undefined,
   deviceFontCalibrations: DeviceFontCalibrationMap | undefined, job: PrintJobOptions | undefined,
-  cutOptions: PrintCutOptions | undefined, pageIndex?: number, validateGs1Associations = false): Promise<Blob> {
-  await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia, encoding,
-    escPosDevice, cutOptions, job, signal)
+  cutOptions: PrintCutOptions | undefined, pageIndex?: number, validateGs1Associations = false,
+  customProtocol?: CustomProtocolRequest): Promise<Blob> {
+  if (!customProtocol) await ensureCutContract(protocol, escPosLayoutMode, allowRasterizedLines, tsplMedia, zplMedia,
+    encoding, escPosDevice, cutOptions, job, signal)
   const body = buildPreviewBody(template, data, resources, protocol, escPosLayoutMode, allowRasterizedLines,
     imageThreshold, deviceHalfCellWidthAt24, deviceFullCellWidthAt24, copies, feedLines, cutAfterPrint,
     tsplMedia, zplMedia, encoding, escPosDevice, deviceLineHeightAt24, requireDeclaredNativeBounds,
-    deviceFontCalibrations, job, cutOptions, validateGs1Associations)
+    deviceFontCalibrations, job, cutOptions, validateGs1Associations, customProtocol)
   const response = await postDesignerJson('/api/designer/page-png',
     { ...body, ...(pageIndex === undefined ? {} : { pageIndex }) }, signal, [RASTER_PAGE_PNG_FEATURE])
   return response.blob()
+}
+
+export async function pagePdf(baseBody: Record<string, unknown>, pageIndex?: number,
+  signal?: AbortSignal): Promise<Blob> {
+  const response = await postDesignerJson('/api/designer/page-pdf',
+    { ...baseBody, ...(pageIndex === undefined ? {} : { pageIndex }) }, signal, [PAGE_PDF_EXPORT_FEATURE])
+  return response.blob()
+}
+
+export async function elementSvg(baseBody: Record<string, unknown>, pageIndex: number, elementIndex: number,
+  sourcePath: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await postDesignerJson('/api/designer/element-svg',
+    { ...baseBody, pageIndex, elementIndex, sourcePath }, signal, [BARCODE_SVG_EXPORT_FEATURE])
+  return response.blob()
+}
+
+export type BatchChunkRequest = {
+  records: import('./batch').BatchDataRecord[]
+  recordOffset: number
+  totalRecords: number
+  copiesField?: string
+  exportFormats?: readonly ('pdf' | 'svg')[]
+  remainingPages: number
+  remainingBytes: number
+}
+
+export async function renderBatchChunk(baseBody: Record<string, unknown>, request: BatchChunkRequest,
+  signal?: AbortSignal): Promise<{ blob: Blob; records: number; pages: number; bytes: number; failed: number
+    remainingPages: number; remainingBytes: number }> {
+  const body = {
+    ...baseBody,
+    data: {},
+    records: request.records,
+    recordOffset: request.recordOffset,
+    totalRecords: request.totalRecords,
+    ...(request.copiesField ? { copiesField: request.copiesField } : {}),
+    ...(request.exportFormats?.length ? { exportFormats: [...request.exportFormats] } : {}),
+    remainingPages: request.remainingPages,
+    remainingBytes: request.remainingBytes,
+  }
+  const exportFeatures = new Set<string>()
+  for (const format of request.exportFormats ?? []) {
+    if (format === 'pdf') exportFeatures.add(PAGE_PDF_EXPORT_FEATURE)
+    else if (format === 'svg') exportFeatures.add(BARCODE_SVG_EXPORT_FEATURE)
+    else throw new Error(`不支持批量导出格式：${String(format)}`)
+  }
+  const response = await postDesignerJson('/api/designer/batch', body, signal,
+    [BATCH_EXPORT_FEATURE, ...exportFeatures])
+  const number = (name: string) => Number(response.headers.get(name) ?? 0)
+  return {
+    blob: await response.blob(),
+    records: number('X-EasyPrint-Batch-Records'),
+    pages: number('X-EasyPrint-Batch-Pages'),
+    bytes: number('X-EasyPrint-Batch-Bytes'),
+    failed: number('X-EasyPrint-Batch-Failed'),
+    remainingPages: number('X-EasyPrint-Batch-Remaining-Pages'),
+    remainingBytes: number('X-EasyPrint-Batch-Remaining-Bytes'),
+  }
 }

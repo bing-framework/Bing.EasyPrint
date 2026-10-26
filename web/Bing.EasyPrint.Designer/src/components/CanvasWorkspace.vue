@@ -20,6 +20,7 @@ const props = defineProps<{
   resources: TemplateResource[]
   previewImages?: Record<string, string>
   mode: 'select' | 'pan'
+  isLocked: (sourcePath: string, occurrencePath?: string) => boolean
 }>()
 const emit = defineEmits<{
   select: [path: string, additive?: boolean, occurrencePath?: string]
@@ -143,9 +144,10 @@ function rectangleFilled(element: PreviewElement): boolean {
 }
 
 function groupConfig(element: PreviewElement) {
+  const locked = props.isLocked(selectionPath(element), element.sourcePath)
   return {
     ...nodeRect(element),
-    draggable: props.mode === 'select',
+    draggable: props.mode === 'select' && !locked,
     listening: props.mode === 'select',
     onClick: (event: { evt?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } }) => emit('select', selectionPath(element),
       Boolean(event.evt?.ctrlKey || event.evt?.metaKey || event.evt?.shiftKey), element.sourcePath),
@@ -157,6 +159,7 @@ function groupConfig(element: PreviewElement) {
 }
 
 function onDragMove(element: PreviewElement, event: KonvaDragEvent) {
+  if (props.isLocked(selectionPath(element), element.sourcePath)) return
   const definition = findElement(props.template, element.sourcePath)
   const start = definition?.StartCoordinate
   const dx = snapDeltaToGrid(start?.X ?? element.x, event.target.x() / scale.value - element.x)
@@ -172,6 +175,7 @@ function onDragMove(element: PreviewElement, event: KonvaDragEvent) {
 }
 
 function onDragEnd(element: PreviewElement, event: KonvaDragEvent) {
+  if (props.isLocked(selectionPath(element), element.sourcePath)) return
   const definition = findElement(props.template, element.sourcePath)
   const rawDx = event.target.x() / scale.value - element.x
   const rawDy = event.target.y() / scale.value - element.y
@@ -198,7 +202,7 @@ function textConfig(element: PreviewElement) {
     width: Math.max(1, content.width * scale.value + 2),
     height: Math.max(1, content.height * scale.value),
     rotation: (element.rotation ?? 0) as RotationAngle,
-    text: element.text || (element.type === 1 ? '文字' : ''),
+    text: element.displayText ?? element.text ?? (element.type === 1 ? '文字' : ''),
     fontSize: Math.max(8, fontSize * scale.value * 0.7),
     fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
     fontStyle: definition?.Type === 1 && definition.Bold ? 'bold' : 'normal',
@@ -460,7 +464,7 @@ function dropTool(event: DragEvent) {
               </template>
               <v-rect :config="{ x: -4, y: -4, width: Math.max(12, nodeRect(element).width + 8), height: Math.max(12, nodeRect(element).height + 8), fill: '#ffffff', opacity: 0.001, listening: true, perfectDrawEnabled: false }" />
               <v-rect v-if="selectedPath === selectionPath(element) || selectedPaths?.includes(selectionPath(element))" :config="{ x: -3, y: -3, width: nodeRect(element).width + 6, height: nodeRect(element).height + 6, stroke: '#0a8792', strokeWidth: 1, dash: [3, 2], listening: false }" />
-              <v-circle v-if="selectedPath === selectionPath(element) && resizable(element) && mode === 'select'" :config="resizeConfig(element)" />
+              <v-circle v-if="selectedPath === selectionPath(element) && resizable(element) && mode === 'select' && !isLocked(selectionPath(element), element.sourcePath)" :config="resizeConfig(element)" />
             </v-group>
             <v-line v-if="guides.x !== undefined" :config="{ name: 'alignment-guide-x', points: [guides.x * scale, 0, guides.x * scale, stageHeight], stroke: '#d0814f', strokeWidth: 1, dash: [4, 3], listening: false }" />
             <v-line v-if="guides.y !== undefined" :config="{ name: 'alignment-guide-y', points: [0, guides.y * scale, stageWidth, guides.y * scale], stroke: '#d0814f', strokeWidth: 1, dash: [4, 3], listening: false }" />

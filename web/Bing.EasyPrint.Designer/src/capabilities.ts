@@ -56,7 +56,8 @@ export type TsplCutterCapability = {
 }
 
 export type DesignerCapabilities = {
-  protocol: PrintProtocol
+  protocol: PrintProtocol | null
+  protocolId?: string
   escPosLayoutMode: EscPosLayoutMode | null
   nativeFlow: EscPosNativeFlowMode | null
   nativeText: EscPosNativeTextProfile | null
@@ -101,6 +102,7 @@ export type DesignerCapabilities = {
   supportsBarcodeHumanReadable: boolean
   supportsCut: boolean
   supportsExtraFeed: boolean
+  supportsFinishing?: boolean
   supportsFilledRectangles: boolean
   supportsCoordinates: boolean
   supportsExplicitQuietZone: boolean
@@ -140,6 +142,12 @@ export type DesignerCapabilities = {
   rasterElementPngFeature?: boolean
   /** 来自协商响应头；旧 Host 不视为支持完整页面 PNG。 */
   rasterPagePngFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持共享光栅整页 PDF 导出。 */
+  pagePdfExportFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持共享码图矢量 SVG 导出。 */
+  barcodeSvgExportFeature?: boolean
+  /** 来自协商响应头；旧 Host 不视为支持单次渲染的合并预览包。 */
+  previewBundleFeature?: boolean
   /** 来自协商响应头；旧 Host 不视为支持 GS1 二维。 */
   gs1TwoDimensionalFeature?: boolean
   /** 来自协商响应头；旧 Host 不视为支持严格 GS1 关联校验。 */
@@ -161,7 +169,8 @@ export type CapabilityFontSource = 'legacy' | 'default' | 'device' | 'host'
 const knownCutCapabilities = Symbol('knownCutCapabilities')
 
 export type CapabilityQuery = Pick<DesignerCapabilitiesRequest,
-  'protocol' | 'escPosLayoutMode' | 'encoding' | 'escPosDevice' | 'tsplMedia' | 'zplMedia' | 'allowRasterizedLines' | 'requireCutContract'>
+  'protocol' | 'protocolId' | 'protocolConfig' | 'escPosLayoutMode' | 'encoding' | 'escPosDevice' | 'tsplMedia' |
+  'zplMedia' | 'allowRasterizedLines' | 'requireCutContract'>
 
 export const ELEMENT_TYPES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
 
@@ -835,6 +844,8 @@ export function normalizeDesignerCapabilities(value: unknown): DesignerCapabilit
     expandedStackedRowsFeature: input.expandedStackedRowsFeature === undefined ? false : parseBoolean(input.expandedStackedRowsFeature, 'expandedStackedRowsFeature'),
     rasterElementPngFeature: input.rasterElementPngFeature === undefined ? false : parseBoolean(input.rasterElementPngFeature, 'rasterElementPngFeature'),
     rasterPagePngFeature: input.rasterPagePngFeature === undefined ? false : parseBoolean(input.rasterPagePngFeature, 'rasterPagePngFeature'),
+    pagePdfExportFeature: input.pagePdfExportFeature === undefined ? false : parseBoolean(input.pagePdfExportFeature, 'pagePdfExportFeature'),
+    barcodeSvgExportFeature: input.barcodeSvgExportFeature === undefined ? false : parseBoolean(input.barcodeSvgExportFeature, 'barcodeSvgExportFeature'),
     gs1CompositeCcCFeature: input.gs1CompositeCcCFeature === undefined ? false : parseBoolean(input.gs1CompositeCcCFeature, 'gs1CompositeCcCFeature'),
     gs1CompositeExpandedFeature: input.gs1CompositeExpandedFeature === undefined ? false : parseBoolean(input.gs1CompositeExpandedFeature, 'gs1CompositeExpandedFeature'),
     gs1CompositeStackedFeature: input.gs1CompositeStackedFeature === undefined ? false : parseBoolean(input.gs1CompositeStackedFeature, 'gs1CompositeStackedFeature'),
@@ -875,7 +886,7 @@ export function protocolLabel(value: string): string {
 export function capabilityFeatureReason(caps: DesignerCapabilities | undefined, feature: string): string {
   if (!caps) return '当前协议能力尚未查询，暂不能确认支持情况。'
   const layout = caps.escPosLayoutMode ? ` ${caps.escPosLayoutMode}` : ''
-  return `${protocolLabel(caps.protocol)}${layout} 不支持${feature}。`
+  return `${protocolLabel(caps.protocol ?? caps.protocolId ?? '未知协议')}${layout} 不支持${feature}。`
 }
 
 export function elementTypeSupported(caps: DesignerCapabilities | undefined, type: TemplateElement['Type']): boolean {
@@ -1095,6 +1106,16 @@ export function rasterElementPngSupported(caps: DesignerCapabilities | undefined
 
 export function rasterPagePngSupported(caps: DesignerCapabilities | undefined): boolean {
   return Boolean(caps?.rasterPagePngFeature && caps.rasterPreview?.pagePng)
+}
+
+export function pagePdfExportSupported(caps: DesignerCapabilities | undefined): boolean {
+  return Boolean(caps?.pagePdfExportFeature && !caps.protocolId &&
+    caps.protocol === 'EscPos' && caps.escPosLayoutMode === 'Raster')
+}
+
+export function barcodeSvgExportSupported(caps: DesignerCapabilities | undefined, type: number | undefined): boolean {
+  return Boolean(caps?.barcodeSvgExportFeature && !caps.protocolId &&
+    (type === 3 || type === 4 || type === 10 || type === 11))
 }
 
 export function rasterPreviewUnavailableReason(caps: DesignerCapabilities | undefined, type: number): string | undefined {

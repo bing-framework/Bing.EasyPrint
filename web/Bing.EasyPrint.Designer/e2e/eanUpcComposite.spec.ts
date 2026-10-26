@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 const cases = [
   { name: 'EAN-8', type: 4, primary: '96385074', mode: 1, width: 144 },
@@ -34,7 +35,7 @@ for (const item of cases) {
       Type: 11, LinearType: item.type, Mode: item.mode, ModuleWidth: 2, LinearBarHeight: 38,
       Field: { Value: item.primary }, SecondaryField: { Value: '(91)LOT-EANUPC' },
     }] }] }] })
-    const layout = await response.json()
+    const layout = await readPreviewLayout(response)
     const composite = layout.pages.flatMap((value: { elements: Array<Record<string, unknown>> }) => value.elements)
       .find((value: Record<string, unknown>) => value.type === 11)
     expect(composite).toMatchObject({ width: expect.any(Number), height: expect.any(Number) })
@@ -68,7 +69,7 @@ for (const item of cases) {
     await page.getByTestId('template-import').setInputFiles({
       name: `${item.name.toLowerCase()}.json`, mimeType: 'application/json', buffer: saved,
     })
-    expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+    expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
     await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
     await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue(String(item.type))
     await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue(String(item.mode))
@@ -108,13 +109,13 @@ for (const item of [
 
     const basePreview = waitForCompositePreview(page, item.base, 1)
     await page.getByLabel('Composite 二维模式', { exact: true }).selectOption('1')
-    const baseLayout = await (await basePreview).json()
+    const baseLayout = await readPreviewLayout(await basePreview)
     const baseComposite = compositeLayout(baseLayout)
 
     const addon2 = `${item.base}+12`
     const addon2Preview = waitForCompositePreview(page, addon2, 1)
     await page.getByLabel('显示内容', { exact: true }).fill(addon2)
-    const addon2Layout = await (await addon2Preview).json()
+    const addon2Layout = await readPreviewLayout(await addon2Preview)
     const addon2Composite = compositeLayout(addon2Layout)
     expect(addon2Composite.width).toBe(item.addon2Width)
     expect(addon2Composite.height).toBe(baseComposite.height)
@@ -122,13 +123,13 @@ for (const item of [
     if (item.name === 'EAN-8') {
       const switchedPreview = waitForCompositePreview(page, addon2, 2)
       await page.getByLabel('Composite 二维模式', { exact: true }).selectOption('2')
-      const switchedLayout = await (await switchedPreview).json()
+      const switchedLayout = await readPreviewLayout(await switchedPreview)
       expect(compositeLayout(switchedLayout).width).toBe(216)
 
       const addon5 = `${item.base}+51234`
       const addon5Preview = waitForCompositePreview(page, addon5, 2)
       await page.getByLabel('显示内容', { exact: true }).fill(addon5)
-      const layout = await (await addon5Preview).json()
+      const layout = await readPreviewLayout(await addon5Preview)
       const composite = compositeLayout(layout)
       expect(composite.width).toBe(270)
       expect(composite.height).toBe(compositeLayout(switchedLayout).height)
@@ -159,7 +160,7 @@ for (const item of [
       await page.getByTestId('template-import').setInputFiles({
         name: 'ean-8-addon.json', mimeType: 'application/json', buffer: saved,
       })
-      expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+      expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
       await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
       await expect(page.getByLabel('显示内容', { exact: true })).toHaveValue(addon5)
       await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('2')
@@ -169,7 +170,7 @@ for (const item of [
     const addon5 = `${item.base}+51234`
     const addon5Preview = waitForCompositePreview(page, addon5, 1)
     await page.getByLabel('显示内容', { exact: true }).fill(addon5)
-    const layout = await (await addon5Preview).json()
+    const layout = await readPreviewLayout(await addon5Preview)
     const composite = compositeLayout(layout)
     expect(composite.width).toBe(item.addon5Width)
     expect(composite.height).toBe(addon2Composite.height)
@@ -190,7 +191,7 @@ for (const item of [
     await page.getByTestId('template-import').setInputFiles({
       name: 'upc-a-addon.json', mimeType: 'application/json', buffer: saved,
     })
-    expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+    expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
     await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
     await expect(page.getByLabel('显示内容', { exact: true })).toHaveValue(addon5)
   })

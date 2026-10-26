@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 test('GS1 DataBar Stacked Composite 编辑、预览、输出和项目往返', async ({ page }) => {
   await page.goto('/')
@@ -29,7 +30,7 @@ test('GS1 DataBar Stacked Composite 编辑、预览、输出和项目往返', as
     Field: { Value: '12345678901231' },
     SecondaryField: { Value: '(10)LOT-STACKED(17)270101' },
   }] }] }] })
-  const layout = await response.json()
+  const layout = await readPreviewLayout(response)
   const element = layout.pages.flatMap((p: { elements: any[] }) => p.elements).find((e: { type: number }) => e.type === 11)
   expect(element.width).toBe(56 * 3)
   expect(element.height).toBeGreaterThan(48)
@@ -57,7 +58,7 @@ test('GS1 DataBar Stacked Composite 编辑、预览、输出和项目往返', as
   const restoredPreview = page.waitForResponse(response => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && JSON.stringify(response.request().postDataJSON()?.template).includes('(10)LOT-STACKED'))
   await page.getByTestId('template-import').setInputFiles({ name: 'stacked.json', mimeType: 'application/json', buffer: saved })
-  expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+  expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('30')
   await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('2')

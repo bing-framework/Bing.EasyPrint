@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { duplicateElement, groupRowsAtPaths, offsetFlowGroup, reorderFlowGroup, setFlowGroupPosition } from './editorOperations'
 import type { BpTemplate, GroupElement } from './model'
+import { NodeIdentityStore } from './editorIdentity'
 
 function nestedTemplate(): BpTemplate {
   return { Version: 2, Width: 160, Height: 100, Rows: [{ Cells: [{ Rows: [
@@ -11,6 +12,21 @@ function nestedTemplate(): BpTemplate {
 }
 
 describe('V3 editor operations', () => {
+  test('preserves child identities when rows move into a flowing group', () => {
+    const template = nestedTemplate()
+    let nextId = 0
+    const identities = new NodeIdentityStore(() => `row-${++nextId}`)
+    const initial = identities.reconcile(template)
+    const titleId = initial['Rows[0].Cells[0].Rows[0].Cells[0].Elements[0]']!.id
+    const detailId = initial['Rows[0].Cells[0].Rows[1].Cells[0].Elements[0]']!.id
+
+    const groupPath = groupRowsAtPaths(template, ['Rows[0].Cells[0].Rows[0]', 'Rows[0].Cells[0].Rows[1]'])
+    const grouped = identities.reconcile(template)
+
+    expect(grouped[`${groupPath}.Rows[0].Cells[0].Elements[0]`]!.id).toBe(titleId)
+    expect(grouped[`${groupPath}.Rows[1].Cells[0].Elements[0]`]!.id).toBe(detailId)
+  })
+
   test('groups consecutive nested rows and reorders the flow container', () => {
     const template = nestedTemplate()
     const first = 'Rows[0].Cells[0].Rows[0]'

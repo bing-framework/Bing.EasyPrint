@@ -16,12 +16,48 @@ export const MAX_QUIET_ZONE_DOTS = 2_147_483_647
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
+export type FieldFormatKind = 'Text' | 'Number' | 'Currency' | 'Date' | 'Enum'
+
+export type FieldFormat = {
+  Kind?: FieldFormatKind
+  Pattern?: string
+  InputFormat?: string
+  Culture?: string
+  NullText?: string
+  PadLength?: number
+  PadCharacter?: string
+  Prefix?: string
+  Suffix?: string
+  Map?: Record<string, string>
+}
+
+export type Gs1InputMode = 0 | 1
+export type Gs1InputPlacement = 0 | 1 | 2
+export type Gs1InputItem = {
+  Ai: string
+  Value?: string
+  Name?: string
+  Format?: FieldFormat
+  Placement?: Gs1InputPlacement
+}
+export type Gs1InputQueryParameter = { Key: string; Value?: string }
+export type Gs1Input = {
+  Mode: Gs1InputMode
+  BaseUri?: string
+  Fragment?: string
+  ValidateAssociations?: boolean
+  Items: Gs1InputItem[]
+  QueryParameters?: Gs1InputQueryParameter[]
+}
+
 export type Field = {
   Title?: string
   Name?: string
   Value?: string
   NeedFeedLine?: boolean
   Fit?: boolean
+  Format?: FieldFormat
+  Gs1Input?: Gs1Input
 }
 
 export type Condition = {
@@ -205,6 +241,8 @@ export type PreviewElement = {
   width: number
   height: number
   text?: string | null
+  /** Host 按字段格式生成的权威显示值；旧 Host 省略。 */
+  displayText?: string | null
   resourceKey?: string | null
 }
 

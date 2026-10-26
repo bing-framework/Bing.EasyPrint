@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { readPreviewLayout } from './previewResponse'
 
 const longExpandedData = '(91)1234567890123456789012345678901234'
 const secondaryData = '(20)12'
@@ -26,14 +27,14 @@ test('普通 Expanded Stacked 自定义列数改变真实尺寸并通过导出�
     JSON.stringify(response.request().postDataJSON()?.template).includes(longExpandedData))
   await page.getByRole('combobox', { name: '输出协议' }).selectOption('EscPosRaster')
   await page.locator('.tree-row.tree-element .tree-select').first().click()
-  const baseline = previewElement(await (await baselineResponse).json(), 4)
+  const baseline = previewElement(await readPreviewLayout(await baselineResponse), 4)
   await expect(page.getByLabel('Expanded Stacked 每行列数', { exact: true })).toHaveValue('default')
 
   const configuredResponse = page.waitForResponse((response) => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && response.request().postDataJSON()?.template.Rows[0].Cells[0].Elements[0]
       .ExpandedStackedColumns === 3)
   await page.getByLabel('Expanded Stacked 每行列数', { exact: true }).selectOption('3')
-  const configured = previewElement(await (await configuredResponse).json(), 4)
+  const configured = previewElement(await readPreviewLayout(await configuredResponse), 4)
   expect(baseline).toMatchObject({ width: 244, height: 117 })
   expect(configured).toMatchObject({ width: 342, height: 76 })
 
@@ -78,7 +79,7 @@ test('Expanded Stacked Composite 自定义列数改变真实尺寸并通过导�
   const baselineReply = await baselineResponse
   expect(baselineReply.request().headers()['x-easyprint-required-features'])
     .toContain('gs1-composite-expanded-stacked')
-  const baseline = previewElement(await baselineReply.json(), 11)
+  const baseline = previewElement(await readPreviewLayout(await baselineReply), 11)
   await expect(page.getByLabel('Composite Expanded Stacked 每行列数', { exact: true })).toHaveValue('default')
 
   const configuredResponse = page.waitForResponse((response) => response.url().includes('/api/designer/preview') &&
@@ -88,7 +89,7 @@ test('Expanded Stacked Composite 自定义列数改变真实尺寸并通过导�
   const configuredReply = await configuredResponse
   expect(configuredReply.request().headers()['x-easyprint-required-features'])
     .toContain('gs1-databar-expanded-stacked-columns')
-  const configured = previewElement(await configuredReply.json(), 11)
+  const configured = previewElement(await readPreviewLayout(await configuredReply), 11)
   expect(baseline).toMatchObject({ width: 204, height: 131 })
   expect(configured).toMatchObject({ width: 302, height: 90 })
 

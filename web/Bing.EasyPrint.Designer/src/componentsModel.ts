@@ -40,7 +40,7 @@ export function groupConsecutiveRows(template: BpTemplate, indices: number[]): s
     throw new Error('页面页眉、页脚和文档分区不能移入流式组合。')
   if (rows.at(-1)?.Section === 'TableHeader') throw new Error('表格表头必须连同明细一起组合。')
   enableV3(template)
-  const group: TemplateElement = { Type: 6, Rows: cloneTemplate(rows), Pagination: 'Split' }
+  const group: TemplateElement = { Type: 6, Rows: rows, Pagination: 'Split' }
   template.Rows.splice(selected[0], selected.length, { Cells: [{ Elements: [group] }] })
   return `Rows[${selected[0]}].Cells[0].Elements[0]`
 }
@@ -97,7 +97,7 @@ export function groupCellElements(template: BpTemplate, cellPath: string, indice
   const bottom = Math.max(...boxes.map((box) => box.bottom))
   const hasFlowingText = selected.some((index) => cell.Elements![index]?.Type === 1 && !cell.Elements![index]?.EndCoordinate)
   const children = selected.map((index, selectedIndex) => {
-    const child = cloneTemplate(cell.Elements![index])
+    const child = cell.Elements![index]
     const marginLeft = child.Margin?.Left ?? 0
     const marginTop = child.Margin?.Top ?? 0
     if (child.StartCoordinate) {
@@ -171,7 +171,8 @@ export function ungroupElement(template: BpTemplate, elementPath: string, measur
   if (group.DataPath !== undefined || Object.keys(group.Parameters ?? {}).length > 0 ||
     Object.keys(definition?.Parameters ?? {}).length > 0)
     throw new Error('组合包含独立数据上下文或参数，无法安全拆组。')
-  const children = cloneTemplate(definition?.Elements ?? group.Elements ?? [])
+  const sourceChildren = definition?.Elements ?? group.Elements ?? []
+  const children = group.ComponentId ? cloneTemplate(sourceChildren) : sourceChildren
   if (!children.length) throw new Error('组合没有子元素。')
   if (group.Margin?.Bottom || group.Margin?.Right || group.EndCoordinate)
     throw new Error('请先清除组合的右侧或底部间距和结束坐标，再拆开组合。')

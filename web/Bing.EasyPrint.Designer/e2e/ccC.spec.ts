@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { readPreviewLayout } from './previewResponse'
 
 test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page }) => {
   await page.goto('/')
@@ -18,7 +19,7 @@ test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page })
   await page.getByLabel('Composite 次数据').fill('(10)CCCTEST')
   const response = await preview
   expect(response.request().headers()['x-easyprint-required-features']).toContain('gs1-composite-cc-c')
-  const layout = await response.json()
+  const layout = await readPreviewLayout(response)
   const element = layout.pages.flatMap((p: { elements: any[] }) => p.elements).find((e: { type: number }) => e.type === 11)
   expect(element.width).toBeGreaterThan(0)
   expect(element.height).toBeGreaterThan(40)
@@ -48,7 +49,7 @@ test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page })
   const restored = page.waitForResponse(response => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && JSON.stringify(response.request().postDataJSON()?.template).includes('(10)CCCTEST'))
   await page.getByTestId('template-import').setInputFiles({ name: 'cc-c.json', mimeType: 'application/json', buffer: saved })
-  expect((await (await restored).json()).pages).toEqual(layout.pages)
+  expect((await readPreviewLayout(await restored)).pages).toEqual(layout.pages)
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('11')
   await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('3')
@@ -71,7 +72,7 @@ test('严格关联允许分散 Composite 主次数据并拒绝非法合并', asy
     response.request().postDataJSON()?.validateGs1Associations === true)
   await page.locator('.output-settings-button').click()
   await page.getByLabel('严格 GS1 关联校验').check()
-  const layout = await (await strictPreview).json()
+  const layout = await readPreviewLayout(await strictPreview)
   const element = layout.pages.flatMap((page: { elements: any[] }) => page.elements)
     .find((item: { type: number }) => item.type === 11)
   expect(element.width).toBeGreaterThan(0)
@@ -111,7 +112,7 @@ test('GS1-128 CC-A 和 CC-B 真实 Host 编辑、预览、输出与项目往返'
     expect(response.request().postDataJSON()?.template).toMatchObject({ Rows: [{ Cells: [{ Elements: [{
       LinearType: 11, Mode: Number(mode), Field: { Value: '(01)12345678901231' }, SecondaryField: { Value: secondary },
     }] }] }] })
-    const layout = await response.json()
+    const layout = await readPreviewLayout(response)
     const element = layout.pages.flatMap((p: { elements: any[] }) => p.elements).find((e: { type: number }) => e.type === 11)
     expect(element.width).toBeGreaterThan(0)
     expect(element.height).toBeGreaterThan(40)
@@ -143,7 +144,7 @@ test('GS1-128 CC-A 和 CC-B 真实 Host 编辑、预览、输出与项目往返'
       restoredResponse.status() === 200 && JSON.stringify(restoredResponse.request().postDataJSON()?.template).includes(secondary))
     await page.getByTestId('template-import').setInputFiles({ name: `cc-${suffix.toLowerCase()}.json`,
       mimeType: 'application/json', buffer: saved })
-    expect((await (await restored).json()).pages).toEqual(layout.pages)
+    expect((await readPreviewLayout(await restored)).pages).toEqual(layout.pages)
     await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
     await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('11')
     await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue(mode)

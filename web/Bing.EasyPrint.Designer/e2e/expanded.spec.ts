@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { installOldHostFeatureMock } from './oldHostFeatureMock'
+import { readPreviewLayout } from './previewResponse'
 
 test('GS1 DataBar Expanded Composite 编辑、预览、输出和项目往返', async ({ page }) => {
   await page.goto('/')
@@ -27,7 +29,7 @@ test('GS1 DataBar Expanded Composite 编辑、预览、输出和项目往返', a
     Field: { Value: '(01)09506000134352(10)LOT-A' },
     SecondaryField: { Value: '(10)LOT-EXPANDED(17)270101' },
   }] }] }] })
-  const layout = await response.json()
+  const layout = await readPreviewLayout(response)
   const element = layout.pages.flatMap((p: { elements: any[] }) => p.elements).find((e: { type: number }) => e.type === 11)
   expect(element.width).toBeGreaterThan(0)
   expect(element.height).toBeGreaterThan(40)
@@ -55,7 +57,7 @@ test('GS1 DataBar Expanded Composite 编辑、预览、输出和项目往返', a
   const restoredPreview = page.waitForResponse(response => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && JSON.stringify(response.request().postDataJSON()?.template).includes('(10)LOT-EXPANDED'))
   await page.getByTestId('template-import').setInputFiles({ name: 'expanded.json', mimeType: 'application/json', buffer: saved })
-  expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+  expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('28')
   await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('2')
@@ -65,30 +67,14 @@ test('GS1 DataBar Expanded Composite 编辑、预览、输出和项目往返', a
 })
 
 test('缺少 Expanded 协商特性时禁用选项并明确显示降级原因', async ({ page }) => {
-  await page.route('**/api/designer/**', async route => {
-    const response = await route.fetch()
-    const headers = response.headers()
-    headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows'].includes(feature.trim())).join(',')
-    headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-composite-expanded' && feature.trim() !== 'gs1-composite-stacked' &&
-        feature.trim() !== 'gs1-composite-expanded-stacked' && feature.trim() !== 'gs1-composite-ean-upc' &&
-        feature.trim() !== 'gs1-composite-ean-upc-addons' &&
-        feature.trim() !== 'gs1-composite-truncated' && feature.trim() !== 'gs1-composite-stacked-omnidirectional').join(',')
-    if (route.request().url().includes('/capabilities')) {
-      const json = await response.json()
-      delete json.expandedStackedColumns
-      delete json.expandedStackedRows
-      if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
-      if (json.gs1Composite) delete json.gs1Composite.expandedStackedRows
-      if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
-        .filter((type: string) => type !== 'Gs1DataBarExpanded' && type !== 'Gs1DataBarStacked' &&
-          type !== 'Gs1DataBarExpandedStacked' && !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated',
-            'Gs1DataBarStackedOmnidirectional'].includes(type))
-      if (json.gs1Composite?.primaryFormats) json.gs1Composite.primaryFormats = json.gs1Composite.primaryFormats
-        .filter((format: string) => format !== 'ean-upc-digits-with-addon')
-      await route.fulfill({ response, headers, json })
-    } else await route.fulfill({ response, headers })
+  await installOldHostFeatureMock(page, {
+    unavailableFeatures: ['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows',
+      'gs1-composite-expanded', 'gs1-composite-stacked', 'gs1-composite-expanded-stacked', 'gs1-composite-ean-upc',
+      'gs1-composite-ean-upc-addons', 'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'],
+    unavailableLinearTypes: ['Gs1DataBarExpanded', 'Gs1DataBarStacked', 'Gs1DataBarExpandedStacked', 'Ean8', 'Ean13',
+      'UpcA', 'UpcE', 'Gs1DataBarTruncated', 'Gs1DataBarStackedOmnidirectional'],
+    removeCapabilityProperties: ['expandedStackedColumns', 'expandedStackedRows'],
+    removeEanUpcAddonFormat: true,
   })
 
   await page.goto('/')

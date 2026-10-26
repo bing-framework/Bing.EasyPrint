@@ -19,6 +19,7 @@ import type {
   PrintCutMode,
   PrintCutOptions,
   PrintEncoding,
+  ProtocolFinishingRequest,
   TsplCutterProfile,
   ZplCutterProfile,
   ZplCutStrategy,
@@ -40,6 +41,9 @@ export type DesignerOutputTarget = 'Cpcl' | 'Tspl' | 'Zpl' | 'EscPosRaster' | 'E
 /** 设计器需要随模板保存的输出设置。 */
 export type DesignerOutputSettings = {
   outputTarget: DesignerOutputTarget
+  protocolId?: string
+  protocolConfig?: Record<string, unknown>
+  protocolFinishing?: ProtocolFinishingRequest
   allowRasterizedLines: boolean
   imageThreshold: number
   deviceHalfCellWidthAt24?: number
@@ -61,7 +65,7 @@ export type DesignerOutputSettings = {
 
 export type DesignerProject = {
   format: 'Bing.EasyPrint.DesignerProject'
-  version: 1
+  version: 2
   template: BpTemplate
   outputSettings: DesignerOutputSettings
 }
@@ -740,7 +744,7 @@ export function defaultDesignerOutputSettings(): DesignerOutputSettings {
 export function validateDesignerOutputSettings(value: unknown): DesignerOutputSettings {
   if (!isRecord(value)) fail('outputSettings', '必须为对象。')
   assertKnownKeys(value, [
-    'outputTarget', 'allowRasterizedLines', 'imageThreshold', 'deviceHalfCellWidthAt24',
+    'outputTarget', 'protocolId', 'protocolConfig', 'protocolFinishing', 'allowRasterizedLines', 'imageThreshold', 'deviceHalfCellWidthAt24',
     'deviceFullCellWidthAt24', 'deviceLineHeightAt24', 'requireDeclaredNativeBounds', 'validateGs1Associations',
     'deviceFontCalibrations',
     'copies', 'feedLines', 'cutAfterPrint', 'cutOptions', 'job', 'encoding', 'escPosDevice', 'tsplMedia', 'zplMedia',
@@ -748,6 +752,34 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
 
   const defaults = defaultDesignerOutputSettings()
   const outputTarget = optionalEnum(value.outputTarget ?? defaults.outputTarget, 'outputSettings.outputTarget', OUTPUT_TARGETS)!
+  const protocolId = optionalString(value.protocolId, 'outputSettings.protocolId')
+  let protocolConfig: Record<string, unknown> | undefined
+  if (value.protocolConfig !== undefined) {
+    if (!protocolId) fail('outputSettings.protocolConfig', '只有声明 protocolId 时才能配置协议参数。')
+    if (!isRecord(value.protocolConfig)) fail('outputSettings.protocolConfig', '必须为 JSON 对象。')
+    protocolConfig = JSON.parse(JSON.stringify(value.protocolConfig)) as Record<string, unknown>
+  }
+  let protocolFinishing: ProtocolFinishingRequest | undefined
+  if (value.protocolFinishing !== undefined) {
+    if (!protocolId) fail('outputSettings.protocolFinishing', '只有声明 protocolId 时才能配置协议收尾。')
+    if (!isRecord(value.protocolFinishing)) fail('outputSettings.protocolFinishing', '必须为 JSON 对象。')
+    assertKnownKeys(value.protocolFinishing, ['feedAmount', 'feedUnit', 'cut', 'placement'],
+      'outputSettings.protocolFinishing')
+    const feedAmount = optionalInteger(value.protocolFinishing.feedAmount,
+      'outputSettings.protocolFinishing.feedAmount', item => item >= 0)
+    const feedUnit = optionalEnum(value.protocolFinishing.feedUnit,
+      'outputSettings.protocolFinishing.feedUnit', JOB_FEED_UNITS)
+    const cut = optionalBoolean(value.protocolFinishing.cut, 'outputSettings.protocolFinishing.cut')
+    const placement = value.protocolFinishing.placement === undefined ? undefined
+      : optionalEnum(value.protocolFinishing.placement, 'outputSettings.protocolFinishing.placement',
+        ['JobEnd', 'PageEnd'] as const)
+    protocolFinishing = {
+      ...(feedAmount === undefined ? {} : { feedAmount }),
+      ...(feedUnit === undefined ? {} : { feedUnit }),
+      ...(cut === undefined ? {} : { cut }),
+      ...(placement === undefined ? {} : { placement }),
+    }
+  }
   const encoding = optionalEnum(value.encoding, 'outputSettings.encoding', ENCODINGS)
   if (outputTarget === 'Zpl' && encoding === 'Gbk') fail('outputSettings.encoding', 'ZPL 不支持 Gbk 编码。')
 
@@ -791,6 +823,9 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
 
   return {
     outputTarget,
+    ...(protocolId === undefined ? {} : { protocolId }),
+    ...(protocolConfig === undefined ? {} : { protocolConfig }),
+    ...(protocolFinishing === undefined ? {} : { protocolFinishing }),
     allowRasterizedLines,
     imageThreshold,
     ...(deviceHalfCellWidthAt24 === undefined ? {} : { deviceHalfCellWidthAt24 }),
@@ -811,20 +846,29 @@ export function validateDesignerOutputSettings(value: unknown): DesignerOutputSe
   }
 }
 
+function cloneEditorState(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) fail('editorState', '必须为 JSON 对象。')
+  const serialized = JSON.stringify(value)
+  if (serialized.length > 1024 * 1024) fail('editorState', '序列化后不能超过 1 MiB。')
+  return JSON.parse(serialized) as Record<string, unknown>
+}
+
 /** 将模板和输出设置序列化为带版本的设计器项目 envelope。 */
-export function serializeDesignerProject(template: BpTemplate, outputSettings?: DesignerOutputSettings): string {
+export function serializeDesignerProject(template: BpTemplate, outputSettings?: DesignerOutputSettings,
+  editorState?: Record<string, unknown>): string {
   assertTemplate(template)
   const project: DesignerProject = {
     format: DESIGNER_PROJECT_FORMAT,
-    version: 1,
+    version: 2,
     template: cloneTemplate(template),
     outputSettings: validateDesignerOutputSettings(outputSettings ?? defaultDesignerOutputSettings()),
+    ...(editorState === undefined ? {} : { editorState: cloneEditorState(editorState) }),
   }
   return JSON.stringify(project, null, 2)
 }
 
 /** 解析新版项目 envelope，也兼容历史上直接保存的模板 JSON。 */
-export function parseDesignerProject(value: unknown): { template: BpTemplate; outputSettings?: DesignerOutputSettings } {
+export function parseDesignerProject(value: unknown): { template: BpTemplate; outputSettings?: DesignerOutputSettings; editorState?: Record<string, unknown> } {
   if (!isRecord(value)) {
     assertTemplate(value)
     return { template: cloneTemplate(value) }
@@ -836,12 +880,14 @@ export function parseDesignerProject(value: unknown): { template: BpTemplate; ou
     return { template: cloneTemplate(value) }
   }
 
-  assertKnownKeys(value, ['format', 'version', 'template', 'outputSettings'], '设计器项目')
-  if (value.format !== DESIGNER_PROJECT_FORMAT || value.version !== 1) throw new DesignerProjectValidationError('设计器项目版本不受支持。')
+  assertKnownKeys(value, ['format', 'version', 'template', 'outputSettings', 'editorState'], '设计器项目')
+  if (value.format !== DESIGNER_PROJECT_FORMAT || (value.version !== 1 && value.version !== 2))
+    throw new DesignerProjectValidationError('设计器项目版本不受支持。')
   if (!Object.prototype.hasOwnProperty.call(value, 'template')) throw new DesignerProjectValidationError('设计器项目缺少模板。')
   assertTemplate(value.template)
   return {
     template: cloneTemplate(value.template),
     ...(value.outputSettings === undefined ? {} : { outputSettings: validateDesignerOutputSettings(value.outputSettings) }),
+    ...(value.editorState === undefined ? {} : { editorState: cloneEditorState(value.editorState) }),
   }
 }

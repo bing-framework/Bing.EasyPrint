@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
+import { installOldHostFeatureMock } from './oldHostFeatureMock'
+import { readPreviewLayout } from './previewResponse'
 
 test('普通 Expanded Stacked 在 Raster 模式按每行高度编辑并保留真实多行布局', async ({ page }) => {
   await page.goto('/')
@@ -24,7 +26,7 @@ test('普通 Expanded Stacked 在 Raster 模式按每行高度编辑并保留真
   const preview = page.waitForResponse(response => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && response.request().postDataJSON()?.template.Rows[0].Cells[0].Elements[0].Height === 35)
   await dimensions.nth(3).fill('35')
-  const layout = await (await preview).json()
+  const layout = await readPreviewLayout(await preview)
   const barcode = layout.pages[0].elements.find((element: { type: number }) => element.type === 4)
   expect(barcode.height).toBe(117)
   expect(barcode.width).toBeGreaterThanOrEqual(204)
@@ -36,7 +38,7 @@ test('普通 Expanded Stacked 在 Raster 模式按每行高度编辑并保留真
   const rotated = page.waitForResponse(response => response.url().includes('/api/designer/preview') &&
     response.status() === 200 && response.request().postDataJSON()?.template.Rows[0].Cells[0].Elements[0].Rotation === 90)
   await page.getByLabel('元素旋转').selectOption('90')
-  const rotatedLayout = await (await rotated).json()
+  const rotatedLayout = await readPreviewLayout(await rotated)
   expect(rotatedLayout.pages[0].elements.find((element: { type: number }) => element.type === 4).width).toBe(117)
   await expect(dimensions.nth(3)).toHaveValue('35')
 })
@@ -65,7 +67,7 @@ test('GS1 DataBar Expanded Stacked 编辑、预览、输出和项目往返', asy
     Field: { Value: '(01)09506000134352(10)LOT-A' },
     SecondaryField: { Value: '(91)GS1-EXP-STK(17)270101' },
   }] }] }] })
-  const layout = await response.json()
+  const layout = await readPreviewLayout(response)
   const element = layout.pages.flatMap((p: { elements: any[] }) => p.elements)
     .find((candidate: { type: number }) => candidate.type === 11)
   expect(element.width).toBeGreaterThan(0)
@@ -97,7 +99,7 @@ test('GS1 DataBar Expanded Stacked 编辑、预览、输出和项目往返', asy
   await page.getByTestId('template-import').setInputFiles({
     name: 'expanded-stacked.json', mimeType: 'application/json', buffer: saved,
   })
-  expect((await (await restoredPreview).json()).pages).toEqual(layout.pages)
+  expect((await readPreviewLayout(await restoredPreview)).pages).toEqual(layout.pages)
   await page.locator('.tree-row.tree-element .tree-select').filter({ hasText: 'GS1 Composite' }).click()
   await expect(page.getByLabel('Composite 线性组件', { exact: true })).toHaveValue('31')
   await expect(page.getByLabel('Composite 二维模式', { exact: true })).toHaveValue('2')
@@ -108,28 +110,14 @@ test('GS1 DataBar Expanded Stacked 编辑、预览、输出和项目往返', asy
 })
 
 test('旧 Host 缺少 Expanded Stacked 特性时禁用制式并说明降级原因', async ({ page }) => {
-  await page.route('**/api/designer/**', async route => {
-    const response = await route.fetch()
-    const headers = response.headers()
-    headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => !['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows'].includes(feature.trim())).join(',')
-    headers['x-easyprint-features'] = (headers['x-easyprint-features'] ?? '').split(',')
-      .filter(feature => feature.trim() !== 'gs1-composite-expanded-stacked' && feature.trim() !== 'gs1-composite-ean-upc' &&
-        feature.trim() !== 'gs1-composite-ean-upc-addons' &&
-        feature.trim() !== 'gs1-composite-truncated' && feature.trim() !== 'gs1-composite-stacked-omnidirectional').join(',')
-    if (route.request().url().includes('/capabilities')) {
-      const json = await response.json()
-      delete json.expandedStackedColumns
-      delete json.expandedStackedRows
-      if (json.gs1Composite) delete json.gs1Composite.expandedStackedColumns
-      if (json.gs1Composite) delete json.gs1Composite.expandedStackedRows
-      if (json.gs1Composite) json.gs1Composite.linearTypes = json.gs1Composite.linearTypes
-        .filter((type: string) => type !== 'Gs1DataBarExpandedStacked' &&
-          !['Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated', 'Gs1DataBarStackedOmnidirectional'].includes(type))
-      if (json.gs1Composite?.primaryFormats) json.gs1Composite.primaryFormats = json.gs1Composite.primaryFormats
-        .filter((format: string) => format !== 'ean-upc-digits-with-addon')
-      await route.fulfill({ response, headers, json })
-    } else await route.fulfill({ response, headers })
+  await installOldHostFeatureMock(page, {
+    unavailableFeatures: ['gs1-databar-expanded-stacked-columns', 'gs1-databar-expanded-stacked-rows',
+      'gs1-composite-expanded-stacked', 'gs1-composite-ean-upc', 'gs1-composite-ean-upc-addons',
+      'gs1-composite-truncated', 'gs1-composite-stacked-omnidirectional'],
+    unavailableLinearTypes: ['Gs1DataBarExpandedStacked', 'Ean8', 'Ean13', 'UpcA', 'UpcE', 'Gs1DataBarTruncated',
+      'Gs1DataBarStackedOmnidirectional'],
+    removeCapabilityProperties: ['expandedStackedColumns', 'expandedStackedRows'],
+    removeEanUpcAddonFormat: true,
   })
 
   await page.goto('/')

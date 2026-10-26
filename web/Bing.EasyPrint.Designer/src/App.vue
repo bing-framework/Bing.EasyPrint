@@ -5,12 +5,17 @@ import {
   Download, FilePlus2, FileText, ImagePlus, Layers3, Minus, PanelLeft, PanelRight, Play, Printer, Save,
   QrCode, Redo2, RotateCcw, Ruler, Search, Type, Upload, X, Undo2, ZoomIn, ZoomOut,
   Circle, Hand, MousePointer2, Shapes, Square, Table2, Layers, Ungroup, Unlink, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Copy,
+  AlignCenter,
 } from '@lucide/vue'
+import { releasePreviewImages } from './previewLifecycle'
 import CanvasWorkspace from './components/CanvasWorkspace.vue'
 import PropertyInspector from './components/PropertyInspector.vue'
 import TemplateTree from './components/TemplateTree.vue'
 import LabelPrinterProfileEditor from './components/LabelPrinterProfileEditor.vue'
-import { DesignerValidationError, loadDesignerSamples, previewWithImages, elementPng, pagePng, renderTemplate, type DesignerSample,
+import BatchPanel from './components/BatchPanel.vue'
+import { DesignerValidationError, loadDesignerSamples, loadProtocolRegistry, previewWithImages, elementPng, elementSvg, pagePng, pagePdf,
+  renderTemplate, type DesignerSample, type DesignerProtocolDescriptor, type CustomProtocolRequest,
+  type ProtocolFinishingRequest,
   loadDesignerCapabilities, type PrintProtocol, type EscPosLayoutMode, type TsplMediaRequest, type ZplMediaRequest,
   type ZplMediaTracking, type PrintEncoding, type EscPosDeviceRequest,
   type EscPosNativeFlowMode,
@@ -20,10 +25,11 @@ import { DesignerValidationError, loadDesignerSamples, previewWithImages, elemen
   type EscPosNativeTextProfile, type EscPosPrinterProfile, type EscPosTextCharacterMode,
   type BarcodeTypeName, type EscPosBarcodeTextPositionName,
   type EscPosRasterFontResource, type EscPosRasterFontsRequest,
-  defaultEscPosPrinterProfile } from './api'
+  defaultEscPosPrinterProfile, buildPreviewBody } from './api'
 import { canCreateElement, createCapabilityRequestRunner, cutCapabilitiesKnown, elementTypeReason,
   expandedStackedColumnsIssue,
   expandedStackedRowsIssue, rasterElementPngSupported, rasterPagePngSupported, rasterPreviewUnavailableReason,
+  barcodeSvgExportSupported, pagePdfExportSupported,
   type CapabilitiesState, type CapabilityQuery, type DesignerCapabilities } from './capabilities'
 import { collectResourceKeys, createComponentTemplate, exportTemplateBundle, importTemplateBundle, MAX_TEMPLATE_JSON_BYTES, resourceForImage } from './archive'
 import { buildLocalLayout } from './layout'
@@ -33,10 +39,14 @@ import { findDiagnosticPage, formatDesignerDiagnostic, normalizeDesignerDiagnost
 import { makeSample, sampleData, type SampleKey } from './samples'
 import { findCell, findComponent, findElement, findRow, listTemplateTree } from './tree'
 import { SnapshotHistory } from './history'
+import { NodeIdentityStore, type NodeIdentityMap } from './editorIdentity'
+import { arrangeAbsoluteSelection, type ArrangementMode } from './editorLayout'
+import { cloneBatchEditorState, emptyBatchEditorState, type BatchEditorState } from './batchEditorState'
 import { barcodeOccupiedSize, barcodeRawSizeFromOccupied, dotsToMm, getNudgeDelta, materializeElementPosition, PRINT_DPI, rotatedSize, translateElement } from './coordinates'
 import { addNestedRow as appendNestedRow } from './structure'
 import { appendComponent, appendDataTable, appendStaticTable, componentLibraryTargetVersion, detachComponent, enableV2, groupCellElements, removeComponent, renameComponent, saveGroupComponent, ungroupElement, type ElementBounds } from './componentsModel'
 import { parseTextTable } from './textTable'
+import { parseJsonPreservingPrecision, stringifyJsonPreservingPrecision } from './losslessJson'
 import { walkTemplateNodes } from './templateTraversal'
 import { duplicateElement, groupRowsAtPaths, offsetFlowGroup, reorderFlowGroup, setFlowGroupPosition } from './editorOperations'
 import { defaultDesignerOutputSettings, parseDesignerProject, serializeDesignerProject, type DesignerOutputSettings } from './designerProject'
@@ -49,18 +59,90 @@ const localSampleLabels: Record<string, string> = {
 }
 
 const template = ref<BpTemplate>(makeSample('blank'))
+const nodeIdentityStore = new NodeIdentityStore()
+const nodeStates = ref<NodeIdentityMap>(nodeIdentityStore.reconcile(template.value))
+const batchEditorState = ref<BatchEditorState>(emptyBatchEditorState())
 const templateName = ref('空白标签 · 576 × 360 点')
 const selectedPath = ref('Rows[0].Cells[0].Elements[0]')
 const selectedPaths = ref<string[]>([])
 const selectedOccurrencePath = ref('')
+const arrangementMode = ref<ArrangementMode>('align-left')
 const sampleId = ref<string>('blank')
 const remoteSamples = ref<DesignerSample[]>([])
 const serviceSampleError = ref('')
 const unit = ref<'pt' | 'mm'>('pt')
 const outputTarget = ref<'Cpcl' | 'Tspl' | 'Zpl' | 'EscPosRaster' | 'EscPosNative'>('Cpcl')
-const printProtocol = computed<PrintProtocol>(() => outputTarget.value.startsWith('EscPos') ? 'EscPos' : outputTarget.value as PrintProtocol)
+const protocolCatalog = ref<DesignerProtocolDescriptor[]>([])
+const protocolCatalogState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+const protocolCatalogError = ref('')
+const customProtocolId = ref('')
+const customProtocolConfig = ref<Record<string, unknown>>({})
+const customConfigDraft = ref('{}')
+const customConfigError = ref('')
+const protocolFinishingEnabled = ref(false)
+const protocolFinishing = ref<ProtocolFinishingRequest>({
+  feedAmount: 0, feedUnit: 'Lines', cut: false, placement: 'JobEnd',
+})
+const customProtocolDescriptor = computed(() => protocolCatalog.value.find((item) => item.id === customProtocolId.value))
+const isCustomProtocol = computed(() => customProtocolId.value.length > 0)
+const customProtocolReady = computed(() => Boolean(customProtocolId.value && customProtocolDescriptor.value))
+const customProtocolRequest = computed<CustomProtocolRequest | undefined>(() =>
+  isCustomProtocol.value && customProtocolId.value
+    ? {
+        id: customProtocolId.value,
+        config: customProtocolConfig.value,
+        ...(protocolFinishingEnabled.value ? { finishing: cloneTemplate(protocolFinishing.value) } : {}),
+      } : undefined)
+const selectedOutputKey = computed(() => isCustomProtocol.value ? `custom:${customProtocolId.value}` : outputTarget.value)
+type CustomConfigField = {
+  name: string
+  title: string
+  type: string
+  minimum?: number
+  maximum?: number
+}
+const customConfigFields = computed<CustomConfigField[]>(() => {
+  const schema = customProtocolDescriptor.value?.configSchema
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return []
+  const properties = (schema as { properties?: unknown }).properties
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return []
+  return Object.entries(properties).flatMap(([name, raw]) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+    const field = raw as Record<string, unknown>
+    if (typeof field.type !== 'string') return []
+    return [{
+      name,
+      title: typeof field.title === 'string' ? field.title : name,
+      type: field.type,
+      ...(typeof field.minimum === 'number' ? { minimum: field.minimum } : {}),
+      ...(typeof field.maximum === 'number' ? { maximum: field.maximum } : {}),
+    }]
+  })
+})
+function customConfigValue(name: string): string | number | boolean | undefined {
+  const value = customProtocolConfig.value[name]
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? value : undefined
+}
+function setCustomConfigField(name: string, event: Event) {
+  const target = event.target as HTMLInputElement
+  const next = { ...customProtocolConfig.value }
+  if (target.type === 'checkbox') next[name] = target.checked
+  else if (target.type === 'number') {
+    if (target.value.trim() === '') delete next[name]
+    else next[name] = Number(target.value)
+  } else next[name] = target.value
+  setCustomProtocolConfig(next)
+}
+const builtinPrintProtocol = computed<PrintProtocol>(() =>
+  outputTarget.value.startsWith('EscPos') ? 'EscPos' : outputTarget.value as PrintProtocol)
+const printProtocol = computed<PrintProtocol | null>(() => isCustomProtocol.value ? null : builtinPrintProtocol.value)
 const escPosLayoutMode = computed<EscPosLayoutMode>(() => outputTarget.value === 'EscPosNative' ? 'Native' : 'Raster')
 const targetDpi = computed(() => {
+  if (isCustomProtocol.value) {
+    const declared = customProtocolDescriptor.value?.capabilities?.dpi
+    if (typeof declared === 'number' && Number.isFinite(declared) && declared > 0) return declared
+    return 203
+  }
   if (printProtocol.value === 'Cpcl') return PRINT_DPI
   const configuredDpi = printProtocol.value === 'EscPos'
     ? escPosDevice.value.dpi
@@ -97,11 +179,15 @@ const labelProfileError = computed(() => printProtocol.value === 'Tspl' ? tsplPr
   printProtocol.value === 'Zpl' ? zplProfileError.value : '')
 const escPosProfileExpanded = ref(false)
 const usesDeviceFontCalibration = computed(() => printProtocol.value === 'Tspl' || printProtocol.value === 'Zpl')
-const usesImageThreshold = computed(() => outputTarget.value === 'EscPosRaster' || usesDeviceFontCalibration.value)
-const usesFeedLines = computed(() => printProtocol.value === 'EscPos')
-const printDataLabel = computed(() => `生成 ${printProtocol.value === 'EscPos' ? 'ESC/POS' : printProtocol.value.toUpperCase()}`)
-const usesCutAfterPrint = computed(() => printProtocol.value === 'EscPos' || printProtocol.value === 'Tspl' || printProtocol.value === 'Zpl')
-const usesEscPosDevice = computed(() => printProtocol.value === 'EscPos')
+const usesImageThreshold = computed(() => !isCustomProtocol.value &&
+  (outputTarget.value === 'EscPosRaster' || usesDeviceFontCalibration.value))
+const usesFeedLines = computed(() => !isCustomProtocol.value && printProtocol.value === 'EscPos')
+const printDataLabel = computed(() => isCustomProtocol.value
+  ? `生成 ${customProtocolDescriptor.value?.displayName ?? customProtocolId.value}`
+  : `生成 ${printProtocol.value === 'EscPos' ? 'ESC/POS' : builtinPrintProtocol.value.toUpperCase()}`)
+const usesCutAfterPrint = computed(() => !isCustomProtocol.value &&
+  (printProtocol.value === 'EscPos' || printProtocol.value === 'Tspl' || printProtocol.value === 'Zpl'))
+const usesEscPosDevice = computed(() => !isCustomProtocol.value && printProtocol.value === 'EscPos')
 function cloneEscPosProfileState(profile: EscPosPrinterProfile): EscPosPrinterProfile {
   return {
     ...profile,
@@ -191,7 +277,11 @@ const capabilities = ref<DesignerCapabilities>()
 const capabilitiesState = ref<CapabilitiesState>('idle')
 const capabilitiesError = ref('')
 const capabilityQuery = computed<CapabilityQuery>(() => ({
-  protocol: printProtocol.value,
+  protocol: builtinPrintProtocol.value,
+  ...(customProtocolRequest.value === undefined ? {} : {
+    protocolId: customProtocolRequest.value.id,
+    protocolConfig: customProtocolRequest.value.config,
+  }),
   escPosLayoutMode: escPosLayoutMode.value,
   encoding: effectiveEncoding.value,
   escPosDevice: effectiveEscPosDevice.value ? cloneEscPosDeviceState(effectiveEscPosDevice.value) : undefined,
@@ -205,6 +295,7 @@ const capabilityNotice = computed(() => {
   if (capabilitiesState.value === 'loading') return '正在读取当前协议能力，暂不能新增元素。'
   if (capabilitiesState.value === 'error') return '当前协议能力不可用，已禁用新增元素。'
   if (capabilitiesState.value === 'ready') {
+    if (isCustomProtocol.value) return `${customProtocolDescriptor.value?.displayName ?? customProtocolId.value} 能力已更新`
     const protocol = capabilities.value?.protocol
     return `${protocol === 'EscPos' ? 'ESC/POS' : protocol?.toUpperCase() ?? '当前协议'} 能力已更新`
   }
@@ -252,6 +343,7 @@ const tableColumns = ref<Array<{ title: string; path: string; width?: number; al
 const showAdvancedTools = ref(false)
 const resources = ref<TemplateResource[]>([])
 const dataText = ref('{}')
+const showBatchPanel = ref(false)
 const previewPages = ref<PreviewPage[]>([])
 const previewImages = ref<Record<string, string>>({})
 
@@ -297,6 +389,11 @@ const searchText = ref('')
 
 const outputSettingsSnapshot = (): DesignerOutputSettings => ({
   outputTarget: outputTarget.value,
+  ...(isCustomProtocol.value ? {
+    protocolId: customProtocolId.value,
+    protocolConfig: cloneTemplate(customProtocolConfig.value),
+    ...(protocolFinishingEnabled.value ? { protocolFinishing: cloneTemplate(protocolFinishing.value) } : {}),
+  } : {}),
   allowRasterizedLines: allowRasterizedLines.value,
   imageThreshold: imageThreshold.value,
   deviceHalfCellWidthAt24: deviceHalfCellWidthAt24.value,
@@ -326,8 +423,72 @@ const outputSettingsSnapshot = (): DesignerOutputSettings => ({
   zplMedia: zplMedia.value,
 })
 
+function setCustomProtocolConfig(config: Record<string, unknown>) {
+  customProtocolConfig.value = cloneTemplate(config)
+  customConfigDraft.value = JSON.stringify(customProtocolConfig.value, null, 2)
+  customConfigError.value = ''
+}
+
+function defaultsFromConfigSchema(schema: unknown): Record<string, unknown> {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return {}
+  const properties = (schema as { properties?: unknown }).properties
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return {}
+  const result: Record<string, unknown> = {}
+  for (const [name, raw] of Object.entries(properties)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+    if (Object.hasOwn(raw, 'default')) result[name] = cloneTemplate((raw as { default: unknown }).default)
+  }
+  return result
+}
+
+function setOutputKey(key: string) {
+  if (key.startsWith('custom:')) {
+    const id = key.slice('custom:'.length)
+    const descriptor = protocolCatalog.value.find((item) => item.id === id)
+    const changed = customProtocolId.value !== id
+    customProtocolId.value = id
+    outputTarget.value = 'Cpcl'
+    if (changed || Object.keys(customProtocolConfig.value).length === 0)
+      setCustomProtocolConfig(defaultsFromConfigSchema(descriptor?.configSchema))
+    return
+  }
+  customProtocolId.value = ''
+  customProtocolConfig.value = {}
+  customConfigDraft.value = '{}'
+  customConfigError.value = ''
+  outputTarget.value = key as typeof outputTarget.value
+}
+
+function updateProtocolFinishing(patch: Partial<ProtocolFinishingRequest>) {
+  protocolFinishing.value = { ...protocolFinishing.value, ...patch }
+}
+function applyCustomProtocolConfig() {
+  try {
+    const parsed = JSON.parse(customConfigDraft.value) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new Error('协议配置必须是 JSON 对象。')
+    setCustomProtocolConfig(parsed as Record<string, unknown>)
+    showToast('协议配置已应用')
+  } catch (error) {
+    customConfigError.value = error instanceof Error ? error.message : '协议配置 JSON 无效。'
+  }
+}
+
 function applyOutputSettings(settings: DesignerOutputSettings) {
   outputTarget.value = settings.outputTarget
+  if (settings.protocolId) {
+    customProtocolId.value = settings.protocolId
+    setCustomProtocolConfig((settings.protocolConfig ?? {}) as Record<string, unknown>)
+    protocolFinishingEnabled.value = settings.protocolFinishing !== undefined
+    protocolFinishing.value = settings.protocolFinishing === undefined
+      ? { feedAmount: 0, feedUnit: 'Lines', cut: false, placement: 'JobEnd' }
+      : cloneTemplate(settings.protocolFinishing)
+  } else {
+    customProtocolId.value = ''
+    customProtocolConfig.value = {}
+    customConfigDraft.value = '{}'
+    customConfigError.value = ''
+  }
   allowRasterizedLines.value = settings.allowRasterizedLines
   imageThreshold.value = settings.imageThreshold
   deviceHalfCellWidthAt24.value = settings.deviceHalfCellWidthAt24
@@ -367,22 +528,124 @@ function applyOutputSettings(settings: DesignerOutputSettings) {
   zplMedia.value = cloneTemplate(settings.zplMedia)
 }
 
-type EditorSnapshot = { template: BpTemplate; resources: TemplateResource[]; outputSettings: DesignerOutputSettings }
+type DesignerEditorState = {
+  unit: 'pt' | 'mm'
+  selectedPath: string
+  selectedPaths: string[]
+  selectedOccurrencePath: string
+  templateName: string
+  sampleId: string
+  nodeStates: NodeIdentityMap
+}
+const editorStateSnapshot = (): DesignerEditorState => ({
+  unit: unit.value,
+  selectedPath: selectedPath.value,
+  selectedPaths: [...selectedPaths.value],
+  selectedOccurrencePath: selectedOccurrencePath.value,
+  templateName: templateName.value,
+  sampleId: sampleId.value,
+  nodeStates: nodeStates.value,
+})
+function applyEditorState(value: Record<string, unknown> | undefined) {
+  if (!value) return
+  nodeStates.value = value.nodeStates === undefined
+    ? nodeIdentityStore.reconcile(template.value)
+    : nodeIdentityStore.restore(template.value, value.nodeStates)
+  if (value.unit === 'pt' || value.unit === 'mm') unit.value = value.unit
+  if (typeof value.templateName === 'string' && value.templateName.trim()) templateName.value = value.templateName
+  if (typeof value.sampleId === 'string') sampleId.value = value.sampleId
+  if (typeof value.selectedPath === 'string'
+    && findElement(template.value, value.selectedPath)) selectedPath.value = value.selectedPath
+  if (typeof value.selectedOccurrencePath === 'string' &&
+    (!value.selectedOccurrencePath || findElement(template.value, value.selectedOccurrencePath)))
+    selectedOccurrencePath.value = value.selectedOccurrencePath
+  if (Array.isArray(value.selectedPaths))
+    selectedPaths.value = value.selectedPaths.filter((item): item is string =>
+      typeof item === 'string' && Boolean(findElement(template.value, item)))
+}
+type EditorSnapshot = {
+  template: BpTemplate
+  resources: TemplateResource[]
+  outputSettings: DesignerOutputSettings
+  editorState: DesignerEditorState
+  businessDataText: string
+  batchState: BatchEditorState
+}
 const editorSnapshot = (): EditorSnapshot => ({
   template: template.value, resources: resources.value, outputSettings: outputSettingsSnapshot(),
+  editorState: editorStateSnapshot(), businessDataText: dataText.value, batchState: batchEditorState.value,
 })
-let history = new SnapshotHistory<EditorSnapshot>(editorSnapshot())
-const savedSnapshot = ref(JSON.stringify(editorSnapshot()))
-const isDirty = computed(() => JSON.stringify(editorSnapshot()) !== savedSnapshot.value)
+function cloneEditorSnapshot(value: EditorSnapshot): EditorSnapshot {
+  return { template: cloneTemplate(value.template), resources: [...value.resources],
+    outputSettings: cloneTemplate(value.outputSettings),
+    editorState: { ...value.editorState, selectedPaths: [...value.editorState.selectedPaths], nodeStates: value.editorState.nodeStates },
+    businessDataText: value.businessDataText, batchState: cloneBatchEditorState(value.batchState) }
+}
+function sameEditorSnapshot(left: EditorSnapshot, right: EditorSnapshot): boolean {
+  if (JSON.stringify(left.template) !== JSON.stringify(right.template) ||
+    JSON.stringify(left.outputSettings) !== JSON.stringify(right.outputSettings) ||
+    left.resources.length !== right.resources.length || left.businessDataText !== right.businessDataText ||
+    left.editorState.unit !== right.editorState.unit || left.editorState.selectedPath !== right.editorState.selectedPath ||
+    left.editorState.selectedOccurrencePath !== right.editorState.selectedOccurrencePath ||
+    left.editorState.templateName !== right.editorState.templateName || left.editorState.sampleId !== right.editorState.sampleId ||
+    left.editorState.selectedPaths.join('\n') !== right.editorState.selectedPaths.join('\n') ||
+    JSON.stringify(left.editorState.nodeStates) !== JSON.stringify(right.editorState.nodeStates)) return false
+  if (left.resources.some((resource, index) => {
+    const other = right.resources[index]
+    return !other || resource.key !== other.key || resource.fileName !== other.fileName ||
+      resource.mimeType !== other.mimeType || resource.dataUrl !== other.dataUrl
+  })) return false
+  const leftBatch = left.batchState
+  const rightBatch = right.batchState
+  return leftBatch.fileName === rightBatch.fileName && leftBatch.rawText === rightBatch.rawText &&
+    leftBatch.format === rightBatch.format && leftBatch.copiesField === rightBatch.copiesField &&
+    JSON.stringify(leftBatch.mapping) === JSON.stringify(rightBatch.mapping) &&
+    leftBatch.selectedIndices.join(',') === rightBatch.selectedIndices.join(',') &&
+    leftBatch.exportFormats.join(',') === rightBatch.exportFormats.join(',')
+}
+function historyBytes(snapshots: readonly EditorSnapshot[]): number {
+  const current = snapshots.at(-1)
+  if (!current) return 0
+  const sharedStrings = new Set<string>([current.businessDataText, current.batchState.rawText,
+    ...current.resources.map((resource) => resource.dataUrl)])
+  const sharedObjects = new Set<object>([current.batchState.mapping, current.batchState.selectedIndices,
+    current.batchState.exportFormats, current.editorState.nodeStates])
+  let bytes = 0
+  for (const snapshot of snapshots) {
+    bytes += JSON.stringify(snapshot.template).length * 2 + JSON.stringify(snapshot.outputSettings).length * 2
+    bytes += snapshot.resources.length * 8 + snapshot.editorState.selectedPaths.reduce((sum, path) => sum + path.length * 2, 0)
+    if (!sharedObjects.has(snapshot.editorState.nodeStates)) {
+      sharedObjects.add(snapshot.editorState.nodeStates)
+      bytes += JSON.stringify(snapshot.editorState.nodeStates).length * 2
+    }
+    for (const value of [snapshot.businessDataText, snapshot.batchState.rawText, ...snapshot.resources.map((resource) => resource.dataUrl)]) {
+      if (!sharedStrings.has(value)) { sharedStrings.add(value); bytes += value.length * 2 }
+    }
+    for (const value of [snapshot.batchState.mapping, snapshot.batchState.selectedIndices, snapshot.batchState.exportFormats]) {
+      if (sharedObjects.has(value)) continue
+      sharedObjects.add(value)
+      bytes += JSON.stringify(value).length * 2
+    }
+  }
+  return bytes
+}
+const createHistory = (initial: EditorSnapshot) => new SnapshotHistory<EditorSnapshot>(initial, {
+  limit: 80, maxBytes: 32 * 1024 * 1024, clone: cloneEditorSnapshot, equals: sameEditorSnapshot, measureBytes: historyBytes,
+})
+let history = createHistory(editorSnapshot())
+const savedSnapshot = ref(cloneEditorSnapshot(editorSnapshot()))
+const isDirty = computed(() => !sameEditorSnapshot(editorSnapshot(), savedSnapshot.value))
 let historyTimer: ReturnType<typeof setTimeout> | undefined
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 let historyApplying = false
 let previewRequest = 0
 let previewAbort: AbortController | undefined
+const previewRevision = ref(0)
+const previewLayoutRevision = ref(-1)
 
 const parsedData = computed(() => {
-  try { return { value: JSON.parse(dataText.value) as unknown, error: '' } }
+  try { return { value: parseJsonPreservingPrecision(dataText.value) as unknown, error: '' } }
   catch (error) { return { value: undefined, error: error instanceof Error ? error.message : 'JSON 格式无效。' } }
 })
 const dataByteSize = computed(() => new TextEncoder().encode(dataText.value).length)
@@ -446,6 +709,26 @@ const selectedElement = computed(() => findElement(template.value, selectedPath.
 const selectedDefinition = computed(() => findComponent(template.value, selectedPath.value))
 const selectedRow = computed(() => findRow(template.value, selectedPath.value))
 const selectedCell = computed(() => findCell(template.value, selectedPath.value))
+const selectedIsLocked = computed(() => Boolean(selectedPath.value &&
+  isNodeLocked(selectedPath.value, selectedOccurrencePath.value || selectedPath.value)))
+const arrangementDisabledReason = computed(() => {
+  const minimum = arrangementMode.value.startsWith('distribute-') ? 3 : 2
+  if (selectedPaths.value.length < minimum)
+    return arrangementMode.value.startsWith('distribute-') ? '均分至少需要选择三个元素' : '对齐至少需要选择两个元素'
+  const lockedPath = selectedPaths.value.map(firstLockedSubtreePath).find(Boolean)
+  if (lockedPath) return `排列涉及已锁定节点：${lockedPath}`
+  if (previewBusy.value || previewLayoutRevision.value !== previewRevision.value)
+    return '当前模板的引擎预览布局未就绪，不能使用旧布局排列'
+  if (previewSource.value !== 'service') return '当前布局为本地近似预览，不能用于排列'
+  if (!currentPage.value) return '当前没有可排列的引擎预览页'
+  try { arrangeAbsoluteSelection(selectedArrangementItems(), arrangementMode.value); return '' }
+  catch (error) { return error instanceof Error ? error.message : '当前选择不能排列' }
+})
+const arrangementEnabled = computed(() => !arrangementDisabledReason.value)
+const batchExportCapabilities = computed(() => ({
+  pdf: pagePdfExportSupported(capabilities.value),
+  svg: Boolean(capabilities.value?.barcodeSvgExportFeature && !capabilities.value.protocolId),
+}))
 const currentPage = computed(() => previewPages.value[previewIndex.value])
 const selectedDeviceFontName = computed(() => selectedElement.value?.Type === 1
   ? (selectedElement.value.Font?.Kind === 1
@@ -455,7 +738,7 @@ const sampleOptions = computed(() => [
   ...remoteSamples.value.map((sample) => ({ id: `service:${sample.id}`, name: `${sample.name} · 服务端`, source: 'service' as const })),
 ])
 
-watch([template, resources, outputTarget, allowRasterizedLines, imageThreshold,
+watch([template, resources, outputTarget, customProtocolId, customProtocolConfig, protocolFinishingEnabled, protocolFinishing, allowRasterizedLines, imageThreshold,
   deviceHalfCellWidthAt24, deviceFullCellWidthAt24, deviceLineHeightAt24,
   deviceFontCalibrations,
   requireDeclaredNativeBounds, validateGs1Associations, copies, feedLines, cutAfterPrint, cutOptions, job, encoding,
@@ -466,7 +749,14 @@ watch([template, resources, outputTarget, allowRasterizedLines, imageThreshold,
   schedulePreview()
 }, { deep: true, flush: 'sync' })
 
-watch(dataText, () => schedulePreview(), { flush: 'post' })
+watch(template, () => { nodeStates.value = nodeIdentityStore.reconcile(template.value) }, { deep: true, flush: 'sync' })
+function scheduleHistorySnapshot() {
+  if (historyApplying) return
+  if (historyTimer) clearTimeout(historyTimer)
+  historyTimer = setTimeout(() => { history.record(editorSnapshot()); syncHistoryState() }, 250)
+}
+watch(dataText, () => { schedulePreview(); scheduleHistorySnapshot() }, { flush: 'sync' })
+watch(batchEditorState, scheduleHistorySnapshot, { flush: 'sync' })
 watch(selectedPath, () => loadDeviceFontCalibrationDraft(), { immediate: true })
 watch(capabilityQuery, () => { void refreshCapabilities() }, { deep: true, immediate: true })
 watch(outputTarget, () => {
@@ -488,6 +778,16 @@ watch(outputTarget, () => {
 })
 onMounted(async () => {
   await refreshPreview()
+  protocolCatalogState.value = 'loading'
+  try {
+    protocolCatalog.value = await loadProtocolRegistry()
+    protocolCatalogState.value = 'ready'
+    if (isCustomProtocol.value && !customProtocolDescriptor.value)
+      protocolCatalogError.value = `当前 Host 未注册项目使用的协议 ${customProtocolId.value}。`
+  } catch (error) {
+    protocolCatalogState.value = 'error'
+    protocolCatalogError.value = error instanceof Error ? error.message : '协议目录服务暂不可用。'
+  }
   try {
     const samples = await loadDesignerSamples()
     remoteSamples.value = samples
@@ -553,22 +853,29 @@ function showToast(message: string, tone: 'success' | 'warning' | 'error' = 'suc
   toastTimer = setTimeout(() => { toast.value = '' }, 3600)
 }
 
-function replaceTemplate(next: BpTemplate, path = '', settings = defaultDesignerOutputSettings()) {
+function replaceTemplate(next: BpTemplate, path = '', settings = defaultDesignerOutputSettings(), resetHistory = true) {
   assertTemplate(next)
   historyApplying = true
   template.value = cloneTemplate(next)
+  nodeStates.value = nodeIdentityStore.reconcile(template.value)
   applyOutputSettings(settings)
-  history = new SnapshotHistory<EditorSnapshot>(editorSnapshot())
-  savedSnapshot.value = JSON.stringify(editorSnapshot())
-  syncHistoryState()
   selectedPath.value = path
   selectedPaths.value = path ? [path] : []
+  selectedOccurrencePath.value = ''
   previewIndex.value = 0
+  if (resetHistory) resetHistoryBaseline()
   nextTick(() => { historyApplying = false })
   schedulePreview()
 }
 
+function resetHistoryBaseline() {
+  history = createHistory(editorSnapshot())
+  savedSnapshot.value = cloneEditorSnapshot(editorSnapshot())
+  syncHistoryState()
+}
+
 function useSample(event: Event) {
+  if (!canReplaceCurrentTemplate()) return
   const value = (event.target as HTMLSelectElement).value
   sampleId.value = value
   resources.value = []
@@ -577,7 +884,8 @@ function useSample(event: Event) {
     if (!found) return
     templateName.value = found.name
     replaceTemplate(found.template)
-    dataText.value = JSON.stringify(found.data ?? {}, null, 2)
+    dataText.value = stringifyJsonPreservingPrecision(found.data ?? {}, 2)
+    resetHistoryBaseline()
     showToast(`已载入服务端样例：${found.name}`)
     return
   }
@@ -586,7 +894,8 @@ function useSample(event: Event) {
   templateName.value = localSampleLabels[key] ?? '未命名模板'
   replaceTemplate(next, listTemplateTree(next).find((entry) => entry.kind === 'element')?.path ?? '')
   const data = key === 'blank' ? {} : key === 'product' ? sampleData.product : key === 'receipt-v2' ? sampleData.receiptV2 : sampleData.receipt
-  dataText.value = JSON.stringify(data, null, 2)
+  dataText.value = stringifyJsonPreservingPrecision(data, 2)
+  resetHistoryBaseline()
   activeDataTab.value = key === 'product' ? 'business' : 'fields'
   showToast(`已载入${localSampleLabels[key] ?? '样例'}`)
 }
@@ -1387,7 +1696,7 @@ function locateDiagnostic(diagnostic: DesignerDiagnostic, kind: 'source' | 'defi
   const target = resolveDiagnosticTarget(template.value, diagnostic, kind)
   if (!target) return
   const page = findDiagnosticPage(previewPages.value, diagnostic)
-  if (page !== undefined) previewIndex.value = page
+  if (page !== undefined) setPreviewPage(page)
   selectElement(target.path, false, target.occurrencePath)
   searchText.value = ''
   treeCollapsed.value = false
@@ -1440,10 +1749,10 @@ async function importComponents(event: Event) {
 
 function updateBusinessValue(path: string, value: unknown) {
   let root: Record<string, unknown>
-  try { root = JSON.parse(dataText.value) as Record<string, unknown> }
+  try { root = parseJsonPreservingPrecision(dataText.value) as Record<string, unknown> }
   catch { root = {} }
   setPathValue(root, path, value)
-  dataText.value = JSON.stringify(root, null, 2)
+  dataText.value = stringifyJsonPreservingPrecision(root, 2)
 }
 
 function updateSalePrice(value: string) {
@@ -1457,7 +1766,7 @@ function updateSalePrice(value: string) {
   const normalized = `${integer}.${fraction.padEnd(2, '0')}`
   const next: Record<string, unknown> = { ...root, SalePriceInteger: integer, SalePriceFraction: `.${fraction.padEnd(2, '0')}` }
   if (next.OriginPriceText != null) next.IsPromotion = Number(next.OriginPriceText) !== Number(normalized)
-  dataText.value = JSON.stringify(next, null, 2)
+  dataText.value = stringifyJsonPreservingPrecision(next, 2)
 }
 
 function invalidatePreview() {
@@ -1466,7 +1775,13 @@ function invalidatePreview() {
   previewBusy.value = false
 }
 
+const previewImageTypes = computed(() => capabilities.value?.rasterElementPngFeature
+  ? (capabilities.value.rasterPreview?.elementTypes ?? []).filter((type) => [3, 4, 10, 11].includes(type))
+  : [])
+
 function schedulePreview() {
+  previewRevision.value += 1
+  previewLayoutRevision.value = -1
   invalidatePreview()
   if (previewTimer) clearTimeout(previewTimer)
   previewTimer = setTimeout(() => { void refreshPreview() }, 400)
@@ -1488,11 +1803,51 @@ function expandedStackedColumnsConfigurationIssue(): string | undefined {
   return issue
 }
 
+const batchBaseBody = computed<Record<string, unknown> | null>(() => {
+  if (labelProfileError.value || customCutCapabilitiesUnknown.value ||
+    expandedStackedColumnsConfigurationIssue()) return null
+  try {
+    return { ...buildPreviewBody(template.value, {}, resources.value,
+      builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
+      imageThreshold.value, usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
+      usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
+      jobEnabled.value ? undefined : copies.value,
+      jobEnabled.value ? undefined : (usesFeedLines.value ? feedLines.value : undefined),
+      jobEnabled.value ? undefined : (usesCutAfterPrint.value ? cutAfterPrint.value : undefined),
+      usesTsplMedia.value ? tsplMedia.value : undefined,
+      usesZplMedia.value ? zplMedia.value : undefined,
+      effectiveEncoding.value, effectiveEscPosDevice.value,
+      usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
+      usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
+      deviceFontCalibrationsForRequest.value, job.value,
+      jobEnabled.value ? undefined : cutOptions.value, validateGs1Associations.value,
+      customProtocolRequest.value) }
+  } catch { return null }
+})
+
+async function previewBatchRecord(data: Record<string, unknown>) {
+  dataText.value = stringifyJsonPreservingPrecision(data, 2)
+  await nextTick()
+  await refreshPreview()
+}
 watch(labelProfileError, () => { void refreshPreview() })
 
-async function refreshPreview() {
+async function refreshPreview(pageIndex = previewIndex.value) {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = undefined
+  const requestedRevision = previewRevision.value
+  previewLayoutRevision.value = -1
   invalidatePreview()
   replacePreviewImages({})
+  if (isCustomProtocol.value && !customProtocolReady.value) {
+    previewError.value = protocolCatalogError.value ||
+      `当前 Host 未注册项目使用的协议 ${customProtocolId.value}，已保留配置但禁止预览。`
+    previewDiagnostics.value = []
+    previewPages.value = []
+    statusMessage.value = '协议不可用'
+    statusTone.value = 'error'
+    return
+  }
   if (labelProfileError.value) {
     previewError.value = labelProfileError.value
     previewDiagnostics.value = []
@@ -1530,11 +1885,12 @@ async function refreshPreview() {
     return
   }
   const request = previewRequest
+  const requestedPageIndex = Math.min(Math.max(0, pageIndex), Math.max(0, previewPages.value.length - 1))
   previewAbort = new AbortController()
   previewBusy.value = true
   try {
     const result = await previewWithImages(template.value, parsedData.value.value, resources.value,
-      previewAbort.signal, printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
+      previewAbort.signal, builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
       imageThreshold.value, usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
       usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
       jobEnabled.value ? undefined : copies.value,
@@ -1548,10 +1904,15 @@ async function refreshPreview() {
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
        deviceFontCalibrationsForRequest.value, job.value,
        jobEnabled.value ? undefined : cutOptions.value,
-       capabilities.value?.rasterElementPngFeature ? (capabilities.value.rasterPreview?.elementTypes ?? []).filter((type) => [3, 4, 10, 11].includes(type)) : [],
-       validateGs1Associations.value)
-    if (request !== previewRequest) return
+       previewImageTypes.value,
+       validateGs1Associations.value, requestedPageIndex,
+       capabilities.value?.previewBundleFeature === true, customProtocolRequest.value)
+    if (request !== previewRequest) {
+      releasePreviewImages(result.images)
+      return
+    }
     if (result.errors?.length) {
+      releasePreviewImages(result.images)
       setPreviewDiagnostics(result.errors)
       previewPages.value = []
       previewSource.value = 'service'
@@ -1559,21 +1920,36 @@ async function refreshPreview() {
       statusTone.value = 'error'
       return
     }
-    setPreviewDiagnostics([])
+    setPreviewDiagnostics(result.imageDiagnostics ?? [])
     previewPages.value = result.pages
     replacePreviewImages(result.images ?? {})
-    previewIndex.value = Math.min(previewIndex.value, Math.max(0, result.pages.length - 1))
+    previewIndex.value = Math.min(requestedPageIndex, Math.max(0, result.pages.length - 1))
     previewSource.value = 'service'
+    previewLayoutRevision.value = requestedRevision
     statusMessage.value = `引擎预览 · ${result.pages.length} 页`
-    statusTone.value = 'success'
+    statusTone.value = result.imageDiagnostics?.length ? 'warning' : 'success'
   } catch (error) {
     if (request !== previewRequest || (error instanceof DOMException && error.name === 'AbortError')) return
+    if (error instanceof DesignerValidationError &&
+      requestedPageIndex !== 0 && error.diagnostics.some((item) => item.code === 'InvalidPageIndex')) {
+      previewIndex.value = 0
+      return refreshPreview(0)
+    }
     if (error instanceof DesignerValidationError) {
       setPreviewDiagnostics(error.diagnostics)
       if (!previewDiagnostics.value.length) previewError.value = error.message
       previewPages.value = []
       previewSource.value = 'service'
       statusMessage.value = '模板校验失败'
+      statusTone.value = 'error'
+      return
+    }
+    if (isCustomProtocol.value) {
+      previewError.value = error instanceof Error ? error.message : '新协议预览失败。'
+      previewDiagnostics.value = []
+      previewPages.value = []
+      previewSource.value = 'service'
+      statusMessage.value = '新协议预览不可用'
       statusTone.value = 'error'
       return
     }
@@ -1593,6 +1969,12 @@ async function refreshPreview() {
   }
 }
 
+function setPreviewPage(index: number) {
+  if (index === previewIndex.value) return
+  previewIndex.value = index
+  if (previewSource.value === 'service') void refreshPreview(index)
+}
+
 function syncHistoryState() {
   // Referenced from template after asynchronous snapshot recording.
   historyState.value += 1
@@ -1600,8 +1982,12 @@ function syncHistoryState() {
 function flushHistorySnapshot() {
   if (historyTimer) clearTimeout(historyTimer)
   historyTimer = undefined
-  history.record(editorSnapshot())
+  if (!historyApplying) history.record(editorSnapshot())
   syncHistoryState()
+}
+function commitBatchEditorState(value: BatchEditorState) {
+  batchEditorState.value = value
+  flushHistorySnapshot()
 }
 const historyState = ref(0)
 const canUndo = computed(() => { historyState.value; return history.canUndo })
@@ -1615,6 +2001,11 @@ function undo() {
   template.value = previous.template
   resources.value = previous.resources
   applyOutputSettings(previous.outputSettings)
+  dataText.value = previous.businessDataText
+  batchEditorState.value = cloneBatchEditorState(previous.batchState)
+  applyEditorState(previous.editorState as unknown as Record<string, unknown>)
+  previewAbort?.abort()
+  previewRequest += 1
   syncHistoryState()
   nextTick(() => { historyApplying = false })
   showToast('已撤销')
@@ -1628,6 +2019,11 @@ function redo() {
   template.value = next.template
   resources.value = next.resources
   applyOutputSettings(next.outputSettings)
+  dataText.value = next.businessDataText
+  batchEditorState.value = cloneBatchEditorState(next.batchState)
+  applyEditorState(next.editorState as unknown as Record<string, unknown>)
+  previewAbort?.abort()
+  previewRequest += 1
   syncHistoryState()
   nextTick(() => { historyApplying = false })
   showToast('已重做')
@@ -1677,8 +2073,105 @@ function activeCellPath(): string {
   return 'Rows[0].Cells[0]'
 }
 
+function isNodeLocked(path: string, occurrencePath = ''): boolean {
+  nodeStates.value
+  return nodeIdentityStore.isLocked(template.value, path, occurrencePath || path)
+}
+
+function withNodeStructureTransaction<T>(operation: () => T): T {
+  const finish = nodeIdentityStore.beginStructureTransaction()
+  try { return operation() }
+  finally { nodeStates.value = finish(template.value) }
+}
+
+function canModifyPaths(paths: string[], action: string): boolean {
+  const locked = paths.find((path) => path && isNodeLocked(path, path))
+  if (!locked) return true
+  showToast(`${action}涉及已锁定节点：${locked}`, 'warning')
+  return false
+}
+
+function canModifySubtree(path: string, action: string): boolean {
+  if (!path) return true
+  const locked = firstLockedSubtreePath(path)
+  if (!locked) return true
+  showToast(`${action}涉及已锁定节点：${locked}`, 'warning')
+  return false
+}
+
+function firstLockedSubtreePath(path: string): string | undefined {
+  if (!path) return undefined
+  if (isNodeLocked(path, path)) return path
+  let lockedPath: string | undefined
+  walkTemplateNodes(template.value, (_node, context) => {
+    if (lockedPath) return
+    const isOccurrenceDescendant = context.path.startsWith(`${path}.`)
+    const isDefinitionDescendant = path.startsWith('Components[') && context.sourcePath.startsWith(`${path}.`)
+    if ((isOccurrenceDescendant || isDefinitionDescendant) && isNodeLocked(context.sourcePath, context.path))
+      lockedPath = context.path
+  }, { expandComponentReferences: true, includeUnreferencedComponents: true })
+  return lockedPath
+}
+
+function toggleNodeLock(path: string) {
+  try {
+    const current = nodeStates.value[path]
+    if (!current) nodeStates.value = nodeIdentityStore.reconcile(template.value)
+    const state = nodeStates.value[path]
+    if (!state) throw new Error(`模板节点不存在：${path}`)
+    nodeStates.value = nodeIdentityStore.setLocked(template.value, path, !state.locked)
+    flushHistorySnapshot()
+    showToast(state.locked ? '节点已解锁' : '节点已锁定')
+  } catch (error) { showToast(error instanceof Error ? error.message : '节点锁定状态更新失败。', 'error') }
+}
+
+function canReplaceCurrentTemplate(): boolean {
+  const locked = Object.entries(nodeStates.value).find(([, state]) => state.locked)
+  if (!locked) return true
+  showToast(`替换模板前请先从结构树解锁节点：${locked[0]}`, 'warning')
+  return false
+}
+
+function selectedArrangementItems() {
+  return selectedPaths.value.map((path) => {
+    const element = findElement(template.value, path)
+    const parentPath = path.slice(0, path.lastIndexOf('.Elements['))
+    const rendered = (currentPage.value?.elements ?? []).filter((part) => part.kind === 'element' &&
+      (part.sourcePath === path || part.definitionPath === path))
+    return element?.StartCoordinate && rendered.length === 1
+      ? { path, containerPath: parentPath, x: rendered[0]!.x, y: rendered[0]!.y,
+        width: rendered[0]!.width, height: rendered[0]!.height, absolute: true }
+      : { path, containerPath: parentPath, x: 0, y: 0, width: 0, height: 0, absolute: false }
+  })
+}
+
+function arrangeSelection() {
+  const lockedPath = selectedPaths.value.map(firstLockedSubtreePath).find(Boolean)
+  if (lockedPath) {
+    showToast(`排列涉及已锁定节点：${lockedPath}`, 'warning')
+    return
+  }
+  if (!arrangementEnabled.value) return
+  const items = selectedArrangementItems()
+  try {
+    const positions = arrangeAbsoluteSelection(items, arrangementMode.value)
+    const original = new Map(items.map((item) => [item.path, item]))
+    flushHistorySnapshot()
+    for (const position of positions) {
+      const item = original.get(position.path)!
+      const element = findElement(template.value, position.path)!
+      translateElement(element, position.x - item.x, position.y - item.y)
+    }
+    flushHistorySnapshot()
+    showToast(arrangementMode.value.startsWith('distribute-') ? '元素已均分' : '元素已对齐')
+  } catch (error) { showToast(error instanceof Error ? error.message : '排列失败。', 'error') }
+}
+
 function addElement(type: TemplateElement['Type']): boolean {
   if (!canAddElement(type)) { showCapabilityReason(type); return false }
+  const targetPath = selectedElement.value?.Type === 6 || selectedDefinition.value
+    ? selectedPath.value : activeCellPath()
+  if (!canModifySubtree(targetPath, '在此位置添加元素')) return false
   if (type > 5) enableV2(template.value)
   if (selectedDefinition.value?.Rows) { showToast('请选择定义内的单元格再添加元素。', 'error'); return false }
   const cell = selectedDefinition.value ? undefined : activeCell()
@@ -1749,6 +2242,7 @@ function addElementAt(value: { type: TemplateElement['Type']; x: number; y: numb
     canvasMode.value = 'select'
     return
   }
+  if (value.cellPath && !canModifySubtree(value.cellPath, '向此单元格拖放元素')) { canvasMode.value = 'select'; return }
   if (value.cellPath && findCell(template.value, value.cellPath)) selectedPath.value = value.cellPath
   if (!addElement(value.type)) { canvasMode.value = 'select'; return }
   const element = findElement(template.value, selectedPath.value)
@@ -1761,7 +2255,6 @@ function addElementAt(value: { type: TemplateElement['Type']; x: number; y: numb
 
 async function groupCurrentCell() {
   try {
-    await refreshPreview()
     const cellPath = activeCellPath()
     const cell = findCell(template.value, cellPath)
     const indices = selectedPaths.value.length > 1 ? selectedPaths.value.map((path) => {
@@ -1771,6 +2264,9 @@ async function groupCurrentCell() {
     }) : undefined
     const selectedIndices = indices ?? cell?.Elements?.map((_, index) => index) ?? []
     const selectedElementPaths = selectedIndices.map((index) => `${cellPath}.Elements[${index}]`)
+    if (!canModifyPaths([cellPath, ...selectedElementPaths], '编组元素') ||
+      selectedElementPaths.some((path) => !canModifySubtree(path, '编组元素'))) return
+    await refreshPreview()
     const page = previewSource.value === 'service' && !previewBusy.value
       ? [currentPage.value, ...previewPages.value].find((candidate) => candidate &&
         selectedElementPaths.every((path) => candidate.elements.some((item) => item.sourcePath === path)))
@@ -1794,7 +2290,8 @@ async function groupCurrentCell() {
         bottom: Math.max(...visibleParts.map((item) => item.y + item.height)) - frame.y })
       cellWidth = frame.width
     }
-    selectedPath.value = groupCellElements(template.value, cellPath, indices, measured, cellWidth)
+    selectedPath.value = withNodeStructureTransaction(() =>
+      groupCellElements(template.value, cellPath, indices, measured, cellWidth))
     selectedPaths.value = [selectedPath.value]
     showToast(indices ? '已组合选中元素' : '已组合当前单元格的元素')
   }
@@ -1804,7 +2301,8 @@ async function groupCurrentCell() {
 function groupSelectedRows() {
   try {
     const paths = selectedPaths.value.length ? selectedPaths.value : [selectedPath.value]
-    selectedPath.value = groupRowsAtPaths(template.value, paths)
+    if (!canModifyPaths(paths, '编组行') || paths.some((path) => !canModifySubtree(path, '编组行'))) return
+    selectedPath.value = withNodeStructureTransaction(() => groupRowsAtPaths(template.value, paths))
     selectedPaths.value = [selectedPath.value]
     showToast('已组合流式行')
   } catch (error) { showToast(error instanceof Error ? error.message : '流式组合失败。', 'error') }
@@ -1813,6 +2311,7 @@ function groupSelectedRows() {
 async function ungroupSelected() {
   try {
     const path = selectedPath.value
+    if (!canModifySubtree(path, '拆组')) return
     const group = findElement(template.value, path)
     let measured: Map<number, ElementBounds> | undefined
     let renderedGroup: { width: number; height: number; position: { X: number; Y: number } } | undefined
@@ -1844,7 +2343,8 @@ async function ungroupSelected() {
           bottom: Math.max(...parts.map((item) => item.y + item.height)) - groupPart.y })
       })
     }
-    selectedPath.value = ungroupElement(template.value, path, measured, renderedGroup)
+    selectedPath.value = withNodeStructureTransaction(() =>
+      ungroupElement(template.value, path, measured, renderedGroup))
     selectedPaths.value = [selectedPath.value]
     showToast('组合已拆开')
   }
@@ -1852,18 +2352,73 @@ async function ungroupSelected() {
 }
 
 function detachSelected() {
+  if (!canModifySubtree(selectedPath.value, '解除组件引用')) return
   try { detachComponent(template.value, selectedPath.value); showToast('该实例已转为独立组合') }
   catch (error) { showToast(error instanceof Error ? error.message : '解除引用失败。', 'error') }
 }
 
+function componentRenameTargets(id: string): { definitionPath: string; references: string[] } | undefined {
+  const index = template.value.Components?.findIndex((item) => item.Id === id) ?? -1
+  if (index < 0) return undefined
+  const references = [...new Set(listTemplateTree(template.value).flatMap((entry) => {
+    if (entry.kind !== 'element') return []
+    const element = findElement(template.value, entry.sourcePath)
+    return element?.Type === 6 && element.ComponentId === id ? [entry.sourcePath] : []
+  }))]
+  return { definitionPath: `Components[${index}]`, references }
+}
+
+const componentRenameAvailability = computed(() => {
+  const references = new Map<string, Set<string>>()
+  for (const entry of listTemplateTree(template.value)) {
+    if (entry.kind !== 'element') continue
+    const element = findElement(template.value, entry.sourcePath)
+    if (element?.Type !== 6 || !element.ComponentId) continue
+    const paths = references.get(element.ComponentId) ?? new Set<string>()
+    paths.add(entry.sourcePath)
+    references.set(element.ComponentId, paths)
+  }
+  return new Map((template.value.Components ?? []).map((definition, index) => {
+    const definitionPath = `Components[${index}]`
+    const definitionLocked = Object.keys(nodeStates.value).some((path) =>
+      (path === definitionPath || path.startsWith(`${definitionPath}.`)) && isNodeLocked(path, path))
+    const referenceLocked = [...(references.get(definition.Id) ?? [])].some((path) => isNodeLocked(path, path))
+    return [definition.Id, !definitionLocked && !referenceLocked] as const
+  }))
+})
+
+function canRenameDefinition(id: string): boolean {
+  return componentRenameAvailability.value.get(id) ?? false
+}
+
+function beginRenameDefinition(id: string) {
+  const targets = componentRenameTargets(id)
+  if (!targets) { showToast('组件定义不存在。', 'error'); return }
+  if (!canModifySubtree(targets.definitionPath, '重命名组件定义')) return
+  if (!canModifyPaths(targets.references, '重命名组件引用')) return
+  componentEditId.value = id
+  componentNewId.value = id
+}
+
 function renameDefinition() {
+  const oldId = componentEditId.value
+  const targets = componentRenameTargets(oldId)
+  if (!targets) { showToast('组件定义不存在。', 'error'); return }
+  if (!canModifySubtree(targets.definitionPath, '重命名组件定义')) return
+  if (!canModifyPaths(targets.references, '重命名组件引用')) return
   try {
-    renameComponent(template.value, componentEditId.value, componentNewId.value.trim())
+    const updated = cloneTemplate(template.value)
+    renameComponent(updated, oldId, componentNewId.value.trim())
+    const identities = nodeIdentityStore.snapshot()
+    template.value = updated
+    nodeStates.value = nodeIdentityStore.restore(template.value, identities)
     showToast('组件已重命名'); componentEditId.value = ''; componentNewId.value = ''
   } catch (error) { showToast(error instanceof Error ? error.message : '重命名失败。', 'error') }
 }
 
 function deleteDefinition(id: string) {
+  const index = template.value.Components?.findIndex((item) => item.Id === id) ?? -1
+  if (index >= 0 && !canModifySubtree(`Components[${index}]`, '删除组件定义')) return
   try { removeComponent(template.value, id); showToast(`组件 ${id} 已删除`) }
   catch (error) { showToast(error instanceof Error ? error.message : '删除失败。', 'error') }
 }
@@ -1876,7 +2431,14 @@ function selectElement(path: string, additive = false, occurrencePath = '') {
   mobileLayersOpen.value = false
 }
 
+function updateSelectedCondition(value: import('./model').Condition | undefined) {
+  if (!canModifySubtree(selectedPath.value, '修改显示条件')) return
+  if (selectedElement.value) selectedElement.value.Condition = value
+  else if (selectedRow.value) selectedRow.value.Condition = value
+}
+
 function duplicateSelected() {
+  if (!canModifySubtree(selectedPath.value, '复制元素')) return
   try {
     selectedPath.value = duplicateElement(template.value, selectedPath.value)
     selectedPaths.value = [selectedPath.value]
@@ -1885,6 +2447,7 @@ function duplicateSelected() {
 }
 
 function resizeElement(value: { path: string; width: number; height: number }) {
+  if (!canModifySubtree(value.path, '缩放元素')) return
   const element = findElement(template.value, value.path)
   if (!element || element.Type === 11) return
   const start = element.StartCoordinate ?? { X: 0, Y: 0 }
@@ -1962,6 +2525,7 @@ function insertPastedTable() {
 }
 
 function addRow() {
+  if (!canModifyPaths([selectedPath.value].filter(Boolean), '添加行')) return
   const index = template.value.Rows.length
   template.value.Rows.push({ Height: 64, Cells: [{ Width: template.value.Width, Elements: [] }] })
   selectedPath.value = `Rows[${index}]`
@@ -1970,6 +2534,7 @@ function addRow() {
 function addColumn() {
   const selectedRow = findRow(template.value, selectedRowPath()) ?? template.value.Rows[0]
   if (!selectedRow) { addRow(); return }
+  if (!canModifySubtree(selectedRowPath(), '添加列')) return
   selectedRow.Cells ??= []
   selectedRow.Cells.push({ Width: 0, Elements: [] })
   const rowPath = selectedRowPath()
@@ -1977,6 +2542,7 @@ function addColumn() {
 }
 
 function addNestedRow() {
+  if (!canModifySubtree(activeCellPath(), '添加嵌套行')) return
   const path = appendNestedRow(template.value, activeCellPath())
   if (!path) return
   selectedPath.value = path
@@ -1992,6 +2558,7 @@ function selectedRowPath(): string {
 }
 
 function moveElement(value: { path: string; dx: number; dy: number; rendered?: PreviewElement }) {
+  if (!canModifySubtree(value.path, '移动元素')) return
   const element = findElement(template.value, value.path)
   if (!element) return
   if (element.Type === 6 && !element.StartCoordinate) {
@@ -2024,6 +2591,7 @@ function moveElement(value: { path: string; dx: number; dy: number; rendered?: P
 }
 
 function setElementPosition(axis: 'X' | 'Y', target: number) {
+  if (!canModifySubtree(selectedPath.value, '编辑元素坐标')) return
   const element = selectedElement.value
   if (!element) return
   if (element.Type === 6 && !element.StartCoordinate && setFlowGroupPosition(element, axis, target)) {
@@ -2047,6 +2615,7 @@ function setElementPosition(axis: 'X' | 'Y', target: number) {
 }
 
 function removeSelected() {
+  if (!canModifySubtree(selectedPath.value, '删除节点')) return
   const elementMatch = /^(.*)\.Elements\[(\d+)\]$/.exec(selectedPath.value)
   if (elementMatch) {
     const cell = findCell(template.value, elementMatch[1])
@@ -2103,23 +2672,33 @@ function openImagePicker() {
 async function importFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
+  if (!canReplaceCurrentTemplate()) { (event.target as HTMLInputElement).value = ''; return }
   try {
     if (file.name.toLowerCase().endsWith('.zip')) {
       const imported = await importTemplateBundle(file)
+      flushHistorySnapshot()
       resources.value = imported.resources
       templateName.value = file.name.replace(/\.zip$/i, '')
-      replaceTemplate(imported.template, '', imported.outputSettings ?? defaultDesignerOutputSettings())
+      sampleId.value = ''
+      replaceTemplate(imported.template, '', imported.outputSettings ?? defaultDesignerOutputSettings(), false)
+      await nextTick()
+      flushHistorySnapshot()
       showToast(`已导入模板包 · ${imported.resources.length} 个资源`)
     } else {
       if (file.size > MAX_TEMPLATE_JSON_BYTES) throw new Error('JSON 模板超过 1 MiB 上限。')
       const text = await file.text()
       const imported = parseDesignerProject(JSON.parse(text) as unknown)
+      if (imported.editorState?.nodeStates !== undefined)
+        new NodeIdentityStore().restore(imported.template, imported.editorState.nodeStates)
+      flushHistorySnapshot()
       resources.value = []
       templateName.value = file.name.replace(/\.json$/i, '')
-      replaceTemplate(imported.template, '', imported.outputSettings ?? defaultDesignerOutputSettings())
-      showToast('模板 JSON 已导入')
+      sampleId.value = ''
+      replaceTemplate(imported.template, '', imported.outputSettings ?? defaultDesignerOutputSettings(), false)
+      applyEditorState(imported.editorState)
+      await nextTick()
+      flushHistorySnapshot()
     }
-    sampleId.value = ''
   } catch (error) {
     showToast(error instanceof Error ? error.message : '导入失败。', 'error')
   } finally {
@@ -2165,6 +2744,35 @@ function selectedElementPngTitle(): string {
     ?? '下载当前选中元素的真实软件码图 PNG'
 }
 
+function selectedElementSvgSupported(): boolean {
+  const page = currentPage.value
+  const index = selectedPreviewElementIndex()
+  const type = page && index >= 0 ? page.elements[index]!.type : undefined
+  return barcodeSvgExportSupported(capabilities.value, type)
+}
+
+function selectedElementSvgTitle(): string {
+  if (!selectedPath.value) return '请先在画布中选择码图元素'
+  if (selectedPreviewElementIndex() < 0) return '所选码图尚未出现在当前预览页'
+  return selectedElementSvgSupported() ? '导出不含设备HRI的矢量码图 SVG' : '当前Host或元素不支持码图SVG导出'
+}
+
+function currentExportRequestBody(): Record<string, unknown> {
+  return buildPreviewBody(template.value, parsedData.value.value, resources.value,
+    builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
+    usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
+    usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
+    jobEnabled.value ? undefined : copies.value,
+    jobEnabled.value ? undefined : (usesFeedLines.value ? feedLines.value : undefined),
+    jobEnabled.value ? undefined : (usesCutAfterPrint.value ? cutAfterPrint.value : undefined),
+    usesTsplMedia.value ? tsplMedia.value : undefined, usesZplMedia.value ? zplMedia.value : undefined,
+    effectiveEncoding.value, effectiveEscPosDevice.value,
+    usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
+    usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
+    deviceFontCalibrationsForRequest.value, job.value,
+    jobEnabled.value ? undefined : cutOptions.value, validateGs1Associations.value, customProtocolRequest.value)
+}
+
 function saveDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   try {
@@ -2192,7 +2800,7 @@ async function downloadElementPreview() {
   rasterDownloadBusy.value = true
   try {
     const blob = await elementPng(template.value, parsedData.value.value, resources.value, undefined,
-      printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
+      builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
       usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
       usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
       jobEnabled.value ? undefined : copies.value,
@@ -2204,7 +2812,8 @@ async function downloadElementPreview() {
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
       deviceFontCalibrationsForRequest.value, job.value,
       jobEnabled.value ? undefined : cutOptions.value,
-      previewIndex.value, elementIndex, element.sourcePath, validateGs1Associations.value)
+      previewIndex.value, elementIndex, element.sourcePath, validateGs1Associations.value,
+      customProtocolRequest.value)
     saveDownload(blob, `easyprint-element-${previewIndex.value + 1}-${elementIndex + 1}.png`)
     showToast('元素码图 PNG 已下载。')
   } catch (error) {
@@ -2222,7 +2831,7 @@ async function downloadPagePreview() {
   rasterDownloadBusy.value = true
   try {
     const blob = await pagePng(template.value, parsedData.value.value, resources.value, undefined,
-      printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
+      builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value, imageThreshold.value,
       usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
       usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
       jobEnabled.value ? undefined : copies.value,
@@ -2233,11 +2842,60 @@ async function downloadPagePreview() {
       usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
       deviceFontCalibrationsForRequest.value, job.value,
-      jobEnabled.value ? undefined : cutOptions.value, undefined, validateGs1Associations.value)
+      jobEnabled.value ? undefined : cutOptions.value, undefined, validateGs1Associations.value,
+      customProtocolRequest.value)
     saveDownload(blob, blob.type === 'application/zip' ? 'easyprint-pages-png.zip' : 'easyprint-page-1.png')
     showToast(blob.type === 'application/zip' ? '多页 PNG 压缩包已下载。' : '页面 PNG 已下载。')
   } catch (error) {
     showToast(error instanceof Error ? error.message : '页面 PNG 下载失败。', 'error')
+  } finally {
+    rasterDownloadBusy.value = false
+  }
+}
+
+async function downloadPagePdf(allPages: boolean) {
+  if (!pagePdfExportSupported(capabilities.value)) {
+    showToast('整页PDF仅支持已协商能力的ESC/POS Raster输出。', 'warning')
+    return
+  }
+  if (!allPages && !currentPage.value) {
+    showToast('当前没有可导出的页面。', 'warning')
+    return
+  }
+  rasterDownloadBusy.value = true
+  try {
+    const pageIndex = allPages ? undefined : jobEnabled.value
+      ? currentPage.value?.sourcePageIndex ?? undefined : previewIndex.value
+    if (!allPages && pageIndex === undefined) throw new Error('当前输出页没有可用的源页索引。')
+    const blob = await pagePdf(currentExportRequestBody(), pageIndex)
+    saveDownload(blob, allPages ? 'easyprint-pages.pdf' : `easyprint-page-${previewIndex.value + 1}.pdf`)
+    showToast(allPages ? '全部页面 PDF 已下载。' : '当前页面 PDF 已下载。')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '页面PDF下载失败。', 'error')
+  } finally {
+    rasterDownloadBusy.value = false
+  }
+}
+
+async function downloadElementSvg() {
+  const page = currentPage.value
+  const elementIndex = selectedPreviewElementIndex()
+  if (!page || elementIndex < 0) {
+    showToast('请先在画布中选择一个码图元素。', 'warning')
+    return
+  }
+  if (!selectedElementSvgSupported()) {
+    showToast(selectedElementSvgTitle(), 'warning')
+    return
+  }
+  rasterDownloadBusy.value = true
+  try {
+    const element = page.elements[elementIndex]!
+    const blob = await elementSvg(currentExportRequestBody(), previewIndex.value, elementIndex, element.sourcePath)
+    saveDownload(blob, `easyprint-page-${previewIndex.value + 1}-element-${elementIndex + 1}.svg`)
+    showToast('码图SVG已下载。')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '码图SVG下载失败。', 'error')
   } finally {
     rasterDownloadBusy.value = false
   }
@@ -2257,12 +2915,12 @@ async function exportBundle() {
   try {
     if (labelProfileError.value) throw new Error(labelProfileError.value)
     flushHistorySnapshot()
-    const snapshot = cloneTemplate(editorSnapshot())
+    const snapshot = cloneEditorSnapshot(editorSnapshot())
     const selection = collectResourceKeys(snapshot.template)
     const blob = await exportTemplateBundle(snapshot.template, snapshot.resources, snapshot.outputSettings)
     downloadBlob(blob, 'easyprint-template-package.zip')
     if (selection.dynamic || snapshot.resources.every((resource) => selection.keys.has(resource.key)))
-      savedSnapshot.value = JSON.stringify(snapshot)
+      savedSnapshot.value = cloneEditorSnapshot(snapshot)
     showToast(`模板包已导出 · ${snapshot.resources.filter((resource) => selection.dynamic || selection.keys.has(resource.key)).length} 个资源`)
   } catch (error) { showToast(error instanceof Error ? error.message : '模板包导出失败。', 'error') }
 }
@@ -2272,10 +2930,10 @@ async function saveProject() {
   if (resources.value.length || escPosDevice.value.rasterFonts !== undefined) { await exportBundle(); return }
   try {
     flushHistorySnapshot()
-    const json = serializeDesignerProject(template.value, outputSettingsSnapshot())
+    const json = serializeDesignerProject(template.value, outputSettingsSnapshot(), editorStateSnapshot())
     if (new TextEncoder().encode(json).length > MAX_TEMPLATE_JSON_BYTES) throw new Error('设计器项目 JSON 超过 1 MiB 上限。')
     downloadBlob(new Blob([json], { type: 'application/json;charset=utf-8' }), 'easyprint-designer-project.json')
-    savedSnapshot.value = JSON.stringify(editorSnapshot())
+    savedSnapshot.value = cloneEditorSnapshot(editorSnapshot())
     showToast('设计器项目已保存')
   } catch (error) { showToast(error instanceof Error ? error.message : '保存项目失败。', 'error') }
 }
@@ -2284,6 +2942,7 @@ async function importImage(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  if (selectedElement.value?.Type === 2 && !canModifySubtree(selectedPath.value, '替换图片资源')) { input.value = ''; return }
   try {
     const key = `resources/${Date.now()}-${file.name.replace(/[\\/:*?"<>|]/g, '_')}`
     const resource = await resourceForImage(key, file)
@@ -2301,6 +2960,11 @@ async function importImage(event: Event) {
 }
 
 async function exportPrintData() {
+  if (isCustomProtocol.value && !customProtocolReady.value) {
+    showToast(protocolCatalogError.value ||
+      `当前 Host 未注册协议 ${customProtocolId.value}，已保留配置但不能导出。`, 'error')
+    return
+  }
   if (labelProfileError.value) { showToast(labelProfileError.value, 'error'); return }
   if (parsedData.value.error) { showToast('请先修正业务数据 JSON。', 'error'); return }
   if (customCutCapabilitiesUnknown.value) { showToast('当前 Host 未声明所需裁切能力，请更新 Host 后再导出。', 'error'); return }
@@ -2308,7 +2972,7 @@ async function exportPrintData() {
   if (expandedStackedColumnsIssueMessage) { showToast(expandedStackedColumnsIssueMessage, 'error'); return }
   try {
     const blob = await renderTemplate(template.value, parsedData.value.value, resources.value,
-      printProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
+      builtinPrintProtocol.value, escPosLayoutMode.value, allowRasterizedLines.value,
       imageThreshold.value, usesDeviceFontCalibration.value ? deviceHalfCellWidthAt24.value : undefined,
       usesDeviceFontCalibration.value ? deviceFullCellWidthAt24.value : undefined,
       jobEnabled.value ? undefined : copies.value,
@@ -2321,9 +2985,12 @@ async function exportPrintData() {
       usesDeviceFontCalibration.value ? deviceLineHeightAt24.value : undefined,
       usesDeviceFontCalibration.value ? requireDeclaredNativeBounds.value : undefined,
        deviceFontCalibrationsForRequest.value, job.value,
-       jobEnabled.value ? undefined : cutOptions.value, validateGs1Associations.value)
-    downloadBlob(blob, `easyprint-${printProtocol.value.toLowerCase()}-pages.zip`)
-    showToast(`${printProtocol.value.toUpperCase()} 页面包已导出`)
+       jobEnabled.value ? undefined : cutOptions.value, validateGs1Associations.value,
+       customProtocolRequest.value)
+    const exportName = isCustomProtocol.value ? customProtocolId.value : builtinPrintProtocol.value.toLowerCase()
+    downloadBlob(blob, `easyprint-${exportName.replace(/[^a-z0-9.-]+/gi, '-')}-pages.zip`)
+    showToast(`${isCustomProtocol.value ? customProtocolDescriptor.value?.displayName ?? customProtocolId.value
+      : builtinPrintProtocol.value.toUpperCase()} 页面包已导出`)
   } catch (error) {
     if (error instanceof DesignerValidationError) {
       setPreviewDiagnostics(error.diagnostics)
@@ -2383,12 +3050,71 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
         <button class="icon-button header-quiet" type="button" title="重做 Ctrl+Y" :disabled="!canRedo" @click="redo"><Redo2 :size="16" /></button>
         <span class="header-divider small"></span>
         <label class="unit-selector" title="坐标单位"><Ruler :size="14" /><select v-model="unit"><option value="pt">点</option><option value="mm">mm</option></select><ChevronDown :size="12" /></label>
-        <label class="protocol-selector" title="输出协议"><select v-model="outputTarget" aria-label="输出协议"><option value="Cpcl">CPCL</option><option value="EscPosRaster">ESC Raster</option><option value="EscPosNative">ESC Native</option><option value="Tspl">TSPL</option><option value="Zpl">ZPL</option></select><ChevronDown :size="12" /></label>
+        <label class="protocol-selector" title="输出协议"><select :value="selectedOutputKey" aria-label="输出协议" @change="setOutputKey(($event.target as HTMLSelectElement).value)"><option value="Cpcl">CPCL</option><option value="EscPosRaster">ESC Raster</option><option value="EscPosNative">ESC Native</option><option value="Tspl">TSPL</option><option value="Zpl">ZPL</option><option v-if="isCustomProtocol && !customProtocolDescriptor" :value="`custom:${customProtocolId}`">未知协议 · {{ customProtocolId }}</option><optgroup v-if="protocolCatalog.some((item) => !item.isBuiltIn)" label="扩展协议"><option v-for="item in protocolCatalog.filter((entry) => !entry.isBuiltIn)" :key="item.id" :value="`custom:${item.id}`">{{ item.displayName }}</option></optgroup></select><ChevronDown :size="12" /></label>
         <label v-if="printProtocol === 'Tspl' || printProtocol === 'Zpl'" class="raster-line-option" title="允许斜线转换为位图"><input v-model="allowRasterizedLines" type="checkbox" aria-label="允许斜线转换为位图" /><span>位图斜线</span></label>
         <div class="output-settings-wrap">
           <button class="icon-button output-settings-button" type="button" title="输出校准设置" :aria-expanded="showOutputSettings" @click="showOutputSettings = !showOutputSettings"><Ruler :size="15" /></button>
           <div v-if="showOutputSettings" class="output-settings-panel">
             <div class="output-settings-title">输出设置</div>
+            <template v-if="isCustomProtocol">
+              <div class="output-settings-title">扩展协议</div>
+              <p class="field-note">{{ customProtocolDescriptor?.displayName ?? customProtocolId }}</p>
+              <p v-if="!customProtocolReady" class="inline-error"><AlertTriangle :size="13" /> {{ protocolCatalogError || '当前 Host 未注册该协议；项目配置已保留。' }}</p>
+              <template v-for="field in customConfigFields" :key="field.name">
+                <label v-if="field.type === 'boolean'" class="toggle-row">
+                  <span>{{ field.title }}</span>
+                  <input type="checkbox" :checked="customConfigValue(field.name) === true"
+                    :aria-label="field.title" @change="setCustomConfigField(field.name, $event)" />
+                </label>
+                <label v-else class="field-label">{{ field.title }}
+                  <input class="field-input"
+                    :type="field.type === 'integer' || field.type === 'number' ? 'number' : 'text'"
+                    :step="field.type === 'integer' ? 1 : undefined"
+                    :min="field.minimum" :max="field.maximum"
+                    :value="customConfigValue(field.name)"
+                    :aria-label="field.title" @input="setCustomConfigField(field.name, $event)" />
+                </label>
+              </template>
+              <details class="field-note">
+                <summary>高级：协议配置 JSON</summary>
+                <textarea v-model="customConfigDraft" class="field-input code-input" rows="8" aria-label="扩展协议配置 JSON" spellcheck="false" />
+                <p v-if="customConfigError" class="inline-error"><AlertTriangle :size="13" /> {{ customConfigError }}</p>
+                <button class="button-secondary" type="button" @click="applyCustomProtocolConfig">应用协议配置</button>
+              </details>
+              <label v-if="capabilities?.supportsFinishing" class="toggle-row">
+                <span>任务收尾</span>
+                <input v-model="protocolFinishingEnabled" type="checkbox" aria-label="启用新协议任务收尾" />
+              </label>
+              <p v-else-if="capabilityQueryReady" class="field-note">当前协议未声明任务收尾能力，旧 feed/cut 字段不会执行。</p>
+              <template v-if="protocolFinishingEnabled">
+                <label class="field-label">收尾进纸量
+                  <input class="field-input" type="number" min="0" step="1" aria-label="收尾进纸量"
+                    :value="protocolFinishing.feedAmount ?? 0"
+                    @input="updateProtocolFinishing({ feedAmount: Number(($event.target as HTMLInputElement).value) })" />
+                </label>
+                <label class="field-label">进纸单位
+                  <select class="field-input" aria-label="收尾进纸单位" :value="protocolFinishing.feedUnit ?? 'Lines'"
+                    @change="updateProtocolFinishing({ feedUnit: ($event.target as HTMLSelectElement).value as ProtocolFinishingRequest['feedUnit'] })">
+                    <option value="Lines">行</option>
+                    <option value="Dots">点</option>
+                    <option value="MotionUnits">MotionUnits</option>
+                  </select>
+                </label>
+                <label class="toggle-row"><span>收尾切纸</span>
+                  <input type="checkbox" aria-label="收尾切纸" :checked="protocolFinishing.cut === true" @change="updateProtocolFinishing({ cut: ($event.target as HTMLInputElement).checked })" />
+                </label>
+                <label class="field-label">插入位置
+                  <select class="field-input" aria-label="收尾插入位置" :value="protocolFinishing.placement ?? 'JobEnd'"
+                    @change="updateProtocolFinishing({ placement: ($event.target as HTMLSelectElement).value as ProtocolFinishingRequest['placement'] })">
+                    <option value="JobEnd">任务结束</option>
+                    <option value="PageEnd">每页结束</option>
+                  </select>
+                </label>
+              </template>
+              <details v-if="customProtocolDescriptor?.constraints !== undefined" class="field-note">
+                <summary>协议约束</summary><pre>{{ JSON.stringify(customProtocolDescriptor.constraints, null, 2) }}</pre>
+              </details>
+            </template>
             <label class="toggle-row"><span>任务级输出</span><input type="checkbox" :checked="jobEnabled" aria-label="启用任务级输出" @change="setJobEnabled" /></label>
             <p v-if="jobEnabled" class="field-note">任务模式统一管理份数、进纸和切纸；旧页面字段已清除。</p>
             <template v-if="jobEnabled">
@@ -2630,9 +3356,13 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
         </div>
         <button class="button-secondary" type="button" @click="openTemplatePicker"><Upload :size="15" /><span>导入</span></button>
         <button class="button-secondary" type="button" @click="exportJson"><Download :size="15" /><span>导出 JSON</span></button>
+        <button class="button-secondary" type="button" data-testid="batch-toggle" @click="showBatchPanel = !showBatchPanel"><Layers3 :size="15" /><span>批量</span></button>
         <button class="button-secondary" type="button" @click="saveProject"><Save :size="15" /><span>保存项目</span></button>
         <button class="button-secondary" type="button" :disabled="rasterDownloadBusy || !currentPage || !selectedElementPngSupported()" :title="selectedElementPngTitle()" @click="downloadElementPreview"><Download :size="15" /><span>下载码图</span></button>
+        <button class="button-secondary" type="button" data-testid="export-element-svg" :disabled="rasterDownloadBusy || !currentPage || !selectedElementSvgSupported()" :title="selectedElementSvgTitle()" @click="downloadElementSvg"><CodeXml :size="15" /><span>码图 SVG</span></button>
         <button class="button-secondary" type="button" :disabled="rasterDownloadBusy || !rasterPagePngSupported(capabilities)" :title="capabilities?.rasterPreview?.pagePngReason ?? '下载当前页面 PNG；多页时导出每页 PNG 的 ZIP'" @click="downloadPagePreview"><Download :size="15" /><span>下载页面 PNG</span></button>
+        <button class="button-secondary" type="button" data-testid="export-current-pdf" :disabled="rasterDownloadBusy || !currentPage || !pagePdfExportSupported(capabilities)" :title="pagePdfExportSupported(capabilities) ? '导出当前打印页为PDF' : '当前Host或输出配置不支持整页PDF'" @click="downloadPagePdf(false)"><FileText :size="15" /><span>单页 PDF</span></button>
+        <button class="button-secondary" type="button" data-testid="export-all-pdf" :disabled="rasterDownloadBusy || !currentPage || !pagePdfExportSupported(capabilities)" :title="pagePdfExportSupported(capabilities) ? '导出全部打印页为PDF' : '当前Host或输出配置不支持整页PDF'" @click="downloadPagePdf(true)"><FileText :size="15" /><span>全部 PDF</span></button>
         <button v-if="resources.length || escPosDevice.rasterFonts" class="button-secondary has-resource" type="button" @click="exportBundle"><ArrowDownToLine :size="15" /><span>模板包</span></button>
         <button class="button-primary" type="button" :disabled="previewBusy" :aria-label="printDataLabel" :title="printDataLabel" @click="exportPrintData"><Printer :size="15" /><span>{{ printDataLabel }}</span></button>
       </div>
@@ -2647,10 +3377,10 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
 
     <div class="workbench">
       <div class="layers-shell" :class="{ 'mobile-open': mobileLayersOpen }">
-        <TemplateTree :template="template" :selected-path="selectedPath" :selected-paths="selectedPaths" :collapsed="treeCollapsed" :query="searchText" @select="selectElement" @toggle="treeCollapsed = !treeCollapsed" />
+        <TemplateTree :template="template" :selected-path="selectedPath" :selected-paths="selectedPaths" :collapsed="treeCollapsed" :query="searchText" :node-states="nodeStates" :is-locked="isNodeLocked" @select="selectElement" @toggle-lock="toggleNodeLock" @toggle="treeCollapsed = !treeCollapsed" />
         <div class="tree-tools">
           <label class="search-control"><Search :size="14" /><input v-model="searchText" placeholder="搜索元素" /><span v-if="searchText">{{ filteredTreeCount }}</span></label>
-          <div class="tools-heading"><span>添加元素</span><span>{{ printProtocol === 'EscPos' ? 'ESC/POS' : printProtocol.toUpperCase() }}</span></div>
+          <div class="tools-heading"><span>添加元素</span><span>{{ customProtocolDescriptor?.displayName ?? (printProtocol === 'EscPos' ? 'ESC/POS' : builtinPrintProtocol.toUpperCase()) }}</span></div>
           <div class="capability-note" :class="capabilitiesState" :title="capabilitiesError || capabilityNotice"><AlertTriangle v-if="capabilitiesState !== 'ready'" :size="13" /><Check v-else :size="13" />{{ capabilityNotice }}</div>
           <div class="element-tools">
             <button type="button" :draggable="canDragElement(1)" :disabled="!canAddElement(1)" :title="elementToolTitle(1, '单行文字', 'T')" @click="addElement(1)" @dragstart="dragTool($event, 1)"><Type :size="15" /><span>单行文字</span><kbd>T</kbd></button>
@@ -2707,12 +3437,12 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
                 <button type="button" :title="`插入组件 ${item.Id}`" @click="insertComponent(item.Id)"><Layers :size="14" />{{ item.Id }}</button>
                 <button type="button" :title="`导出 ${item.Id} 及依赖`" @click="exportComponents(item.Id)"><Download :size="13" /></button>
                 <button type="button" :title="`编辑定义 ${item.Id}`" @click="selectElement(`Components[${index}]`)"><Pencil :size="13" /></button>
-                <button type="button" :title="`重命名组件 ${item.Id}`" @click="componentEditId = item.Id; componentNewId = item.Id"><Pencil :size="13" /></button>
+                <button type="button" :disabled="!canRenameDefinition(item.Id)" :title="`重命名组件 ${item.Id}`" @click="beginRenameDefinition(item.Id)"><Pencil :size="13" /></button>
                 <button type="button" :title="`删除组件 ${item.Id}`" @click="deleteDefinition(item.Id)"><Trash2 :size="13" /></button>
               </div>
               <div v-if="componentEditId" class="component-save">
                 <input v-model="componentNewId" aria-label="新组件标识" @keydown.enter="renameDefinition" />
-                <button class="button-secondary" type="button" @click="renameDefinition">保存名称</button>
+                <button class="button-secondary" type="button" :disabled="!canRenameDefinition(componentEditId)" @click="renameDefinition">保存名称</button>
               </div>
             </div>
             <div class="component-library-actions">
@@ -2742,10 +3472,19 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
           </div>
           <span class="toolbar-divider"></span>
           <div class="element-toolbar-group">
-            <button class="tool-button" type="button" title="添加行" @click="addRow"><FilePlus2 :size="15" /></button>
-            <button class="tool-button" type="button" title="添加列" @click="addColumn"><Layers3 :size="15" /></button>
-            <button class="tool-button tool-delete" type="button" title="删除所选项" :disabled="!selectedPath" @click="removeSelected"><X :size="15" /></button>
-            <button class="tool-button" type="button" title="复制所选元素" :disabled="!selectedElement" @click="duplicateSelected"><Copy :size="15" /></button>
+            <button class="tool-button" type="button" title="添加行" :disabled="selectedIsLocked" @click="addRow"><FilePlus2 :size="15" /></button>
+            <button class="tool-button" type="button" title="添加列" :disabled="selectedIsLocked" @click="addColumn"><Layers3 :size="15" /></button>
+            <button class="tool-button tool-delete" type="button" title="删除所选项" :disabled="!selectedPath || selectedIsLocked" @click="removeSelected"><X :size="15" /></button>
+            <button class="tool-button" type="button" title="复制所选元素" :disabled="!selectedElement || selectedIsLocked" @click="duplicateSelected"><Copy :size="15" /></button>
+          </div>
+          <span class="toolbar-divider"></span>
+          <div class="element-toolbar-group arrangement-tools">
+            <select v-model="arrangementMode" aria-label="对齐或均分方式">
+              <option value="align-left">左对齐</option><option value="align-right">右对齐</option><option value="align-center-x">水平居中</option>
+              <option value="align-top">顶对齐</option><option value="align-bottom">底对齐</option><option value="align-center-y">垂直居中</option>
+              <option value="distribute-x">水平均分</option><option value="distribute-y">垂直均分</option>
+            </select>
+            <button class="tool-button" type="button" :title="arrangementDisabledReason || '排列所选元素'" :disabled="!arrangementEnabled" @click="arrangeSelection"><AlignCenter :size="15" /></button>
           </div>
           <span class="toolbar-spacer"></span>
           <div class="canvas-modes" role="group" aria-label="画布模式">
@@ -2758,7 +3497,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
           <button class="icon-button" type="button" title="放大画布" @click="zoom = Math.min(1.5, Math.round((zoom + 0.1) * 100) / 100)"><ZoomIn :size="16" /></button>
           <span class="toolbar-divider"></span>
           <button class="icon-button" type="button" title="切换业务数据面板" :class="{ 'tool-active': showDataPanel }" @click="showDataPanel = !showDataPanel"><CodeXml :size="16" /></button>
-          <button class="icon-button" type="button" title="刷新预览" @click="refreshPreview"><RotateCcw :size="15" /></button>
+          <button class="icon-button" type="button" title="刷新预览" @click="refreshPreview()"><RotateCcw :size="15" /></button>
         </div>
 
         <section v-if="previewDiagnostics.length" class="diagnostic-panel" aria-label="打印诊断" aria-live="polite">
@@ -2787,18 +3526,19 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
           :resources="resources"
           :preview-images="previewImages"
           :mode="canvasMode"
+          :is-locked="isNodeLocked"
           @select="selectElement"
           @move="moveElement"
           @resize="resizeElement"
           @drop-element="addElementAt"
           @update:zoom="zoom = $event"
-          @page-change="previewIndex = $event"
+          @page-change="setPreviewPage"
         />
 
         <section v-if="showDataPanel" class="data-panel">
           <header class="data-panel-header">
             <div class="data-panel-tabs"><button type="button" :class="{ active: activeDataTab === 'business' }" @click="activeDataTab = 'business'">价签</button><button type="button" :class="{ active: activeDataTab === 'fields' }" @click="activeDataTab = 'fields'">样例字段</button><button type="button" :class="{ active: activeDataTab === 'json' }" @click="activeDataTab = 'json'">JSON</button></div>
-            <div class="data-panel-meta"><span v-if="parsedData.error" class="inline-error"><AlertTriangle :size="13" /> JSON 语法错误</span><span v-else class="inline-good"><Check :size="13" /> 数据有效</span><span class="meta-divider"></span><button class="text-button" type="button" @click="refreshPreview"><Play :size="13" />重新预览</button><button class="icon-button quiet" type="button" title="收起数据面板" @click="showDataPanel = false"><ChevronDown :size="15" /></button></div>
+            <div class="data-panel-meta"><span v-if="parsedData.error" class="inline-error"><AlertTriangle :size="13" /> JSON 语法错误</span><span v-else class="inline-good"><Check :size="13" /> 数据有效</span><span class="meta-divider"></span><button class="text-button" type="button" @click="refreshPreview()"><Play :size="13" />重新预览</button><button class="icon-button quiet" type="button" title="收起数据面板" @click="showDataPanel = false"><ChevronDown :size="15" /></button></div>
           </header>
           <div v-if="activeDataTab === 'business'" class="business-data-view">
             <div class="data-field-block"><label>商品名称 <span>Product.Name</span></label><input class="field-input" :value="(parsedData.value as any)?.Product?.Name ?? (parsedData.value as any)?.Name ?? ''" @input="updateBusinessField((parsedData.value as any)?.Product ? 'Product.Name' : 'Name', ($event.target as HTMLInputElement).value)" /></div>
@@ -2822,6 +3562,7 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
             <div class="json-data-status"><span>{{ dataByteSize.toLocaleString() }} bytes</span><span v-if="parsedData.error" class="inline-error">{{ parsedData.error }}</span><span v-else class="inline-good">JSON 格式正确</span></div>
           </div>
         </section>
+        <BatchPanel v-if="showBatchPanel" :base-body="batchBaseBody" :preview-record="previewBatchRecord" :state="batchEditorState" :export-capabilities="batchExportCapabilities" @state-change="commitBatchEditorState" />
       </section>
 
       <div class="inspector-shell" :class="{ 'mobile-open': mobileInspectorOpen }">
@@ -2838,8 +3579,10 @@ function focusDataJson() { activeDataTab.value = 'json'; dataTextarea.value?.foc
           :capabilities-state="capabilitiesState"
           :resources="resources"
           :field-paths="selectedPath ? bindingFieldPaths : rootFieldPaths"
+          :data="parsedData.value"
+          :locked="selectedIsLocked"
           @set-position="setElementPosition"
-          @update-condition="selectedElement ? selectedElement.Condition = $event : selectedRow && (selectedRow.Condition = $event)"
+          @update-condition="updateSelectedCondition"
           @add-row="addRow"
           @add-column="addColumn"
           @add-nested-row="addNestedRow"
