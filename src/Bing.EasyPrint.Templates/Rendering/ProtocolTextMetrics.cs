@@ -7,7 +7,7 @@ using Bing.EasyPrint.Protocols;
 
 namespace Bing.EasyPrint.Templates;
 
-internal sealed class ProtocolTextMetrics
+internal sealed class ProtocolTextMetrics : ITemplateTextMetrics
 {
     private readonly CpclFontMetrics _cpcl;
     private readonly TextCellMetrics _cellClassifier;
@@ -211,6 +211,17 @@ internal sealed class ProtocolTextMetrics
         return ink.IsEmpty ? advance : Math.Max(advance, checked(Math.Max(0, -ink.Left) + ink.Right));
     }
 
+    int ITemplateTextMetrics.LineHeight => LineHeight;
+    string ITemplateTextMetrics.FontFamily => FontFamily;
+    bool ITemplateTextMetrics.HasDeviceTextElementCalibrations => HasDeviceTextElementCalibrations;
+    bool ITemplateTextMetrics.NeedsFullMeasure => NeedsFullMeasure;
+    int ITemplateTextMetrics.Advance(string textElement) => Advance(textElement);
+    long ITemplateTextMetrics.Measure(string text) => Measure(text);
+    TemplateTextBounds ITemplateTextMetrics.MeasureBounds(string text)
+    {
+        var bounds = MeasureBounds(text);
+        return new TemplateTextBounds(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
     private readonly struct DeviceTextElementMetrics
     {
         internal int Advance { get; }

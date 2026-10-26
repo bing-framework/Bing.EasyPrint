@@ -27,9 +27,13 @@ internal interface IPrintCanvas
         int? expandedStackedColumns = null, int? expandedStackedRows = null);
     void DrawQrCode(int x, int y, string text, int unitWidth, string errorLevel, int rotation,
         int reservedWidth = 0, int reservedHeight = 0, PrintQuietZone quietZone = null);
-    void DrawImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None);
+    void DrawImage(int x, int y, Image image, ImageProcessingOptions options,
+        RotationAngle rotation = RotationAngle.None, PrintVectorCodeInfo vectorCodeInfo = null);
     void DrawCompressedImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None);
     void DrawGs1Composite(int x, int y, PrintGs1CompositeElement element);
+
+    /// <summary>添加目标适配器已转换的协议无关打印元素。</summary>
+    void DrawElement(PrintElement element);
     byte[] Build();
 }
 
@@ -39,6 +43,8 @@ internal static class PrintCanvasFactory
     internal static IPrintCanvas Create(PrintProtocol protocol, Encoding encoding, int width, int height, TemplateRenderOptions options,
         CancellationToken cancellationToken = default(CancellationToken), PrintStorageBudget storage = null)
     {
+        if (options.CustomProtocol != null)
+            return new DocumentPrintCanvas(protocol, encoding, width, options, cancellationToken, storage, true);
         switch (protocol)
         {
             case PrintProtocol.Cpcl:
@@ -59,6 +65,7 @@ internal static class PrintCanvasFactory
 internal sealed class DocumentPrintCanvas : IPrintCanvas
 {
     private readonly PrintProtocol _protocol;
+    private readonly bool _custom;
     private readonly Encoding _encoding;
     private readonly int _width;
     private readonly TemplateRenderOptions _options;
@@ -72,8 +79,10 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
     private int _copies;
 
     internal DocumentPrintCanvas(PrintProtocol protocol, Encoding encoding, int width, TemplateRenderOptions options,
-        CancellationToken cancellationToken = default(CancellationToken), PrintStorageBudget storage = null)
+        CancellationToken cancellationToken = default(CancellationToken), PrintStorageBudget storage = null,
+        bool custom = false)
     {
+        _custom = custom || options.CustomProtocol != null;
         _elements = new BudgetedList<(PrintElement Element, string SourcePath)>("Template.CanvasElements", slotBytes: 16,
             itemBytes: 64, owner: storage, retainedSize: item => item.Element.GetRetainedBytes(item.SourcePath));
         _elementOwnership = new BudgetedList<TemplateLayoutElement>("Template.CanvasOwnership", owner: storage);
@@ -113,7 +122,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
     {
         if (!Enum.IsDefined(typeof(RotationAngle), rotation))
             throw new NotSupportedException("统一模板文字模型不支持此旋转角度。");
-        if (_protocol == PrintProtocol.Cpcl && rotation != 0)
+        if (!_custom && _protocol == PrintProtocol.Cpcl && rotation != 0)
         {
             // 模板使用顺时针角度与左上角占位；旧 CPCL 命令继续采用原生逆时针锚点。
             if (rotation == 90) x = checked(x + reservedHeight);
@@ -122,7 +131,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
             rotation = (360 - rotation) % 360;
         }
         // 记录已经用于排版的实际字体族，避免默认字体在分行绘制时重新选择。
-        if (_protocol == PrintProtocol.EscPos && font != null && !string.IsNullOrWhiteSpace(fontFamily))
+        if (!_custom && _protocol == PrintProtocol.EscPos && font != null && !string.IsNullOrWhiteSpace(fontFamily))
             font = new PrintFont(PrintFontKind.Host, fontFamily);
         Add(font == null
             ? new PrintTextElement(x, y, text, fontSize, bold, underline, (RotationAngle)rotation,
@@ -140,6 +149,20 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
         int reservedWidth = 0, int? narrowModuleWidth = null, int? wideModuleWidth = null, PrintQuietZone quietZone = null,
         int? expandedStackedColumns = null, int? expandedStackedRows = null)
     {
+        if (_custom)
+        {
+            var customNarrow = narrowModuleWidth ?? checked(lineWidth + 1);
+            var customWide = wideModuleWidth ?? checked(customNarrow * 2);
+            var customElement = quietZone == null
+                ? new PrintBarcodeElement(x, y, type, text, height, customNarrow, customWide, rotation,
+                    humanReadable: humanReadable, humanReadableReserveHeight: humanReadableReserveHeight,
+                    reservedWidth: reservedWidth)
+                : new PrintBarcodeElement(x, y, type, text, height, quietZone, customNarrow, customWide,
+                    rotation, humanReadable: humanReadable, humanReadableReserveHeight: humanReadableReserveHeight,
+                    reservedWidth: reservedWidth);
+            Add(customElement);
+            return;
+        }
         var narrow = narrowModuleWidth ?? checked(lineWidth + 1);
         var ratioTenths = ratio <= 4 ? 15 + ratio * 5 : ratio;
         // ZPL 和 ESC/POS 没有独立的宽条参数；旧模板 Ratio 在这些协议中只能
@@ -179,6 +202,18 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
     public void DrawQrCode(int x, int y, string text, int unitWidth, string errorLevel, int rotation,
         int reservedWidth = 0, int reservedHeight = 0, PrintQuietZone quietZone = null)
     {
+        if (_custom)
+        {
+            if (!Enum.TryParse(errorLevel, out QrCodeCorrectionLevel customCorrection) ||
+                !Enum.IsDefined(typeof(QrCodeCorrectionLevel), customCorrection))
+                throw new NotSupportedException("统一模板二维码模型不支持此纠错等级。");
+            Add(quietZone == null
+                ? new PrintQrCodeElement(x, y, text, unitWidth, customCorrection, reservedWidth,
+                    reservedHeight, (RotationAngle)rotation)
+                : new PrintQrCodeElement(x, y, text, unitWidth, customCorrection, quietZone,
+                    reservedWidth, reservedHeight, (RotationAngle)rotation));
+            return;
+        }
         if (!Enum.IsDefined(typeof(RotationAngle), rotation) ||
             !Enum.TryParse(errorLevel, out QrCodeCorrectionLevel correctionLevel) ||
             !Enum.IsDefined(typeof(QrCodeCorrectionLevel), correctionLevel))
@@ -190,17 +225,20 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
                 reservedWidth, reservedHeight, (RotationAngle)rotation));
     }
 
-    public void DrawImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None)
+    public void DrawImage(int x, int y, Image image, ImageProcessingOptions options,
+        RotationAngle rotation = RotationAngle.None, PrintVectorCodeInfo vectorCodeInfo = null)
     {
-        var raster = _protocol == PrintProtocol.Cpcl
+        var raster = !_custom && _protocol == PrintProtocol.Cpcl
             ? PrintImageRasterizer.ToCpclMonochrome(image, _cancellationToken)
             : PrintCanvasRasterizer.ToMonochrome(image, _options.ImageThreshold, _cancellationToken).Bytes;
-        Add(new PrintImageElement(x, y, image.Width, image.Height, raster, rotation));
+        var result = new PrintImageElement(x, y, image.Width, image.Height, raster, rotation);
+        if (vectorCodeInfo != null) result.SetVectorCodeInfo(vectorCodeInfo);
+        Add(result);
     }
 
     public void DrawCompressedImage(int x, int y, Image image, ImageProcessingOptions options, RotationAngle rotation = RotationAngle.None)
     {
-        var raster = _protocol == PrintProtocol.Cpcl
+        var raster = !_custom && _protocol == PrintProtocol.Cpcl
             ? PrintImageRasterizer.ToCpclMonochrome(image, _cancellationToken)
             : PrintCanvasRasterizer.ToMonochrome(image, _options.ImageThreshold, _cancellationToken).Bytes;
         Add(new PrintImageElement(x, y, image.Width, image.Height, raster, rotation, compressed: true));
@@ -208,6 +246,7 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
 
     public void DrawGs1Composite(int x, int y, PrintGs1CompositeElement element)
     {
+
         var copy = new PrintGs1CompositeElement(x, y, element.LinearType, element.PrimaryData,
             element.SecondaryData, element.LinearBarHeight, element.ModuleWidth, element.Mode,
             element.Rotation, element.QuietZone);
@@ -217,13 +256,20 @@ internal sealed class DocumentPrintCanvas : IPrintCanvas
         Add(copy);
     }
 
+    public void DrawElement(PrintElement element)
+    {
+        if (!_custom) throw new NotSupportedException("自定义元素转换仅用于新协议。");
+        if (element == null) throw new ArgumentNullException(nameof(element));
+        Add(element);
+    }
+
     internal PrintPage AppendPage(PrintDocument document)
     {
         if (_height <= 0) throw new InvalidOperationException("打印页尚未结束。");
         var page = document.AddPage(_width, _height);
         page.Copies = _copies;
-        page.FeedLines = _options.Job == null ? _options.FeedLines ?? (_protocol == PrintProtocol.EscPos ? 1 : 0) : 0;
-        page.CutAfterPrint = _options.Job == null && (_options.CutAfterPrint ?? (_protocol == PrintProtocol.EscPos));
+        page.FeedLines = _options.Job == null ? _options.FeedLines ?? (!_custom && _protocol == PrintProtocol.EscPos ? 1 : 0) : 0;
+        page.CutAfterPrint = _options.Job == null && (_options.CutAfterPrint ?? (!_custom && _protocol == PrintProtocol.EscPos));
         page.CutOptions = _options.CutOptions?.Snapshot();
         foreach (var item in _elements) page.Add(item.Element, item.SourcePath);
         return page;

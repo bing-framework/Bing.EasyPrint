@@ -745,6 +745,32 @@ public sealed partial class EscPosRasterCanvas
         return (matrix, first, last);
     }
 
+    internal static (BitMatrix Matrix, int First, int Last) EncodeVectorBarcodeMatrix(
+        PrintBarcodeElement barcode, CancellationToken cancellationToken)
+    {
+        if (barcode == null) throw new ArgumentNullException(nameof(barcode));
+        if (!SupportsBarcodeType(barcode.Type))
+            throw new NotSupportedException($"ESC/POS Raster 不支持主机条码类型 {barcode.Type}。");
+        ValidateExpandedStackedLayout(barcode.Type, barcode.ExpandedStackedColumns,
+            barcode.ExpandedStackedRows);
+        using var operation = PrintResourceScope.BeginTemporary();
+        var encoded = EncodeBarcode(barcode.Type, barcode.Data, cancellationToken,
+            barcode.ExpandedStackedColumns, barcode.ExpandedStackedRows);
+        cancellationToken.ThrowIfCancellationRequested();
+        operation?.CommitReservations();
+        return encoded;
+    }
+
+    internal static BitMatrix EncodeVectorQrMatrix(string data, QrCodeCorrectionLevel errorLevel,
+        CancellationToken cancellationToken)
+    {
+        using var operation = PrintResourceScope.BeginTemporary();
+        var matrix = EncodeQrCode(data, errorLevel, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        operation?.CommitReservations();
+        return matrix;
+    }
+
     private static (BitMatrix Matrix, int First, int Last) EncodePlessey(
         string normalizedData, CancellationToken cancellationToken)
     {

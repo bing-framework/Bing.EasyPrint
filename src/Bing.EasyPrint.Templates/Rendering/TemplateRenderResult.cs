@@ -205,6 +205,8 @@ public sealed class TemplatePage
     public IReadOnlyList<Printing.PrintOutputSegment> Segments => Output.Segments;
     /// <summary>全部命令文件字节数。</summary>
     public long ByteLength => Output.ByteLength;
+    /// <summary>新注册协议标识；内置协议页面为 null。</summary>
+    public string ProtocolId { get; }
     /// <summary>显式任务输出对应的原逻辑页序号；旧页面模式为 null。</summary>
     public int? SourcePageIndex { get; }
     /// <summary>显式任务输出对应的零基份数序号；旧页面模式为 null。</summary>
@@ -235,24 +237,26 @@ public sealed class TemplatePage
     /// <param name="cutAfterPrint">显式任务是否在本页后切纸。</param>
     /// <param name="renderElements">本页实际参与协议渲染的打印元素，仅供 Host 同源位图预览复用。</param>
     /// <param name="renderElementOwnership">与渲染元素平行对应的布局归属；仅 Host 捕获时提供。</param>
+    /// <param name="protocolId">新注册协议标识；内置协议为 null。</param>
     internal TemplatePage(int width, int height, byte[] data, IEnumerable<TemplateLayoutElement> elements = null,
         PrintProtocol protocol = PrintProtocol.Cpcl, int? sourcePageIndex = null, int? copyIndex = null,
         bool? feedAfterPrint = null, bool? cutAfterPrint = null, IEnumerable<PrintElement> renderElements = null,
-        IEnumerable<TemplateLayoutElement> renderElementOwnership = null)
+        IEnumerable<TemplateLayoutElement> renderElementOwnership = null, string protocolId = null)
         : this(width, height, new Printing.PrintPageOutput(new[] { new Printing.PrintOutputSegment(data) }),
             elements, protocol, sourcePageIndex, copyIndex, feedAfterPrint, cutAfterPrint, renderElements,
-            renderElementOwnership) { }
+            renderElementOwnership, protocolId) { }
 
     internal TemplatePage(int width, int height, Printing.PrintPageOutput output, IEnumerable<TemplateLayoutElement> elements = null,
         PrintProtocol protocol = PrintProtocol.Cpcl, int? sourcePageIndex = null, int? copyIndex = null,
         bool? feedAfterPrint = null, bool? cutAfterPrint = null, IEnumerable<PrintElement> renderElements = null,
-        IEnumerable<TemplateLayoutElement> renderElementOwnership = null)
+        IEnumerable<TemplateLayoutElement> renderElementOwnership = null, string protocolId = null)
     {
         Printing.PrintResourceScope.Retain(64, "Template.PageResult");
         Width = width;
         Height = height;
         Output = output;
         Protocol = protocol;
+        ProtocolId = protocolId;
         SourcePageIndex = sourcePageIndex; CopyIndex = copyIndex;
         FeedAfterPrint = feedAfterPrint; CutAfterPrint = cutAfterPrint;
         if (elements == null) Elements = EmptyElements;
@@ -418,8 +422,11 @@ public sealed class TemplateRenderResult
     /// 获取已生成的所有打印页。
     /// </summary>
     public IReadOnlyList<TemplatePage> Pages { get; }
+    /// <summary>获取新注册协议标识；内置协议结果为 null。</summary>
+    public string ProtocolId { get; }
     /// <summary>获取本次渲染使用的打印协议。</summary>
     public PrintProtocol Protocol { get; }
+    internal IReadOnlyList<PrintProtocolControlOutput> CustomFinishingFiles { get; }
     /// <summary>
     /// 获取已生成的页数。
     /// </summary>
@@ -429,9 +436,16 @@ public sealed class TemplateRenderResult
     /// </summary>
     /// <param name="pages">已生成的完整页面集合。</param>
     /// <param name="protocol">本次渲染使用的打印协议。</param>
-    internal TemplateRenderResult(IEnumerable<TemplatePage> pages, PrintProtocol protocol = PrintProtocol.Cpcl)
+    /// <param name="protocolId">新注册协议标识；内置协议为 null。</param>
+    /// <param name="finishingFiles">可选独立收尾控制文件；不增加物理页。</param>
+    internal TemplateRenderResult(IEnumerable<TemplatePage> pages, PrintProtocol protocol = PrintProtocol.Cpcl,
+        string protocolId = null, IEnumerable<PrintProtocolControlOutput> finishingFiles = null)
     {
         Printing.PrintResourceScope.Retain(32, "Template.Result");
+        ProtocolId = protocolId;
+        var controls = new List<PrintProtocolControlOutput>();
+        if (finishingFiles != null) controls.AddRange(finishingFiles);
+        CustomFinishingFiles = controls.AsReadOnly();
         var copy = new BudgetedList<TemplatePage>("Template.ResultPages");
         copy.AddRange(pages);
         Pages = copy.AsReadOnly();

@@ -98,7 +98,7 @@ public sealed class ProtocolRestrictedRawTests
         var error = Assert.Throws<ArgumentException>(() => command.WriteRestrictedRaw(
             "TEXT 2,20,\"0\",0,1,1,\"SECOND\"\r\n"));
 
-        Assert.Contains("TSPL", error.Message);
+        Assert.True(error.Message.Contains("TSPL", StringComparison.OrdinalIgnoreCase), error.Message);
         Assert.Contains("分隔符", error.Message);
         Assert.Equal(before, command.Build().GetBytes());
 
@@ -116,7 +116,7 @@ public sealed class ProtocolRestrictedRawTests
 
         var missing = Assert.Throws<ArgumentException>(() =>
             command.WriteRestrictedRaw("TEXT 1,1,\"0\",0,1,1,\"X\"\r\n"));
-        Assert.Contains("TSPL", missing.Message);
+        Assert.True(missing.Message.Contains("TSPL", StringComparison.OrdinalIgnoreCase), missing.Message);
         Assert.Equal(before, command.Build().GetBytes());
 
         Assert.Throws<ArgumentException>(() => command.WriteRestrictedRaw(

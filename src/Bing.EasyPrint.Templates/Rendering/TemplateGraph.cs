@@ -357,6 +357,8 @@ internal static class TemplateGraph
                     EscPosRasterCanvas.ValidateExpandedStackedLayout(stackedBarcode.BarcodeType,
                         stackedBarcode.ExpandedStackedColumns, stackedBarcode.ExpandedStackedRows);
                 if (saving && element.Field?.ValueFunc != null) throw new ArgumentException("含 ValueFunc 的模板不能保存为 JSON。");
+                if (element.Field?.Gs1Input != null)
+                    Gs1StructuredInput.Validate(element, element.Field, elementPath + ".Field.Gs1Input");
                 if (element is BpGs1CompositeElement composite)
                 {
                     Protocols.EscPosRasterCanvas.ValidateExpandedStackedLayout(composite.LinearType,
@@ -365,6 +367,9 @@ internal static class TemplateGraph
                         throw new ArgumentException("Composite 必须指定 SecondaryField。");
                     if (saving && composite.SecondaryField.ValueFunc != null)
                         throw new ArgumentException("含 SecondaryField.ValueFunc 的模板不能保存为 JSON。");
+                    if (composite.SecondaryField.Gs1Input != null)
+                        Gs1StructuredInput.Validate(element, composite.SecondaryField,
+                            elementPath + ".SecondaryField.Gs1Input");
                     if (!Printing.PrintGs1CompositeElement.IsSupportedCombination(composite.LinearType, composite.Mode) || composite.ModuleWidth <= 0 ||
                         composite.LinearBarHeight <= 0 || !Enum.IsDefined(typeof(Printing.Gs1CompositeMode), composite.Mode) ||
                         !Enum.IsDefined(typeof(RotationAngle), composite.Rotation))

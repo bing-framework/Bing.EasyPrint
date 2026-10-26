@@ -22,6 +22,10 @@ internal sealed class Binding
     /// 保存当前重复行对应的数据项。
     /// </summary>
     internal object Item;
+    /// <summary>保存保留十进制和时区原文的根数据。</summary>
+    internal object RawRoot;
+    /// <summary>保存保留十进制和时区原文的当前数据项。</summary>
+    internal object RawItem;
     /// <summary>
     /// 保存当前重复项的零基序号。
     /// </summary>
@@ -38,6 +42,7 @@ internal sealed class Binding
     /// </summary>
     internal readonly Bing.EasyPrint.Core.BudgetedDictionary<(Type, string), PropertyInfo> Properties;
     private readonly Bing.EasyPrint.Core.PrintStorageBudget storage;
+    private readonly long maxFieldTextBytes;
     /// <summary>
     /// 保存变量名与根数据字段路径的映射。
     /// </summary>
@@ -46,18 +51,26 @@ internal sealed class Binding
     /// 保存当前组件实例的参数值。
     /// </summary>
     internal readonly IReadOnlyDictionary<string, object> Parameters;
+    /// <summary>保存当前组件实例保留原文的参数值。</summary>
+    internal readonly IReadOnlyDictionary<string, object> RawParameters;
     /// <summary>
     /// 初始化一个 <see cref="Binding"/> 类型的实例。
     /// </summary>
     /// <param name="root">根业务数据。</param>
     /// <param name="variables">可选的模板变量定义。</param>
     /// <param name="storage">临时模型估计的归属；为空时保留到调用作用域结束。</param>
+    /// <param name="maxFieldTextBytes">字段格式输出使用的文本预算；默认不限制。</param>
     internal Binding(object root, IReadOnlyDictionary<string, string> variables = null,
-        Bing.EasyPrint.Core.PrintStorageBudget storage = null)
+        Bing.EasyPrint.Core.PrintStorageBudget storage = null, long maxFieldTextBytes = long.MaxValue)
     {
         this.storage = storage;
+        this.maxFieldTextBytes = maxFieldTextBytes;
         Bing.EasyPrint.Core.PrintStorageBudget.Reserve(64, "Template.Binding", storage);
-        Root = Item = root; Index = -1; InstanceIndices = Array.AsReadOnly(Array.Empty<int>());
+        var pair = root as TemplateDataPair;
+        Root = Item = pair?.Legacy ?? root;
+        RawRoot = RawItem = pair?.Raw ?? Root;
+        Parameters = RawParameters = null;
+        Index = -1; InstanceIndices = Array.AsReadOnly(Array.Empty<int>());
         Properties = new Bing.EasyPrint.Core.BudgetedDictionary<(Type, string), PropertyInfo>(
             "Template.PropertyIndex", storage,
             retainedSize: (key, _) => Bing.EasyPrint.Core.PrintStorageBudget.TextBytes(key.Item2));
@@ -69,35 +82,44 @@ internal sealed class Binding
     /// <param name="item">当前明细数据项。</param>
     /// <param name="index">当前明细的零基序号。</param>
     /// <returns>指向当前明细项的绑定上下文。</returns>
-    internal Binding Child(object item, int index)
+    internal Binding Child(object item, int index) => Child(item, item, index);
+    /// <summary>为重复明细创建共享属性缓存的子绑定上下文，并保留原始值上下文。</summary>
+    internal Binding Child(object item, object rawItem, int index)
     {
         Bing.EasyPrint.Core.PrintStorageBudget.Reserve(checked(32L + (InstanceIndices.Count + 1L) * 4),
             "Template.BindingIndices", storage);
         var indices = new int[InstanceIndices.Count + 1];
         for (var current = 0; current < InstanceIndices.Count; current++) indices[current] = InstanceIndices[current];
         indices[indices.Length - 1] = index;
-        return new Binding(Root, item, index, Array.AsReadOnly(indices), Properties, Variables, Parameters, storage);
+        return new Binding(Root, RawRoot, item, rawItem, index, Array.AsReadOnly(indices), Properties, Variables, Parameters, RawParameters, storage, maxFieldTextBytes);
     }
     /// <summary>
     /// 初始化一个 <see cref="Binding"/> 类型的实例。
     /// </summary>
     /// <param name="root">根业务数据。</param>
+    /// <param name="rawRoot">保留十进制和日期原文的根数据。</param>
     /// <param name="item">当前明细数据项。</param>
+    /// <param name="rawItem">保留十进制和日期原文的当前明细项。</param>
     /// <param name="index">当前明细的零基序号。</param>
     /// <param name="instanceIndices">各层重复明细的序号。</param>
     /// <param name="properties">本次渲染共享的属性缓存。</param>
     /// <param name="variables">可选的模板变量定义。</param>
     /// <param name="parameters">当前组件实例的参数值。</param>
+    /// <param name="rawParameters">当前组件实例保留原文的参数值。</param>
     /// <param name="storage">与父绑定共享的临时存储归属。</param>
-    private Binding(object root, object item, int index, IReadOnlyList<int> instanceIndices,
+    /// <param name="maxFieldTextBytes">字段格式输出使用的文本预算；默认不限制。</param>
+    private Binding(object root, object rawRoot, object item, object rawItem, int index, IReadOnlyList<int> instanceIndices,
         Bing.EasyPrint.Core.BudgetedDictionary<(Type, string), PropertyInfo> properties,
         IReadOnlyDictionary<string, string> variables, IReadOnlyDictionary<string, object> parameters = null,
-        Bing.EasyPrint.Core.PrintStorageBudget storage = null)
+        IReadOnlyDictionary<string, object> rawParameters = null,
+        Bing.EasyPrint.Core.PrintStorageBudget storage = null, long maxFieldTextBytes = long.MaxValue)
     {
         this.storage = storage;
+        this.maxFieldTextBytes = maxFieldTextBytes;
         Bing.EasyPrint.Core.PrintStorageBudget.Reserve(64, "Template.Binding", storage);
-        Root = root; Item = item; Index = index; InstanceIndices = instanceIndices; Properties = properties; Variables = variables;
-        Parameters = parameters;
+        Root = root; RawRoot = rawRoot; Item = item; RawItem = rawItem; Index = index;
+        InstanceIndices = instanceIndices; Properties = properties; Variables = variables;
+        Parameters = parameters; RawParameters = rawParameters;
     }
 
     /// <summary>
@@ -107,7 +129,12 @@ internal sealed class Binding
     /// <param name="parameters">组件实例解析后的参数值。</param>
     /// <returns>包含指定数据及参数上下文的绑定。</returns>
     internal Binding Component(object item, IReadOnlyDictionary<string, object> parameters)
-        => new Binding(Root, item, Index, InstanceIndices, Properties, Variables, parameters, storage);
+        => Component(item, item, parameters, parameters);
+    /// <summary>创建组件实例的数据及参数绑定上下文，并保留原始值上下文。</summary>
+    internal Binding Component(object item, object rawItem, IReadOnlyDictionary<string, object> parameters,
+        IReadOnlyDictionary<string, object> rawParameters)
+        => new Binding(Root, RawRoot, item, rawItem, Index, InstanceIndices, Properties, Variables, parameters,
+            rawParameters, storage, maxFieldTextBytes);
 
     /// <summary>
     /// 解析字段路径、变量或重复项内置引用。
@@ -116,7 +143,7 @@ internal sealed class Binding
     /// <returns>字段值；存在但值为空时返回 null。</returns>
     internal object Resolve(string path)
     {
-        try { return ResolveCore(path); }
+        try { return ResolveCore(path, false); }
         catch (ArgumentException error)
         {
             TemplateBindingDiagnostic.Attach(error, path);
@@ -124,7 +151,17 @@ internal sealed class Binding
         }
     }
 
-    private object ResolveCore(string path)
+    /// <summary>解析保留原始十进制和时区文本的字段路径。</summary>
+    internal object ResolveRaw(string path)
+    {
+        try { return ResolveCore(path, true); }
+        catch (ArgumentException error)
+        {
+            TemplateBindingDiagnostic.Attach(error, path);
+            throw;
+        }
+    }
+    private object ResolveCore(string path, bool raw)
     {
         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("字段路径不能为空。");
         using var pathStorage = Bing.EasyPrint.Printing.PrintResourceScope.Reserve(
@@ -134,23 +171,26 @@ internal sealed class Binding
             var name = path.Substring(5);
             if (name.IndexOf('.') >= 0 || Variables == null || !Variables.TryGetValue(name, out var source))
                 throw Missing(path);
-            return ResolveRoot(source);
+            return ResolveRoot(source, raw);
         }
         if (path == "$index") return Index;
-        object value = Item;
+        var root = raw ? RawRoot : Root;
+        var item = raw ? RawItem : Item;
+        var parameters = raw ? RawParameters : Parameters;
+        object value = item;
         if (path.StartsWith("$param.", StringComparison.Ordinal))
         {
             var separator = path.IndexOf('.', 7);
             var name = separator < 0 ? path.Substring(7) : path.Substring(7, separator - 7);
-            if (name.Length == 0 || Parameters == null || !Parameters.TryGetValue(name, out value)) throw Missing(path);
+            if (name.Length == 0 || parameters == null || !parameters.TryGetValue(name, out value)) throw Missing(path);
             if (separator < 0) return value;
             path = path.Substring(separator + 1);
         }
         else
         {
-        if (path == "$root") return Root;
-        if (path == "$item") return Item;
-        if (path.StartsWith("$root.", StringComparison.Ordinal)) { value = Root; path = path.Substring(6); }
+        if (path == "$root") return root;
+        if (path == "$item") return item;
+        if (path.StartsWith("$root.", StringComparison.Ordinal)) { value = root; path = path.Substring(6); }
         else if (path.StartsWith("$item.", StringComparison.Ordinal)) path = path.Substring(6);
         }
         foreach (var name in path.Split('.'))
@@ -194,12 +234,15 @@ internal sealed class Binding
     /// 从根数据解析变量所引用的字段路径。
     /// </summary>
     /// <param name="path">不含内置引用的根数据字段路径。</param>
+    /// <param name="raw">为 true 时读取保留原文的根数据。</param>
     /// <returns>根数据字段值；值为空时返回 null。</returns>
-    private object ResolveRoot(string path)
+    private object ResolveRoot(string path, bool raw)
     {
         if (path.StartsWith("$", StringComparison.Ordinal)) throw new ArgumentException("变量定义必须引用根数据字段。");
-        var rootBinding = new Binding(Root, Root, -1, InstanceIndices, Properties, null, storage: storage);
-        return rootBinding.Resolve(path);
+        var root = raw ? RawRoot : Root;
+        var rootBinding = new Binding(root, root, root, root, -1, InstanceIndices, Properties, null, storage: storage,
+            maxFieldTextBytes: maxFieldTextBytes);
+        return raw ? rootBinding.ResolveRaw(path) : rootBinding.Resolve(path);
     }
     /// <summary>
     /// 创建包含缺失字段路径的错误。
@@ -225,7 +268,12 @@ internal sealed class Binding
     private string TextCore(BgField field)
     {
         if (field == null) return string.Empty;
-        var value = field.ValueFunc != null ? field.ValueFunc(Item) : !string.IsNullOrEmpty(field.Name) ? Resolve(field.Name) : field.Value;
+        var formatted = field.Format != null;
+        var value = field.ValueFunc != null ? field.ValueFunc(formatted ? RawItem : Item)
+            : !string.IsNullOrEmpty(field.Name) ? (formatted ? ResolveRaw(field.Name) : Resolve(field.Name))
+            : field.Value;
+        if (field.Format != null)
+            return BgFieldFormatter.Format(field.Format, value, maxFieldTextBytes, storage);
         if (value == null) return string.Empty;
         if (!(value is string) && !(value is ValueType)) throw new ArgumentException("显示字段必须为标量。");
         return Convert.ToString(value, CultureInfo.InvariantCulture);

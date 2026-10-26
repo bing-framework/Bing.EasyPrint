@@ -13,6 +13,59 @@ internal static class TemplateFontResolver
             throw new ArgumentException("Font 不能与旧版 FontName、FontFamily 或 DeviceFontName 同时指定。");
     }
 
+    internal static ResolvedTemplateFont Resolve(BpFontElement element, TemplateRenderOptions options)
+    {
+        if (options?.CustomProtocol == null)
+            return Resolve(element, options?.Protocol ?? PrintProtocol.Cpcl,
+                options?.EscPosLayout ?? EscPosLayoutMode.Native);
+        ValidateStructure(element);
+        var capabilities = options.CustomProtocol.Capabilities;
+        var font = element.Font;
+        if (font == null)
+        {
+            if (element.FontName != 0)
+                throw new NotSupportedException($"协议 {options.ProtocolId} 不支持 CPCL FontName；请使用 Font 选择目标协议字体。");
+            if (!string.IsNullOrEmpty(element.DeviceFontName))
+            {
+                if (!capabilities.SupportsLegacyDeviceFont ||
+                    !capabilities.SupportsFontKind(PrintFontKind.Device))
+                    throw new NotSupportedException($"协议 {options.ProtocolId} 未声明设备字体来源。");
+                return new ResolvedTemplateFont(0, null, element.DeviceFontName, null);
+            }
+            if (!string.IsNullOrWhiteSpace(element.FontFamily))
+            {
+                if (!capabilities.SupportsHostFontFamily ||
+                    !capabilities.SupportsFontKind(PrintFontKind.Host))
+                    throw new NotSupportedException($"协议 {options.ProtocolId} 不支持主机字体族。");
+                return new ResolvedTemplateFont(0, element.FontFamily, null, null);
+            }
+            if (!capabilities.SupportsFontKind(PrintFontKind.Default))
+                throw new NotSupportedException($"协议 {options.ProtocolId} 未声明默认字体来源。");
+            return new ResolvedTemplateFont(0, null, null, null);
+        }
+        if (font.Kind == PrintFontKind.Default)
+        {
+            if (!capabilities.SupportsFontKind(PrintFontKind.Default))
+                throw new NotSupportedException($"协议 {options.ProtocolId} 未声明默认字体来源。");
+            return new ResolvedTemplateFont(0, null, null, font);
+        }
+        if (font.Kind == PrintFontKind.Host)
+        {
+            if (!capabilities.SupportsHostFontFamily ||
+                !capabilities.SupportsFontKind(PrintFontKind.Host))
+                throw new NotSupportedException($"协议 {options.ProtocolId} 不支持主机字体族。");
+            return new ResolvedTemplateFont(0, font.Name, null, font);
+        }
+        if (font.Kind == PrintFontKind.Device)
+        {
+            if (!capabilities.SupportsLegacyDeviceFont ||
+                !capabilities.SupportsFontKind(PrintFontKind.Device))
+                throw new NotSupportedException($"协议 {options.ProtocolId} 未声明设备字体来源。");
+            return new ResolvedTemplateFont(0, null, font.Name, font);
+        }
+        throw new NotSupportedException($"协议 {options.ProtocolId} 不支持该字体来源。");
+    }
+
     internal static ResolvedTemplateFont Resolve(BpFontElement element, PrintProtocol protocol,
         EscPosLayoutMode layout)
     {

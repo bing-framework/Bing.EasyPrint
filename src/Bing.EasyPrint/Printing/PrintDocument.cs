@@ -140,6 +140,9 @@ public abstract class PrintElement
             case PrintQrCodeElement qrCode:
                 bytes = checked(bytes + PrintStorageBudget.TextBytes(qrCode.Data));
                 break;
+            case PrintImageElement image when image.VectorCodeInfo != null:
+                bytes = checked(bytes + image.VectorCodeInfo.StorageBytes);
+                break;
         }
         return bytes;
     }
@@ -517,10 +520,18 @@ public sealed class PrintQrCodeElement : PrintElement
 public sealed class PrintImageElement : PrintElement
 {
     private readonly byte[] _raster;
+    internal PrintVectorCodeInfo VectorCodeInfo { get; private set; }
     /// <summary>获取按行排列的 MSB 优先单色位图副本；修改返回数组不会改变元素。</summary>
     public byte[] Raster => Core.BudgetedBuffer.Copy(_raster, "Document.ImageSnapshot", CancellationToken.None);
     // 内置 Provider 仅只读访问，避免输出时再次分配公共访问器的副本。
     internal byte[] RasterData => _raster;
+
+    internal void SetVectorCodeInfo(PrintVectorCodeInfo vectorCodeInfo)
+    {
+        if (vectorCodeInfo == null) throw new ArgumentNullException(nameof(vectorCodeInfo));
+        if (VectorCodeInfo != null) throw new InvalidOperationException("码图矩阵只能设置一次。");
+        VectorCodeInfo = vectorCodeInfo;
+    }
     /// <summary>每行字节数。</summary>
     public int RowBytes { get; }
     /// <summary>是否使用 CPCL 的二进制 CG 图片命令；其他协议忽略此编码偏好。</summary>

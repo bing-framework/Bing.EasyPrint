@@ -15,6 +15,31 @@ namespace Bing.EasyPrint.Templates;
 public sealed class TemplateRenderOptions
 {
     /// <summary>
+    /// 获取或设置新注册协议标识；与旧 <see cref="Protocol"/> 选择器互斥，为空时走内置协议。
+    /// </summary>
+    public string ProtocolId { get; set; }
+
+    /// <summary>
+    /// 获取或设置新协议模板适配器；由宿主启动阶段解析注册表后注入，不能由请求上传可执行实现。
+    /// </summary>
+    public ITemplateProtocolAdapter CustomProtocol { get; set; }
+
+    /// <summary>
+    /// 获取或设置新协议 JSON 配置快照；仅当 <see cref="ProtocolId"/> 非空时使用。
+    /// </summary>
+    public string CustomProtocolConfigurationJson { get; set; }
+
+    /// <summary>
+    /// 获取或设置冻结的新协议注册表；自定义渲染必须通过它创建后端会话。
+    /// </summary>
+    public PrintProtocolRegistry ProtocolRegistry { get; set; }
+
+    /// <summary>
+    /// 获取或设置可选的新协议任务收尾请求；控制文件不增加物理页面。
+    /// </summary>
+    public PrintProtocolFinishingRequest CustomFinishing { get; set; }
+
+    /// <summary>
     /// 获取或设置目标打印协议。默认保持现有 CPCL 输出。
     /// </summary>
     public PrintProtocol Protocol { get; set; } = PrintProtocol.Cpcl;
@@ -113,6 +138,38 @@ public sealed class TemplateRenderOptions
     /// </summary>
     internal void Validate()
     {
+        if (!string.IsNullOrEmpty(ProtocolId) || CustomProtocol != null)
+        {
+            if (string.IsNullOrEmpty(ProtocolId) || CustomProtocol == null)
+                throw new ArgumentException("新协议必须同时提供 ProtocolId 和 CustomProtocol。", nameof(ProtocolId));
+            if (!string.Equals(ProtocolId, CustomProtocol.ProtocolId, StringComparison.Ordinal))
+                throw new ArgumentException("协议标识与模板适配器标识不一致。", nameof(ProtocolId));
+            if (ProtocolRegistry == null)
+                throw new ArgumentException("新协议必须提供冻结的协议注册表。", nameof(ProtocolRegistry));
+            if (!ProtocolRegistry.IsFrozen || !ProtocolRegistry.Contains(ProtocolId))
+                throw new ArgumentException("协议注册表必须已冻结并包含当前协议。", nameof(ProtocolRegistry));
+            if (Protocol != PrintProtocol.Cpcl)
+                throw new ArgumentException("新协议不能携带非默认内置协议选择。", nameof(Protocol));
+            if (EscPosDevice != null || TsplMedia != null || ZplMedia != null ||
+                DeviceHalfCellWidthAt24.HasValue || DeviceFullCellWidthAt24.HasValue ||
+                DeviceLineHeightAt24.HasValue || DeviceFontCalibrations != null || RequireDeclaredNativeBounds)
+                throw new ArgumentException("新协议不能携带内置协议专用配置。", nameof(ProtocolId));
+            if (Job != null || CutOptions != null)
+                throw new ArgumentException("新协议不支持旧任务或页面裁切参数；请使用协议配置和可选收尾契约。",
+                    nameof(Job));
+            if (FeedLines.HasValue || CutAfterPrint.HasValue)
+                throw new ArgumentException("新协议不能使用旧 feedLines/cutAfterPrint 快捷字段；请使用 CustomFinishing。",
+                    nameof(CustomFinishing));
+            if (MaxWorkingBytes < 0) throw new ArgumentOutOfRangeException(nameof(MaxWorkingBytes));
+            if (ImageThreshold < 0 || ImageThreshold > 255)
+                throw new ArgumentOutOfRangeException(nameof(ImageThreshold));
+            if (Copies < 1 || FeedLines < 0 || MaxJsonBytes < 1 || MaxDepth < 1 || MaxDepth > 128 ||
+                MaxDetailRows < 1 || MaxPages < 1 || MaxOutputBytes < 1 || MaxImageBytes < 1 ||
+                MaxImagePixels < 1 || MaxPageHeight < 1)
+                throw new ArgumentOutOfRangeException(nameof(TemplateRenderOptions),
+                    "资源限制必须为正数，MaxDepth 不得超过 128。");
+            return;
+        }
         if (MaxWorkingBytes < 0) throw new ArgumentOutOfRangeException(nameof(MaxWorkingBytes));
         if (CutOptions != null)
         {

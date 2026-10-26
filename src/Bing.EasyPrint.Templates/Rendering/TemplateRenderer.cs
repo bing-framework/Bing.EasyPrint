@@ -43,7 +43,7 @@ public sealed class TemplateRenderer
     /// <returns>包含所有目标协议页面的渲染结果。</returns>
     public TemplateRenderResult Render(BpTemplate template, object data, ITemplateResourceProvider resources = null,
         TemplateRenderOptions options = null, CancellationToken cancellationToken = default)
-        => RenderCore(template, data, resources, options, cancellationToken, false, false);
+        => RenderCore(template, data, resources, RequireBuiltinOptions(options), cancellationToken, false, false);
 
     /// <summary>
     /// 渲染模板并生成逐页打印数据与布局轨迹。
@@ -56,11 +56,46 @@ public sealed class TemplateRenderer
     /// <returns>包含目标协议页面及可定位布局节点的渲染结果。</returns>
     public TemplateRenderResult RenderWithLayout(BpTemplate template, object data, ITemplateResourceProvider resources = null,
         TemplateRenderOptions options = null, CancellationToken cancellationToken = default)
-        => RenderCore(template, data, resources, options, cancellationToken, true, false);
+        => RenderCore(template, data, resources, RequireBuiltinOptions(options), cancellationToken, true, false);
 
     internal TemplateRenderResult RenderWithLayoutAndPrimitives(BpTemplate template, object data,
         ITemplateResourceProvider resources, TemplateRenderOptions options, CancellationToken cancellationToken)
-        => RenderCore(template, data, resources, options, cancellationToken, true, true);
+        => RenderCore(template, data, resources, RequireBuiltinOptions(options), cancellationToken, true, true);
+    /// <summary>渲染新注册协议，返回不携带内置协议值的中立结果。</summary>
+    public TemplateCustomRenderResult RenderCustomProtocol(BpTemplate template, object data,
+        ITemplateResourceProvider resources = null, TemplateRenderOptions options = null,
+        CancellationToken cancellationToken = default)
+        => ToCustomResult(RenderCore(template, data, resources, RequireCustomOptions(options), cancellationToken,
+            false, false), options.ProtocolId);
+    /// <summary>渲染新注册协议并捕获布局轨迹。</summary>
+    public TemplateCustomRenderResult RenderCustomProtocolWithLayout(BpTemplate template, object data,
+        ITemplateResourceProvider resources = null, TemplateRenderOptions options = null,
+        CancellationToken cancellationToken = default)
+        => ToCustomResult(RenderCore(template, data, resources, RequireCustomOptions(options), cancellationToken,
+            true, false), options.ProtocolId);
+    internal TemplateCustomRenderResult RenderCustomProtocolWithLayoutAndPrimitives(BpTemplate template,
+        object data, ITemplateResourceProvider resources, TemplateRenderOptions options,
+        CancellationToken cancellationToken)
+        => ToCustomResult(RenderCore(template, data, resources, RequireCustomOptions(options), cancellationToken,
+            true, true), options.ProtocolId);
+    private static TemplateRenderOptions RequireBuiltinOptions(TemplateRenderOptions options)
+    {
+        if (options?.CustomProtocol != null || !string.IsNullOrEmpty(options?.ProtocolId))
+            throw new ArgumentException("新协议必须使用 RenderCustomProtocol 入口。", nameof(options));
+        return options;
+    }
+    private static TemplateRenderOptions RequireCustomOptions(TemplateRenderOptions options)
+    {
+        if (options?.CustomProtocol == null || string.IsNullOrWhiteSpace(options.ProtocolId))
+            throw new ArgumentException("自定义渲染必须提供 ProtocolId 和 CustomProtocol。", nameof(options));
+        return options;
+    }
+    private static TemplateCustomRenderResult ToCustomResult(TemplateRenderResult result, string protocolId)
+    {
+        var pages = new List<TemplateCustomPage>(result.PageCount);
+        foreach (var page in result.Pages) pages.Add(new TemplateCustomPage(page));
+        return new TemplateCustomRenderResult(protocolId, pages, result.CustomFinishingFiles);
+    }
 
     private static TemplateRenderResult RenderCore(BpTemplate template, object data, ITemplateResourceProvider resources,
         TemplateRenderOptions options, CancellationToken cancellationToken, bool captureLayout, bool capturePrimitives)
@@ -73,6 +108,18 @@ public sealed class TemplateRenderer
             foreach (var font in options.EscPosDevice.RasterFonts.Fonts)
                 PrintResourceScope.Retain(font.ByteLength, "Template.FontData");
         options.Validate();
+        if (options.CustomProtocol != null)
+        {
+            TemplateGraph.Validate(template, options, false, cancellationToken, includePaths: true,
+                checkProtocol: false);
+            TemplateCustomProtocolValidator.Validate(template, options, cancellationToken);
+            TemplateRenderResult customResult;
+            using (var customSession = new Session(template, options, resources, cancellationToken, captureLayout,
+                       capturePrimitives))
+                customResult = customSession.Render(customSession.BindRoot(data));
+            resourceScope?.CommitReservations();
+            return customResult;
+        }
         TemplateGraph.Validate(template, options, false, cancellationToken,
             captureLayout || options.Protocol != PrintProtocol.Cpcl, checkProtocol: true);
         var encoding = ResolveEncoding(options);
@@ -361,11 +408,14 @@ public sealed class TemplateRenderer
             this.captureLayout = captureLayout;
             this.capturePrimitives = capturePrimitives;
             encoding = ResolveEncoding(options);
-            pageHeight = template.Height == 0 ? options.MaxPageHeight : template.Height;
+            pageHeight = template.Height == 0
+                ? (options.CustomProtocol?.Capabilities.MaxPageHeightDots ?? options.MaxPageHeight)
+                : template.Height;
         }
 
         /// <summary>创建与布局会话一起释放的根绑定上下文。</summary>
-        internal Binding BindRoot(object data) => new Binding(data, template.Variables, storage);
+        internal Binding BindRoot(object data) => new Binding(data, template.Variables, storage,
+            options.MaxOutputBytes);
 
         /// <summary>
         /// 展开模板行并生成分页结果。
@@ -509,13 +559,17 @@ public sealed class TemplateRenderer
                 activeScopedHeaders = null;
             }
             if (dirty || pages.Count == 0) Finish(false);
+            if (options.CustomProtocol != null)
+                return RenderCustom(document, pages);
             {
                 var provider = PrintProtocolProviderFactory.Create(options.Protocol, encoding, options.EscPosLayout,
                     options.EscPosDevice, options.TsplMedia, options.ZplMedia, options.RequireDeclaredNativeBounds);
                 var providerPageOffset = 0;
                 try
                 {
-                    provider.Validate(document, cancellation);
+                    using var backend = new PrintProtocolProviderBackend(
+                        options.Protocol.ToString().ToLowerInvariant(), provider);
+                    backend.Validate(document, cancellation);
                     if (options.Job != null)
                     {
                         var job = new PrintJobRenderer().Render(provider, document, options.Job, cancellation,
@@ -533,24 +587,19 @@ public sealed class TemplateRenderer
                         }
                         return new TemplateRenderResult(jobPages, options.Protocol);
                     }
-                    var rendered = new BudgetedList<TemplatePage>("Template.RenderedPages", owner: storage, capacity: pages.Count);
+                    var commonOutput = PrintProtocolOutputComposer.RenderLegacy(backend, document, null,
+                        options.MaxOutputBytes - outputBytes, cancellation);
+                    var rendered = new BudgetedList<TemplatePage>("Template.RenderedPages", owner: storage,
+                        capacity: pages.Count);
                     for (var index = 0; index < document.Pages.Count; index++)
                     {
                         providerPageOffset = index;
                         cancellation.ThrowIfCancellationRequested();
                         var logicalPage = document.Pages[index];
-                        var singlePage = new PrintDocument(storage);
-                        var target = singlePage.AddPage(logicalPage.Width, logicalPage.Height);
-                        target.Copies = logicalPage.Copies;
-                        target.FeedLines = logicalPage.FeedLines;
-                        target.CutAfterPrint = logicalPage.CutAfterPrint;
-                        target.CutOptions = logicalPage.CutOptions?.Snapshot();
-                        foreach (var element in logicalPage.Elements) target.Add(element, element.SourcePath);
-                        var output = provider.RenderOutput(singlePage, cancellation)[0];
-                        outputBytes = checked(outputBytes + output.ByteLength);
-                        if (outputBytes > options.MaxOutputBytes) throw new ArgumentException("输出超过字节上限。");
-                        rendered.Add(new TemplatePage(logicalPage.Width, logicalPage.Height, output,
-                            captureLayout ? pages[index].Elements : null, options.Protocol,
+                        outputBytes = checked(outputBytes + commonOutput.Pages[index].ByteLength);
+                        rendered.Add(new TemplatePage(logicalPage.Width, logicalPage.Height,
+                            commonOutput.Pages[index], captureLayout ? pages[index].Elements : null,
+                            options.Protocol,
                             renderElements: capturePrimitives ? logicalPage.Elements : null,
                             renderElementOwnership: capturePrimitives ? ownershipLayouts[index] : null));
                     }
@@ -566,6 +615,59 @@ public sealed class TemplateRenderer
                 }
             }
 
+            TemplateRenderResult RenderCustom(PrintDocument document, BudgetedList<TemplateDraft> drafts)
+            {
+                if (options.ProtocolRegistry == null)
+                    throw new TemplateRenderException("Template", "新协议渲染必须提供冻结的协议注册表。",
+                        new InvalidOperationException("缺少 PrintProtocolRegistry。"));
+                try
+                {
+                    PrintProtocolOutputComposer.ValidatePageCount(document, options.MaxPages, cancellation);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error) when (error is ArgumentException || error is NotSupportedException)
+                {
+                    throw new TemplateRenderException("Template", error.Message, error);
+                }
+                using var backend = options.ProtocolRegistry.CreateBackend(options.ProtocolId,
+                    options.CustomProtocolConfigurationJson);
+                PrintProtocolOutputResult outputResult;
+                try
+                {
+                    outputResult = PrintProtocolOutputComposer.Render(backend, document, options.CustomFinishing,
+                        options.MaxOutputBytes, options.MaxPages, cancellation);
+                }
+                catch (PrintProtocolBackendException error)
+                {
+                    throw new TemplateRenderException(error.ElementPath ?? "Template", error.Message, error)
+                        .WithLocation(error.PageIndex, error.ElementIndex);
+                }
+                var outputs = outputResult.Pages;
+                if (outputs.Count != outputResult.PageOrigins.Count)
+                    throw new TemplateRenderException("Template", "新协议页面归属数量与页面输出不一致。",
+                        new InvalidOperationException("新协议页面归属数量不一致。"));
+                var rendered = new BudgetedList<TemplatePage>("Template.CustomPages", owner: storage,
+                    capacity: outputs.Count);
+                for (var index = 0; index < outputs.Count; index++)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    var output = outputs[index];
+                    var origin = outputResult.PageOrigins[index];
+                    var source = document.Pages[origin.SourcePageIndex];
+                    outputBytes = checked(outputBytes + output.ByteLength);
+                    if (outputBytes > options.MaxOutputBytes)
+                        throw new TemplateRenderException("Template", "输出超过字节上限。",
+                            new ArgumentException("输出超过字节上限。"));
+                    rendered.Add(new TemplatePage(source.Width, source.Height, output,
+                        captureLayout ? drafts[origin.SourcePageIndex].Elements : null, options.Protocol,
+                        sourcePageIndex: origin.SourcePageIndex, copyIndex: origin.CopyIndex,
+                        protocolId: options.ProtocolId,
+                        renderElements: capturePrimitives ? source.Elements : null,
+                        renderElementOwnership: capturePrimitives ? ownershipLayouts[origin.SourcePageIndex] : null));
+                }
+                return new TemplateRenderResult(rendered, options.Protocol, options.ProtocolId,
+                    outputResult.FinishingFiles);
+            }
             TemplateRenderException ProviderError(string path, string message, Exception error, int pageOffset)
             {
                 var providerPage = error is PrintCapabilityException capability ? capability.PageIndex
@@ -705,49 +807,24 @@ public sealed class TemplateRenderer
         /// <returns>符合条件的行布局块序列。</returns>
         private IEnumerable<Block> Expand(BpRow row, int width, Binding binding, string sourcePath)
         {
-            cancellation.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(row.RepeatSource))
+            using var instances = TemplateBindingTraversal.ExpandRowBindings(row, binding, cancellation, CountRow).GetEnumerator();
+            while (true)
             {
-                bool matches;
-                try { matches = binding.Matches(row.Condition); }
+                bool hasInstance;
+                Binding instance;
+                try
+                {
+                    hasInstance = instances.MoveNext();
+                    instance = hasInstance ? instances.Current : null;
+                }
                 catch (ArgumentException error)
                 {
-                    if (captureLayout || options.Protocol != PrintProtocol.Cpcl) throw new TemplateRenderException(sourcePath, error.Message, error);
+                    if (captureLayout || options.Protocol != PrintProtocol.Cpcl)
+                        throw new TemplateRenderException(sourcePath, error.Message, error);
                     throw;
                 }
-                if (matches) { CountRow(); yield return Layout(row, width, binding, sourcePath); }
-                yield break;
-            }
-            object source;
-            try { source = binding.Resolve(row.RepeatSource); }
-            catch (ArgumentException error)
-            {
-                if (captureLayout || options.Protocol != PrintProtocol.Cpcl) throw new TemplateRenderException(sourcePath, error.Message, error);
-                throw;
-            }
-            if (source == null) yield break;
-            if (!(source is IEnumerable sequence) || source is string || source is IDictionary)
-            {
-                var error = new ArgumentException("RepeatSource 必须为集合。");
-                TemplateBindingDiagnostic.Attach(error, row.RepeatSource);
-                if (captureLayout || options.Protocol != PrintProtocol.Cpcl)
-                    throw new TemplateRenderException(sourcePath, error.Message, error);
-                throw error;
-            }
-            var index = 0;
-            foreach (var item in sequence)
-            {
-                cancellation.ThrowIfCancellationRequested();
-                CountRow(); // 即使条件为 false 也计数，限制无限枚举。
-                var child = binding.Child(item, index++);
-                bool matches;
-                try { matches = child.Matches(row.Condition); }
-                catch (ArgumentException error)
-                {
-                    if (captureLayout || options.Protocol != PrintProtocol.Cpcl) throw new TemplateRenderException(sourcePath, error.Message, error);
-                    throw;
-                }
-                if (matches) yield return Layout(row, width, child, sourcePath);
+                if (!hasInstance) yield break;
+                yield return Layout(row, width, instance, sourcePath);
             }
         }
         /// <summary>
@@ -802,6 +879,8 @@ public sealed class TemplateRenderer
                     catch (TemplateRenderException) { throw; }
                     catch (ArgumentException error)
                     {
+                        if (element is BpBarcodeElement || element is BpQrCodeElement || element is BpMatrixCodeElement)
+                            TemplateInputDiagnostic.Mark(error);
                         if (captureLayout || options.Protocol != PrintProtocol.Cpcl) throw new TemplateRenderException(elementPath, error.Message, error);
                         throw;
                     }
@@ -920,11 +999,24 @@ public sealed class TemplateRenderer
             if (element is BpEllipseElement ellipse) return Shape(ellipse.Width, ellipse.Height, ellipse.LineWidth, true, width, sourcePath, binding);
             if (element is BpIconElement icon) return Icon(icon, width, sourcePath, binding);
             if (element is BpGs1CompositeElement composite) return Composite(composite, width, sourcePath, binding);
-            var text = binding.Text(element.Field);
+            string text;
+            try { text = Gs1StructuredInput.Resolve(element, binding); }
+            catch (BgFieldFormatException error)
+            {
+                throw new TemplateRenderException(sourcePath, error.Message, error);
+            }
+            catch (Gs1InputException error)
+            {
+                throw new TemplateRenderException(sourcePath, error.Message, error);
+            }
             payloadBytes = checked(payloadBytes + encoding.GetByteCount(text));
             if (payloadBytes > options.MaxOutputBytes) throw new ArgumentException("字段数据超过输出预算。");
             if (element is BpFontElement font) return Text(font, text, width, sourcePath, binding);
             if (text.IndexOfAny(new[] { '\r', '\n', '\0', '\u001b' }) >= 0) throw new ArgumentException("图片键或条码内容不能包含协议控制字符。");
+            if (element is BpQrCodeElement customQr && options.CustomProtocol != null)
+                return CustomQrCode(customQr, text, width, sourcePath, binding);
+            if (element is BpBarcodeElement customBarcode && options.CustomProtocol != null)
+                return CustomBarcode(customBarcode, text, width, sourcePath, binding);
             if (element is BpMatrixCodeElement matrix) return MatrixCode(matrix, text, width, sourcePath, binding);
             var result = new Block(storage);
             if (element is BpImageElement picture)
@@ -1060,6 +1152,80 @@ public sealed class TemplateRenderer
             return result;
         }
 
+        private Block CustomBarcode(BpBarcodeElement barcode, string text, int available, string sourcePath,
+            Binding binding)
+        {
+            var adapter = options.CustomProtocol;
+            var capabilities = adapter.Capabilities;
+            if (!capabilities.SupportsBarcodes || !capabilities.SupportsBarcodeType(barcode.BarcodeType))
+                throw new TemplateRenderException(sourcePath, "新协议未声明该一维码制式。",
+                    new NotSupportedException("一维码制式未声明。"));
+            if (!capabilities.SupportsBarcodeRotation(barcode.Rotation))
+                throw new TemplateRenderException(sourcePath, "新协议未声明该一维码旋转角度。",
+                    new NotSupportedException("一维码旋转未声明。"));
+            var measurement = adapter.MeasureBarcode(new TemplateBarcodeMeasurementRequest(barcode, text, available));
+            if (measurement.Width > available)
+                throw new TemplateRenderException(sourcePath, "一维码占位超过单元格可用宽度。",
+                    new ArgumentException("条码宽度超过可用宽度。"));
+            var result = new Block(storage) { Height = measurement.Height };
+            result.Atoms.Add(new Atom
+            {
+                Width = measurement.Width,
+                Height = measurement.Height,
+                Rotation = barcode.Rotation,
+                SourcePath = sourcePath,
+                Type = barcode.Type,
+                Text = text,
+                InstanceIndices = binding.InstanceIndices,
+                Draw = (command, x, y) => command.DrawElement(adapter.ConvertBarcode(
+                    new TemplateBarcodeConversionRequest(barcode, text, x, y, measurement.Width,
+                        measurement.Height))),
+            });
+            return result;
+        }
+
+        private Block CustomQrCode(BpQrCodeElement qr, string text, int available, string sourcePath,
+            Binding binding)
+        {
+            var adapter = options.CustomProtocol;
+            var capabilities = adapter.Capabilities;
+            if (qr.Gs1)
+            {
+                if (!capabilities.SupportsGs1QrCode)
+                    throw new TemplateRenderException(sourcePath, "新协议未声明 GS1 QR。",
+                        new NotSupportedException("GS1 QR 未声明。"));
+                return Gs1Qr(qr, text, available, sourcePath, binding);
+            }
+            if (!capabilities.SupportsQrCode)
+                throw new TemplateRenderException(sourcePath, "新协议未声明二维码支持。",
+                    new NotSupportedException("二维码未声明。"));
+            if (!capabilities.SupportsQrCodeRotation(qr.Rotation))
+                throw new TemplateRenderException(sourcePath, "新协议未声明该二维码旋转角度。",
+                    new NotSupportedException("二维码旋转未声明。"));
+            if (qr.UnitWidth < 1 || qr.UnitWidth > 32 || !new[] { "L", "M", "Q", "H" }.Contains(qr.ErrorLevel))
+                throw new TemplateRenderException(sourcePath, "二维码参数无效。",
+                    new ArgumentException("二维码参数无效。"));
+            var measurement = adapter.MeasureQrCode(new TemplateQrCodeMeasurementRequest(qr, text, available));
+            if (measurement.Width > available)
+                throw new TemplateRenderException(sourcePath, "二维码占位超过单元格可用宽度。",
+                    new ArgumentException("二维码宽度超过可用宽度。"));
+            var result = new Block(storage) { Height = measurement.Height };
+            result.Atoms.Add(new Atom
+            {
+                Width = measurement.Width,
+                Height = measurement.Height,
+                Rotation = qr.Rotation,
+                SourcePath = sourcePath,
+                Type = qr.Type,
+                Text = text,
+                InstanceIndices = binding.InstanceIndices,
+                Draw = (command, x, y) => command.DrawElement(adapter.ConvertQrCode(
+                    new TemplateQrCodeConversionRequest(qr, text, x, y, measurement.Width,
+                        measurement.Height))),
+            });
+            return result;
+        }
+
         /// <summary>
         /// 生成不可拆分的复合码布局块。
         /// </summary>
@@ -1070,8 +1236,21 @@ public sealed class TemplateRenderer
         /// <returns>包含点阵码位图的布局块。</returns>
         private Block Composite(BpGs1CompositeElement element, int available, string sourcePath, Binding binding)
         {
-            var primary = binding.Text(element.Field);
-            var secondary = binding.Text(element.SecondaryField);
+            string primary;
+            string secondary;
+            try
+            {
+                primary = Gs1StructuredInput.Resolve(element, element.Field, binding);
+                secondary = Gs1StructuredInput.Resolve(element, element.SecondaryField, binding);
+            }
+            catch (BgFieldFormatException error)
+            {
+                throw new TemplateRenderException(sourcePath, error.Message, error);
+            }
+            catch (Gs1InputException error)
+            {
+                throw new TemplateRenderException(sourcePath, error.Message, error);
+            }
             if (options.ValidateGs1Associations)
             {
                 try { Gs1AssociationValidator.ValidateComposite(primary, secondary, element.LinearType); }
@@ -1188,7 +1367,8 @@ public sealed class TemplateRenderer
             {
                 Width = quarterTurn ? h : w, Height = result.Height, Rotation = qr.Rotation,
                 SourcePath = sourcePath, Type = qr.Type, Text = text, InstanceIndices = binding.InstanceIndices,
-                Draw = (cmd, x, y) => cmd.DrawImage(x, y, image, imageOptions, qr.Rotation)
+                Draw = (cmd, x, y) => cmd.DrawImage(x, y, image, imageOptions, qr.Rotation,
+                    new PrintVectorCodeInfo("QR", bits, unit, w, h, left, top, true))
             });
             return result;
         }
@@ -1266,7 +1446,10 @@ public sealed class TemplateRenderer
             var imageOptions = new ImageProcessingOptions { MaxEncodedBytes = options.MaxImageBytes, MaxPixels = options.MaxImagePixels };
             var result = new Block(storage) { Height = bits.Height };
             result.Atoms.Add(new Atom { Width = bits.Width, Height = bits.Height, SourcePath = sourcePath, Type = element.Type,
-                Text = text, InstanceIndices = binding.InstanceIndices, Draw = (cmd, x, y) => cmd.DrawImage(x, y, image, imageOptions) });
+                Text = text, InstanceIndices = binding.InstanceIndices,
+                Draw = (cmd, x, y) => cmd.DrawImage(x, y, image, imageOptions,
+                    vectorCodeInfo: new PrintVectorCodeInfo(element.Format, bits, 1, bits.Width, bits.Height,
+                        0, 0, element.Gs1)) });
             return result;
         }
 
@@ -1280,7 +1463,7 @@ public sealed class TemplateRenderer
         /// <returns>包含全部子元素的组合布局块。</returns>
         private Block Group(BpGroupElement group, int width, Binding binding, string sourcePath)
         {
-            var definition = group.ComponentId == null ? null : template.Components.First(item => item.Id == group.ComponentId);
+            var definition = TemplateBindingTraversal.ComponentDefinition(template, group);
             var definitionPath = definition == null ? null : "Components[" + template.Components.IndexOf(definition) + "]";
             var componentInstancePath = definition == null ? null : sourcePath;
             var groupWidth = group.Width > 0 ? group.Width : definition?.Width > 0 ? definition.Width : width;
@@ -1290,24 +1473,7 @@ public sealed class TemplateRenderer
             {
                 try
                 {
-                    var parameters = new BudgetedDictionary<string, object>("Template.ComponentParameters", storage,
-                        StringComparer.Ordinal, (key, value) => checked(PrintStorageBudget.TextBytes(key) +
-                            (value is string text ? PrintStorageBudget.TextBytes(text) : 0)));
-                    if (definition?.Parameters != null) foreach (var parameter in definition.Parameters)
-                    {
-                        if (group.Parameters != null && group.Parameters.TryGetValue(parameter.Key, out var supplied))
-                            parameters.Add(parameter.Key, supplied.Path != null ? binding.Resolve(supplied.Path) : ParameterValue(supplied.Value));
-                        else if (parameter.Value.DefaultValue != null)
-                            parameters.Add(parameter.Key, ParameterValue(parameter.Value.DefaultValue));
-                        else if (parameter.Value.Required) throw new ArgumentException("缺少组件参数：" + parameter.Key);
-                    }
-                    if (group.Parameters != null) foreach (var parameter in group.Parameters)
-                        if (definition != null && (definition.Parameters == null || !definition.Parameters.ContainsKey(parameter.Key)))
-                            throw new ArgumentException("组件未声明参数：" + parameter.Key);
-                    if (definition == null && group.Parameters != null) foreach (var parameter in group.Parameters)
-                        parameters.Add(parameter.Key, parameter.Value.Path != null ? binding.Resolve(parameter.Value.Path) : ParameterValue(parameter.Value.Value));
-                    var item = group.DataPath == null ? binding.Item : binding.Resolve(group.DataPath);
-                    binding = binding.Component(item, parameters);
+                    binding = TemplateBindingTraversal.BindComponent(template, group, binding, storage);
                 }
                 catch (TemplateRenderException error)
                 {
@@ -1431,14 +1597,6 @@ public sealed class TemplateRenderer
                     frame.DefinitionPath = definitionPath + frame.SourcePath.Substring(childPath.Length);
             }
         }
-
-        /// <summary>
-        /// 将 JSON 参数值转换为绑定时使用的标量或结构。
-        /// </summary>
-        /// <param name="token">待转换的 JSON 值。</param>
-        /// <returns>转换后的标量值或 JSON 结构。</returns>
-        private static object ParameterValue(Newtonsoft.Json.Linq.JToken token)
-            => token is Newtonsoft.Json.Linq.JValue scalar ? scalar.Value : (object)token;
 
         /// <summary>
         /// 生成矩形或椭圆轮廓的布局块。
@@ -1580,8 +1738,9 @@ public sealed class TemplateRenderer
         /// <returns>由文字行组成的布局块。</returns>
         private Block Text(BpFontElement font, string text, int width, string sourcePath, Binding binding)
         {
-            var resolvedFont = TemplateFontResolver.Resolve(font, options.Protocol, options.EscPosLayout);
+            var resolvedFont = TemplateFontResolver.Resolve(font, options);
             var availableWidth = width;
+            var customProtocol = options.CustomProtocol != null;
             var quarterTurn = font.Rotation == RotationAngle.Rotate90 || font.Rotation == RotationAngle.Rotate270;
             var availableHeight = font.EndCoordinate == null ? pageHeight : checked(font.EndCoordinate.Y -
                 (font.StartCoordinate?.Y ?? 0) - (font.Margin?.Top ?? 0) - (font.Margin?.Bottom ?? 0));
@@ -1591,11 +1750,11 @@ public sealed class TemplateRenderer
             var size = font.FontSize == 0 ? 24 : font.FontSize;
             var bold = font.Bold || (font.FontStyle & 1) != 0;
             var underline = (font.FontStyle & 4) != 0;
-            var rasterizeTextStyles =
+            var rasterizeTextStyles = !customProtocol &&
                 (options.Protocol == PrintProtocol.Tspl && options.TsplMedia?.AllowRasterizedTextStyles == true ||
                  options.Protocol == PrintProtocol.Zpl && options.ZplMedia?.AllowRasterizedTextStyles == true) &&
                 (bold || underline || font.Reverse);
-            var fixedAscii = options.Protocol == PrintProtocol.Tspl &&
+            var fixedAscii = !customProtocol && options.Protocol == PrintProtocol.Tspl &&
                 !string.IsNullOrEmpty(resolvedFont.DeviceName) && resolvedFont.DeviceName != "0" &&
                 text.All(character => character >= 32 && character <= 126 ||
                     character == '\r' || character == '\n');
@@ -1608,48 +1767,50 @@ public sealed class TemplateRenderer
                 throw new TemplateRenderException(sourcePath,
                     $"协议 {options.Protocol} 的字体 {resolvedFont.DeviceName ?? "0"} 严格设备边界校验要求声明 DeviceFontCalibrations，或全局 DeviceHalfCellWidthAt24、DeviceFullCellWidthAt24 和 DeviceLineHeightAt24。",
                     new ArgumentException("请按目标设备字体实测字宽和行高设置模板选项。"));
-            if (!string.IsNullOrWhiteSpace(resolvedFont.HostFamily) &&
+            if (!customProtocol && !string.IsNullOrWhiteSpace(resolvedFont.HostFamily) &&
                 (options.Protocol != PrintProtocol.EscPos || options.EscPosLayout != EscPosLayoutMode.Raster))
                 throw new TemplateRenderException(sourcePath,
                     $"协议 {options.Protocol} 不支持模板系统字体族。", new NotSupportedException("请使用 ESC/POS Raster。"));
-            if (resolvedFont.DeviceName != null &&
+            if (!customProtocol && resolvedFont.DeviceName != null &&
                 options.Protocol != PrintProtocol.Tspl && options.Protocol != PrintProtocol.Zpl)
                 throw new TemplateRenderException(sourcePath,
                     $"协议 {options.Protocol} 不支持设备字体标识。",
                     new NotSupportedException("设备字体标识仅用于 TSPL/ZPL。"));
-            ProtocolTextMetrics metrics;
-            try
+            ITemplateTextMetrics CreateMetrics(int candidateSize)
             {
-                metrics = new ProtocolTextMetrics(options.Protocol, options.EscPosLayout, size,
-                    resolvedFont.CpclFontName, encoding, text, bold, options.DeviceHalfCellWidthAt24, resolvedFont.HostFamily,
-                    options.EscPosDevice?.NativeTabWidthDots, options.DeviceFullCellWidthAt24,
-                    (font.FontStyle & 4) != 0, options.MaxImagePixels, resolvedFont.DeviceName,
-                    options.DeviceLineHeightAt24, fontCalibration, options.EscPosDevice?.Profile?.Text,
-                    options.EscPosDevice?.RasterFonts, cancellation, rasterizeTextStyles, font.Reverse);
+                if (customProtocol)
+                    return options.CustomProtocol.CreateTextMetrics(new TemplateTextMeasurementRequest(text,
+                        candidateSize, bold, (font.FontStyle & 4) != 0, font.Reverse, font.Rotation,
+                        resolvedFont.HostFamily, resolvedFont.Selection));
+                return new ProtocolTextMetrics(options.Protocol, options.EscPosLayout, candidateSize,
+                    resolvedFont.CpclFontName, encoding, text, bold, options.DeviceHalfCellWidthAt24,
+                    resolvedFont.HostFamily, options.EscPosDevice?.NativeTabWidthDots,
+                    options.DeviceFullCellWidthAt24, (font.FontStyle & 4) != 0, options.MaxImagePixels,
+                    resolvedFont.DeviceName, options.DeviceLineHeightAt24, fontCalibration,
+                    options.EscPosDevice?.Profile?.Text, options.EscPosDevice?.RasterFonts, cancellation,
+                    rasterizeTextStyles, font.Reverse);
             }
+            ITemplateTextMetrics metrics;
+            try { metrics = CreateMetrics(size); }
             catch (NotSupportedException error)
             {
-                throw new TemplateRenderException(sourcePath, $"协议 {options.Protocol} 无法使用字体：{error.Message}", error);
+                throw new TemplateRenderException(sourcePath,
+                    $"协议 {(customProtocol ? options.ProtocolId : options.Protocol.ToString())} 无法使用字体：{error.Message}",
+                    error);
             }
             if ((font.FontStyle & ~5) != 0) throw new ArgumentException("模板文字只支持普通、粗体、下划线。");
             if (font.Field?.Fit == true)
             {
-                if (options.Protocol == PrintProtocol.Cpcl)
+                if (!customProtocol && options.Protocol == PrintProtocol.Cpcl)
                 {
                     foreach (var candidate in Enum.GetValues(typeof(FontSize)).Cast<int>().Where(n => n <= size && (resolvedFont.CpclFontName == 0 || (n % 24 == 0 ? 24 : 55) == resolvedFont.CpclFontName)).OrderByDescending(n => n))
                     {
-                        var candidateMetrics = new ProtocolTextMetrics(options.Protocol, options.EscPosLayout,
-                            candidate, resolvedFont.CpclFontName, encoding, text, bold, options.DeviceHalfCellWidthAt24,
-                            resolvedFont.HostFamily, options.EscPosDevice?.NativeTabWidthDots,
-                            options.DeviceFullCellWidthAt24, (font.FontStyle & 4) != 0,
-                            options.MaxImagePixels, resolvedFont.DeviceName, options.DeviceLineHeightAt24,
-                            fontCalibration, options.EscPosDevice?.Profile?.Text, options.EscPosDevice?.RasterFonts, cancellation,
-                            rasterizeTextStyles, font.Reverse);
+                        var candidateMetrics = CreateMetrics(candidate);
                         if (candidateMetrics.Measure(text) <= width && (!quarterTurn || candidateMetrics.LineHeight <= availableWidth) && text.IndexOfAny(new[] { '\r', '\n' }) < 0)
                         { size = candidate; metrics = candidateMetrics; break; }
                     }
                 }
-                else if (options.Protocol != PrintProtocol.EscPos || options.EscPosLayout != EscPosLayoutMode.Native)
+                else if (customProtocol || options.Protocol != PrintProtocol.EscPos || options.EscPosLayout != EscPosLayoutMode.Native)
                 {
                     if (text.IndexOfAny(new[] { '\r', '\n' }) < 0)
                     {
@@ -1658,13 +1819,7 @@ public sealed class TemplateRenderer
                         while (low <= high)
                         {
                             var candidate = low + (high - low) / 2;
-                            var candidateMetrics = new ProtocolTextMetrics(options.Protocol, options.EscPosLayout,
-                                candidate, resolvedFont.CpclFontName, encoding, text, bold, options.DeviceHalfCellWidthAt24,
-                                resolvedFont.HostFamily, options.EscPosDevice?.NativeTabWidthDots,
-                                options.DeviceFullCellWidthAt24, (font.FontStyle & 4) != 0,
-                                options.MaxImagePixels, resolvedFont.DeviceName, options.DeviceLineHeightAt24,
-                                fontCalibration, options.EscPosDevice?.Profile?.Text, options.EscPosDevice?.RasterFonts, cancellation,
-                                rasterizeTextStyles, font.Reverse);
+                            var candidateMetrics = CreateMetrics(candidate);
                             if (candidateMetrics.Measure(text) <= width && (!quarterTurn || candidateMetrics.LineHeight <= availableWidth))
                             { size = candidate; metrics = candidateMetrics; low = candidate + 1; }
                             else high = candidate - 1;
@@ -1690,7 +1845,7 @@ public sealed class TemplateRenderer
                 var lineWidth = checked((int)metrics.Measure(line));
                 var calibratedBounds = metrics.HasDeviceTextElementCalibrations
                     ? metrics.MeasureBounds(line)
-                    : new DeviceTextBounds(0, 0, lineWidth, metrics.LineHeight);
+                    : new TemplateTextBounds(0, 0, lineWidth, metrics.LineHeight);
                 var rasterInk = options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster
                     ? EscPosRasterCanvas.MeasureTextInkBounds(content, fontSize, bold,
                         (font.FontStyle & 4) != 0, fontFamily, options.MaxImagePixels, options.EscPosDevice?.RasterFonts, cancellation)
@@ -1742,7 +1897,7 @@ public sealed class TemplateRenderer
             return result;
         }
 
-        private Block RotatedText(BpFontElement font, ResolvedTemplateFont resolvedFont, IReadOnlyList<string> lines, ProtocolTextMetrics metrics,
+        private Block RotatedText(BpFontElement font, ResolvedTemplateFont resolvedFont, IReadOnlyList<string> lines, ITemplateTextMetrics metrics,
             int size, bool bold, int lineWidthLimit, int availableWidth, string sourcePath, Binding binding)
         {
             var lineHeights = new int[lines.Count];
@@ -1823,12 +1978,12 @@ public sealed class TemplateRenderer
         }
 
         private Block RotatedTextWithDeviceBounds(BpFontElement font, ResolvedTemplateFont resolvedFont,
-            IReadOnlyList<string> lines, ProtocolTextMetrics metrics, int size, bool bold,
+            IReadOnlyList<string> lines, ITemplateTextMetrics metrics, int size, bool bold,
             int lineWidthLimit, int availableWidth, string sourcePath, Binding binding)
         {
             using var widthsStorage = PrintResourceScope.Reserve(checked(lines.Count * 20L), "Template.TextWidths");
             var widths = new int[lines.Count];
-            var bounds = new DeviceTextBounds[lines.Count];
+            var bounds = new TemplateTextBounds[lines.Count];
             var lineOriginsY = new int[lines.Count];
             var leftOffsets = new int[lines.Count];
             var totalHeight = 0;
@@ -1934,7 +2089,7 @@ public sealed class TemplateRenderer
         /// <param name="width">单行可用打印点宽度。</param>
         /// <param name="wrap">是否允许按宽度换行。</param>
         /// <returns>保持 Unicode 字符边界的文字行。</returns>
-        private BudgetedList<string> Wrap(string value, ProtocolTextMetrics metrics, int width, bool wrap)
+        private BudgetedList<string> Wrap(string value, ITemplateTextMetrics metrics, int width, bool wrap)
         {
             if (metrics.NeedsFullMeasure) return WrapRaster(value, metrics, width, wrap);
             using var scratch = PrintResourceScope.Reserve(checked(value.Length * 8L + 128), "Template.WrapScratch");
@@ -1963,7 +2118,7 @@ public sealed class TemplateRenderer
             return result;
         }
 
-        private BudgetedList<string> WrapRaster(string value, ProtocolTextMetrics metrics, int width, bool wrap)
+        private BudgetedList<string> WrapRaster(string value, ITemplateTextMetrics metrics, int width, bool wrap)
         {
             using var scratch = PrintResourceScope.Reserve(checked(value.Length * 8L + 128), "Template.WrapScratch");
             var result = new BudgetedList<string>("Template.TextLines", owner: storage, retainedSize: PrintStorageBudget.TextBytes);
@@ -1992,7 +2147,7 @@ public sealed class TemplateRenderer
         }
 
         private void AppendRasterLines(string segment, IReadOnlyList<int> offsets,
-            ProtocolTextMetrics metrics, int width, bool wrap, BudgetedList<string> result)
+            ITemplateTextMetrics metrics, int width, bool wrap, BudgetedList<string> result)
         {
             var count = offsets.Count - 1;
             if (count == 0) { result.Add(string.Empty); return; }
