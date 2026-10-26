@@ -1,0 +1,66 @@
+{
+  "format": "Bing.EasyPrint.DesignerProject",
+  "version": 2,
+  "template": {
+    "Version": 2,
+    "Width": 400,
+    "Height": 400,
+    "Rows": [
+      {
+        "Height": 400,
+        "Cells": [
+          {
+            "Width": 400,
+            "Elements": [
+              {
+                "Type": 1,
+                "FontSize": 24,
+                "Field": { "Value": "DEMO" },
+                "StartCoordinate": { "X": 20, "Y": 20 }
+              },
+              {
+                "Type": 3,
+                "UnitWidth": 2,
+                "ErrorLevel": "M",
+                "Field": { "Value": "HELLO" },
+                "StartCoordinate": { "X": 20, "Y": 80 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "outputSettings": {
+    "outputTarget": "Cpcl",
+    "protocolId": "demo.protocol",
+    "protocolConfig": {
+      "characterWidth": 6,
+      "lineHeight": 24,
+      "maxPageHeight": 600,
+      "qrModuleWidth": 4,
+      "supportsFinishing": true
+    },
+    "protocolFinishing": {
+      "feedAmount": 2,
+      "feedUnit": "Lines",
+      "cut": true,
+      "placement": "JobEnd"
+    },
+    "allowRasterizedLines": false,
+    "imageThreshold": 128,
+    "deviceFontCalibrations": { "Tspl": {}, "Zpl": {} },
+    "requireDeclaredNativeBounds": false,
+    "validateGs1Associations": false,
+    "escPosDevice": {},
+    "tsplMedia": {},
+    "zplMedia": {}
+  },
+  "editorState": {
+    "unit": "pt",
+    "selectedPath": "Rows[0].Cells[0].Elements[0]",
+    "selectedPaths": [],
+    "templateName": "demo-protocol",
+    "sampleId": ""
+  }
+}

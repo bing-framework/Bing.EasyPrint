@@ -14,8 +14,9 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.PixelFormats;
 
-internal static class DesignerRequestProcessor
+internal static partial class DesignerRequestProcessor
 {
+    internal static DesignerProtocolRegistry ProtocolRegistry { get; set; } = DesignerProtocolRegistry.CreateDefault();
     internal const long MaxRequestBytes = 44L * 1024 * 1024;
     private const int MaxDataBytes = 1024 * 1024;
     private const int MaxResourceCount = 64;
@@ -30,7 +31,11 @@ internal static class DesignerRequestProcessor
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.ProtocolId != null && string.IsNullOrWhiteSpace(request.ProtocolId))
+                throw new DesignerOptionException("InvalidProtocolSelection", "protocolId 不能为空白。", "protocolId");
             var options = PrepareOptions(request, cancellationToken);
+            if (request.ProtocolId != null)
+                return CustomCapabilities(options, cancellationToken);
             var capabilities = TemplateProtocolCapabilities.Create(options);
             var nativeText = capabilities.NativeTextProfile;
             var rasterFonts = capabilities.RasterFonts;
@@ -138,46 +143,399 @@ internal static class DesignerRequestProcessor
         catch (Exception error) { return Error(error); }
     }
 
+    internal static IResult CustomCapabilities(TemplateRenderOptions options, CancellationToken cancellationToken)
+    {
+        var adapter = options.CustomProtocol ?? throw new DesignerOptionException(
+            "InvalidProtocolConfiguration", "新协议模板适配器不可用。", "protocolId");
+        var capabilities = adapter.Capabilities;
+        return new BudgetedJsonResult(new
+        {
+            contract = DesignerContract.Description,
+            protocolId = options.ProtocolId,
+            escPosLayoutMode = (string?)null,
+            nativeFlow = (string?)null,
+            labelProfile = (object?)null,
+            nativeText = (object?)null,
+            rasterFonts = (object?)null,
+            rasterBarcodeHumanReadableFontSize = (int?)null,
+            supportedNativeBarcodeHumanReadableTypes = (object?)null,
+            supportedNativeBarcodeHumanReadablePositions = (object?)null,
+            jobFeedUnits = Array.Empty<string>(),
+            cutModes = Array.Empty<string>(),
+            cutFeedUnits = Array.Empty<string>(),
+            cutFeedMotionUnits = (object?)null,
+            cutFeedDots = (object?)null,
+            tsplCutter = (object?)null,
+            zplCutter = (object?)null,
+            supportsIndependentOutputSegments = false,
+            dpi = capabilities.Dpi,
+            supportsCoordinates = capabilities.SupportsCoordinates,
+            supportsExplicitQuietZone = capabilities.SupportsExplicitQuietZone,
+            elementTypes = capabilities.ElementTypes,
+            supportsGs1Composite = capabilities.SupportsComposite,
+            fontKinds = capabilities.FontKinds,
+            deviceFonts = Array.Empty<string>(),
+            textSizes = capabilities.TextSizes,
+            textSize = new { minimum = 1, maximum = capabilities.MaxTextSize },
+            textRotations = capabilities.TextRotations.Select(value => (int)value),
+            barcodeTypes = capabilities.BarcodeTypes.Select(value => (int)value),
+            barcodeRotations = capabilities.BarcodeRotations.Select(value => (int)value),
+            qrCodeRotations = capabilities.QrCodeRotations.Select(value => (int)value),
+            imageRotations = capabilities.ImageRotations.Select(value => (int)value),
+            qrModuleSize = (object?)null,
+            barcodeModuleWidth = (object?)null,
+            barcodeHeight = (object?)null,
+            supportsExplicitBarcodeModuleWidth = capabilities.SupportsExplicitBarcodeModuleWidth,
+            supportsWideModuleWidth = capabilities.SupportsWideModuleWidth,
+            supportsBoldText = capabilities.SupportsBoldText,
+            supportsUnderlineText = capabilities.SupportsUnderlineText,
+            supportsReverseText = capabilities.SupportsReverseText,
+            supportsRotatedUnderlineText = false,
+            supportsHostFontFamily = capabilities.SupportsHostFontFamily,
+            supportsLegacyDeviceFont = capabilities.SupportsLegacyDeviceFont,
+            supportsBarcodeHumanReadable = capabilities.SupportsBarcodeHumanReadable,
+            supportsCut = false,
+            supportsExtraFeed = capabilities.SupportsExtraFeed,
+            supportsFinishing = capabilities.SupportsFinishing,
+            supportsFilledRectangles = capabilities.SupportsFilledRectangles,
+            rasterPreview = new
+            {
+                softwareBitmap = capabilities.SupportsSoftwareBitmap,
+                elementPng = capabilities.SupportsSoftwareBitmap,
+                elementTypes = capabilities.SoftwareBitmapElementTypes,
+                pagePng = false,
+                pagePngReason = capabilities.SupportsSoftwareBitmap
+                    ? "新协议仅提供当前页元素软件码图。"
+                    : capabilities.SoftwareBitmapReason ?? "新协议未声明软件位图能力。",
+                dpiX = capabilities.Dpi,
+                dpiY = capabilities.Dpi
+            },
+            gs1TwoDimensional = capabilities.SupportsGs1QrCode
+                ? new { qr = true, dataMatrix = false, native = false, associationValidation = true }
+                : null
+        }, WebJson);
+    }
+
+    private static RenderResultView View(TemplateRenderResult result)
+        => new()
+        {
+            ProtocolId = result.ProtocolId,
+            Protocol = result.Protocol,
+            Pages = result.Pages.Select(page => new RenderPageView
+            {
+                Width = page.Width,
+                Height = page.Height,
+                Output = page.Output,
+                Elements = page.Elements,
+                RenderElements = page.RenderElements,
+                RenderElementOwnership = page.RenderElementOwnership,
+                SourcePageIndex = page.SourcePageIndex,
+                CopyIndex = page.CopyIndex,
+                FeedAfterPrint = page.FeedAfterPrint,
+                CutAfterPrint = page.CutAfterPrint,
+            }).ToArray(),
+            FinishingFiles = result.CustomFinishingFiles,
+        };
+
+    private static RenderResultView View(TemplateCustomRenderResult result)
+        => new()
+        {
+            ProtocolId = result.ProtocolId,
+            Pages = result.Pages.Select(page => new RenderPageView
+            {
+                Width = page.Width,
+                Height = page.Height,
+                Output = page.Output,
+                Elements = page.Elements,
+                RenderElements = page.RenderElements,
+                RenderElementOwnership = page.RenderElementOwnership,
+                SourcePageIndex = page.SourcePageIndex,
+                CopyIndex = page.CopyIndex,
+                FeedAfterPrint = page.FeedAfterPrint,
+                CutAfterPrint = page.CutAfterPrint,
+            }).ToArray(),
+            FinishingFiles = result.FinishingFiles,
+        };
+
     internal static IResult Preview(DesignerRequest request, CancellationToken cancellationToken)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var input = Prepare(request, cancellationToken);
-            var result = new TemplateRenderer().RenderWithLayout(input.Template, input.Data, input.Resources,
-                input.Options, cancellationToken);
-            return new BudgetedJsonResult(new
-            {
-                pages = result.Pages.Select(page => new
-                {
-                    width = page.Width,
-                    height = page.Height,
-                    sourcePageIndex = page.SourcePageIndex,
-                    copyIndex = page.CopyIndex,
-                    feedAfterPrint = page.FeedAfterPrint,
-                    cutAfterPrint = page.CutAfterPrint,
-                    elements = page.Elements.Select(element => new
-                    {
-                        sourcePath = element.SourcePath,
-                        definitionPath = element.DefinitionPath,
-                        componentInstancePath = element.ComponentInstancePath,
-                        fragmentIndex = element.FragmentIndex,
-                        kind = element.Kind,
-                        type = element.Type,
-                        instanceIndices = element.InstanceIndices,
-                        x = element.X,
-                        y = element.Y,
-                        width = element.Width,
-                        height = element.Height,
-                        rotation = element.Rotation,
-                        text = element.Text,
-                        resourceKey = element.ResourceKey
-                    })
-                })
-            }, WebJson);
+            var renderer = new TemplateRenderer();
+            var view = input.Options.CustomProtocol != null
+                ? View(renderer.RenderCustomProtocolWithLayout(input.Template, input.Data, input.Resources,
+                    input.Options, cancellationToken))
+                : View(renderer.RenderWithLayout(input.Template, input.Data, input.Resources,
+                    input.Options, cancellationToken));
+            return new BudgetedJsonResult(new { protocolId = view.ProtocolId, pages = CreatePreviewPages(view) }, WebJson);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception error) { return Error(error); }
+    }
+
+    /// <summary>渲染一次模板并返回当前页布局清单、元素 PNG 与逐元素诊断 ZIP。</summary>
+    internal static IResult PreviewBundle(DesignerRequest request, CancellationToken cancellationToken)
+        => PreviewBundleCore(request, cancellationToken, null);
+
+    /// <summary>供测试注入渲染委托的预览包实现；生产入口传入 null 使用模板库默认渲染器。</summary>
+    internal static IResult PreviewBundleCore(DesignerRequest request, CancellationToken cancellationToken,
+        Func<Bing.EasyPrint.Model.BpTemplate, object?, ITemplateResourceProvider, TemplateRenderOptions,
+            TemplateRenderResult>? render, Func<int, Exception?>? elementEncodingFailure = null)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var input = Prepare(request, cancellationToken);
+            TemplateRenderResult? builtinResult = null;
+            TemplateCustomRenderResult? customResult = null;
+            RenderResultView view;
+            if (input.Options.CustomProtocol != null)
+            {
+                customResult = new TemplateRenderer().RenderCustomProtocolWithLayoutAndPrimitives(
+                    input.Template, input.Data, input.Resources, input.Options, cancellationToken);
+                view = View(customResult);
+            }
+            else
+            {
+                builtinResult = render is null
+                    ? RenderPreviewBundle(input.Template, input.Data, input.Resources, input.Options,
+                        cancellationToken)
+                    : render(input.Template, input.Data, input.Resources, input.Options) ??
+                      throw new InvalidOperationException("预览包渲染委托未返回结果。");
+                view = View(builtinResult);
+            }
+            try
+            {
+                return BuildPreviewBundle(request, input, view, cancellationToken, elementEncodingFailure);
+            }
+            finally
+            {
+                builtinResult?.ReleaseRenderElements();
+                customResult?.ReleaseRenderElements();
+            }
+        }        catch (OperationCanceledException) { throw; }
+        catch (Exception error) { return Error(error); }
+    }
+
+    /// <summary>执行一次带布局与 primitive 归属的模板渲染，供预览包和测试注入共用。</summary>
+    internal static TemplateRenderResult RenderPreviewBundle(Bing.EasyPrint.Model.BpTemplate template,
+        object? data, ITemplateResourceProvider resources, TemplateRenderOptions options,
+        CancellationToken cancellationToken)
+        => new TemplateRenderer().RenderWithLayoutAndPrimitives(template, data!, resources, options,
+            cancellationToken);
+
+    private static IResult BuildPreviewBundle(DesignerRequest request, PreparedRequest input,
+        RenderResultView result, CancellationToken cancellationToken,
+        Func<int, Exception?>? elementEncodingFailure)
+    {
+        var pageIndex = request.PageIndex ?? 0;
+        if (pageIndex < 0 || pageIndex >= result.Pages.Count)
+            throw new DesignerOptionException("InvalidPageIndex", "pageIndex 超出预览页范围。", "pageIndex");
+        var imageTypes = ParseBundleImageTypes(request.ImageTypes);
+        var metadataBytes = EstimatePreviewBundleMetadataBytes(result, imageTypes, cancellationToken);
+        var scratchBytes = EstimatePreviewBundleScratchBytes(result, cancellationToken);
+        using var metadataLease = PrintResourceScope.Reserve(
+            checked(metadataBytes + Math.Max(4096L, metadataBytes) + scratchBytes),
+            "Host.PreviewBundleMetadata");
+        var page = result.Pages[pageIndex];
+        var customCapabilities = input.Options.CustomProtocol?.Capabilities;
+        var capabilities = customCapabilities == null ? TemplateProtocolCapabilities.Create(input.Options) : null;
+        var dpiX = customCapabilities?.Dpi ?? RasterDpiX(input.Options, capabilities!);
+        var dpiY = customCapabilities?.Dpi ?? RasterDpiY(input.Options, capabilities!);
+        var humanReadableFontSize = input.Options.EscPosDevice?.RasterBarcodeHumanReadableFontSize ??
+            capabilities?.RasterBarcodeHumanReadableFontSize ?? 12;
+        var images = new List<object>();
+        var diagnostics = new List<object>();
+        using var archiveStream = new BudgetedHostStream("Host.PreviewBundleZipBuffer", cancellationToken);
+        using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, true))
+        {
+            var imageIndex = 0;
+            for (var elementIndex = 0; elementIndex < page.Elements.Count; elementIndex++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var layout = page.Elements[elementIndex];
+                if (imageTypes is not null && !imageTypes.Contains(layout.Type)) continue;
+                if (!ElementPngSupported(input.Options, layout.Type))
+                {
+                    diagnostics.Add(CreateBundleDiagnostic(pageIndex, elementIndex, layout,
+                        "UnsupportedCapability", $"元素类型 {layout.Type} 在当前协议下没有准确的元素码图；请查看布局示意。"));
+                    continue;
+                }
+                try
+                {
+                    var primitives = new List<PrintElement>();
+                    for (var index = 0; index < page.RenderElements.Count; index++)
+                    {
+                        if (index < page.RenderElementOwnership.Count &&
+                            ReferenceEquals(page.RenderElementOwnership[index], layout))
+                            primitives.Add(page.RenderElements[index]);
+                    }
+                    using var preview = PrintRasterPreview.RenderElements(primitives, layout.X, layout.Y,
+                        Math.Max(1, layout.Width), Math.Max(1, layout.Height),
+                        input.Options.EscPosDevice?.RasterFonts, humanReadableFontSize, cancellationToken);
+                    var injectedFailure = elementEncodingFailure?.Invoke(elementIndex);
+                    if (injectedFailure is not null) throw injectedFailure;
+                    var png = EncodePng(preview, dpiX, dpiY, cancellationToken);
+                    var file = $"images/{++imageIndex:0000}.png";
+                    var entry = archive.CreateEntry(file, CompressionLevel.Fastest);
+                    using (var target = entry.Open())
+                        WriteBytes(target, png, cancellationToken);
+                    images.Add(new
+                    {
+                        key = CreatePreviewElementKey(pageIndex, layout),
+                        file,
+                        pageIndex,
+                        elementIndex,
+                        type = layout.Type,
+                        sourcePath = layout.SourcePath,
+                        width = Math.Max(1, layout.Width),
+                        height = Math.Max(1, layout.Height)
+                    });
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error) when (DesignerError.Find<PrintResourceLimitException>(error) is null)
+                {
+                    // 单元素软件码图失败只记录诊断；有效布局和其他元素仍保留。
+                    var description = DesignerError.Describe(error);
+                    diagnostics.Add(CreateBundleDiagnostic(pageIndex, elementIndex, layout,
+                        description.Code, description.Message));
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            using var manifestBuffer = new BudgetedHostStream("Host.PreviewBundleManifestBuffer",
+                cancellationToken);
+            System.Text.Json.JsonSerializer.Serialize(manifestBuffer, new
+            {
+                contract = DesignerContract.Description,
+                protocolId = result.ProtocolId,
+                layout = new
+                {
+                    pageIndex,
+                    pageCount = result.Pages.Count,
+                    pages = CreatePreviewPages(result)
+                },
+                images,
+                diagnostics
+            }, WebJson);
+            var manifestBytes = manifestBuffer.ToArray("Host.PreviewBundleManifestOutput");
+            var manifest = archive.CreateEntry("manifest.json", CompressionLevel.Fastest);
+            using (var manifestStream = manifest.Open())
+                WriteBytes(manifestStream, manifestBytes, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return Results.File(archiveStream.ToArray("Host.PreviewBundleOutput"), "application/zip",
+            "easyprint-preview-bundle.zip");
+    }
+
+    private static object[] CreatePreviewPages(RenderResultView result)
+        => result.Pages.Select(page => (object)new
+        {
+            width = page.Width,
+            height = page.Height,
+            sourcePageIndex = page.SourcePageIndex,
+            copyIndex = page.CopyIndex,
+            feedAfterPrint = page.FeedAfterPrint,
+            cutAfterPrint = page.CutAfterPrint,
+            elements = page.Elements.Select(element => new
+            {
+                sourcePath = element.SourcePath,
+                definitionPath = element.DefinitionPath,
+                componentInstancePath = element.ComponentInstancePath,
+                fragmentIndex = element.FragmentIndex,
+                kind = element.Kind,
+                type = element.Type,
+                instanceIndices = element.InstanceIndices,
+                x = element.X,
+                y = element.Y,
+                width = element.Width,
+                height = element.Height,
+                rotation = element.Rotation,
+                text = element.Text,
+                displayText = element.Text,
+                resourceKey = element.ResourceKey
+            }).ToArray()
+        }).ToArray();
+
+    private static object CreateBundleDiagnostic(int pageIndex, int elementIndex, TemplateLayoutElement layout,
+        string code, string message) => new
+    {
+        pageIndex,
+        elementIndex,
+        type = layout.Type,
+        sourcePath = layout.SourcePath,
+        code,
+        phase = "PreviewImage",
+        message
+    };
+
+    private static string CreatePreviewElementKey(int pageIndex, TemplateLayoutElement element)
+        => $"{pageIndex}:{element.SourcePath}:{element.ComponentInstancePath ?? string.Empty}:" +
+           $"{string.Join(".", element.InstanceIndices ?? Array.Empty<int>())}:{element.FragmentIndex}:{element.Type}";
+
+    private static long EstimatePreviewBundleMetadataBytes(RenderResultView result, int[]? imageTypes,
+        CancellationToken cancellationToken)
+    {
+        var filter = imageTypes is null ? null : new HashSet<int>(imageTypes);
+        long total = 4096;
+        foreach (var page in result.Pages)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            total = checked(total + 256L);
+            foreach (var element in page.Elements)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                total = checked(total + 192L +
+                    MetadataTextBytes(element.SourcePath) +
+                    MetadataTextBytes(element.DefinitionPath) +
+                    MetadataTextBytes(element.ComponentInstancePath) +
+                    MetadataTextBytes(element.Kind) +
+                    MetadataTextBytes(element.Text) +
+                    MetadataTextBytes(element.ResourceKey) +
+                    (element.InstanceIndices?.Count ?? 0) * 4L);
+                if (filter is null || filter.Contains(element.Type))
+                    total = checked(total + 768L);
+            }
+        }
+        return total;
+    }
+
+    private static long EstimatePreviewBundleScratchBytes(RenderResultView result,
+        CancellationToken cancellationToken)
+    {
+        long total = 65536;
+        foreach (var page in result.Pages)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            total = checked(total + 1024L + page.Elements.Count * 1024L);
+        }
+        return total;
+    }
+
+    private static long MetadataTextBytes(string? value)
+        => 24L + (value?.Length ?? 0) * 2L;
+
+    private static int[]? ParseBundleImageTypes(int[]? values)
+    {
+        if (values is null) return null;
+        if (values.Length > 12)
+            throw new DesignerOptionException("InvalidImageTypes", "imageTypes 数量不能超过 12 个元素类型。",
+                "imageTypes");
+        var result = new int[values.Length];
+        for (var index = 0; index < values.Length; index++)
+        {
+            var value = values[index];
+            if (value is < 0 or > 11)
+                throw new DesignerOptionException("InvalidImageTypes", "imageTypes 只能包含 0 到 11 的元素类型。",
+                    "imageTypes");
+            if (Array.IndexOf(result, value, 0, index) >= 0)
+                throw new DesignerOptionException("InvalidImageTypes", "imageTypes 不能包含重复元素类型。",
+                    "imageTypes");
+            result[index] = value;
+        }
+        return result;
     }
 
     internal static IResult Render(DesignerRequest request, CancellationToken cancellationToken)
@@ -186,10 +544,19 @@ internal static class DesignerRequestProcessor
         {
             cancellationToken.ThrowIfCancellationRequested();
             var input = Prepare(request, cancellationToken);
-            var result = new TemplateRenderer().RenderWithLayout(input.Template, input.Data, input.Resources,
-                input.Options, cancellationToken);
-            var extension = GetProtocolFileExtension(result.Protocol);
-            var pages = result.Pages.Select((page, pageIndex) => new
+            var renderer = new TemplateRenderer();
+            RenderResultView view;
+            if (input.Options.CustomProtocol != null)
+                view = View(renderer.RenderCustomProtocolWithLayout(input.Template, input.Data,
+                    input.Resources, input.Options, cancellationToken));
+            else
+                view = View(renderer.RenderWithLayout(input.Template, input.Data, input.Resources,
+                    input.Options, cancellationToken));
+
+            var extension = view.ProtocolId == null
+                ? GetProtocolFileExtension(view.Protocol!.Value)
+                : GetCustomProtocolExtension(view.ProtocolId);
+            var pages = view.Pages.Select((page, pageIndex) => new
             {
                 Page = page,
                 PageIndex = pageIndex,
@@ -201,7 +568,17 @@ internal static class DesignerRequestProcessor
                     Kind = segment.Kind.ToString()
                 }).ToArray()
             }).ToArray();
-            var hasIndependentOutputSegments = pages.Any(page => page.Segments.Length > 1);
+            var controls = view.FinishingFiles.SelectMany((control, controlIndex) =>
+                control.Output.Segments.Select((segment, segmentIndex) => new
+                {
+                    Control = control,
+                    Segment = segment,
+                    File = control.Output.Segments.Count == 1
+                        ? $"finish-{controlIndex + 1:000}.{extension}"
+                        : $"finish-{controlIndex + 1:000}-{segmentIndex + 1:000}.{extension}",
+                })).ToArray();
+            var hasIndependentOutputSegments = pages.Any(page => page.Segments.Length > 1) || controls.Length > 0;
+            var hasManifest = input.Options.Job != null || hasIndependentOutputSegments || controls.Length > 0;
             using var archiveStream = new BudgetedHostStream("Host.ZipBuffer", cancellationToken);
             using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, true))
             {
@@ -216,57 +593,81 @@ internal static class DesignerRequestProcessor
                         WriteBytes(target, segment.Segment.Data, cancellationToken);
                     }
                 }
-                if (input.Options.Job != null || hasIndependentOutputSegments)
+                foreach (var control in controls)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var controlEntry = archive.CreateEntry(control.File, CompressionLevel.Fastest);
+                    using var target = controlEntry.Open();
+                    WriteBytes(target, control.Segment.Data, cancellationToken);
+                }
+                if (hasManifest)
                 {
                     var manifest = archive.CreateEntry("job.json", CompressionLevel.Fastest);
                     using var manifestStream = manifest.Open();
-                    object manifestModel;
-                    if (hasIndependentOutputSegments)
+                    var orderedFiles = new List<object>();
+                    for (var pageIndex = 0; pageIndex < pages.Length; pageIndex++)
                     {
-                        manifestModel = new
-                        {
-                            outputVersion = 2,
-                            preserveFileBoundaries = true,
-                            protocol = GetProtocolName(result.Protocol),
-                            files = pages.SelectMany(page => page.Segments.Select(segment => new
+                        var page = pages[pageIndex];
+                        foreach (var segment in page.Segments)
+                            orderedFiles.Add(new
                             {
                                 file = segment.File,
-                                pageIndex = page.PageIndex,
+                                pageIndex,
                                 segmentIndex = segment.SegmentIndex,
-                                kind = segment.Kind
-                            })),
-                            pages = pages.Select(page => new
-                            {
+                                kind = segment.Kind,
                                 sourcePageIndex = page.Page.SourcePageIndex,
                                 copyIndex = page.Page.CopyIndex,
-                                feedAfterPrint = page.Page.FeedAfterPrint,
-                                cutAfterPrint = page.Page.CutAfterPrint,
-                                segments = page.Segments.Select(segment => new
-                                {
-                                    file = segment.File,
-                                    kind = segment.Kind
-                                })
-                            })
-                        };
+                                placement = (string?)null,
+                            });
+                        foreach (var control in controls.Where(item => item.Control.PageIndex == pageIndex))
+                            orderedFiles.Add(new
+                            {
+                                file = control.File,
+                                pageIndex,
+                                segmentIndex = 0,
+                                kind = "Control",
+                                sourcePageIndex = page.Page.SourcePageIndex,
+                                copyIndex = page.Page.CopyIndex,
+                                placement = control.Control.Placement.ToString(),
+                            });
                     }
-                    else
-                    {
-                        manifestModel = new
+                    foreach (var control in controls.Where(item => item.Control.PageIndex == null))
+                        orderedFiles.Add(new
                         {
-                            protocol = GetProtocolName(result.Protocol),
-                            pages = pages.Select(page => new
+                            file = control.File,
+                            pageIndex = (int?)null,
+                            segmentIndex = 0,
+                            kind = "Control",
+                            sourcePageIndex = (int?)null,
+                            copyIndex = (int?)null,
+                            placement = control.Control.Placement.ToString(),
+                        });
+                    object manifestModel = new
+                    {
+                        outputVersion = hasIndependentOutputSegments ? 2 : (int?)null,
+                        protocol = view.ProtocolId ?? GetProtocolName(view.Protocol!.Value),
+                        preserveFileBoundaries = hasIndependentOutputSegments,
+                        files = orderedFiles,
+                        pages = pages.Select(page => new
+                        {
+                            file = page.Segments[0].File,
+                            sourcePageIndex = page.Page.SourcePageIndex,
+                            copyIndex = page.Page.CopyIndex,
+                            feedAfterPrint = page.Page.FeedAfterPrint,
+                            cutAfterPrint = page.Page.CutAfterPrint,
+                            segments = page.Segments.Select(segment => new
                             {
-                                file = page.Segments[0].File,
-                                sourcePageIndex = page.Page.SourcePageIndex,
-                                copyIndex = page.Page.CopyIndex,
-                                feedAfterPrint = page.Page.FeedAfterPrint,
-                                cutAfterPrint = page.Page.CutAfterPrint
+                                file = segment.File,
+                                kind = segment.Kind
                             })
-                        };
-                    }
-                    cancellationToken.ThrowIfCancellationRequested();
-                    System.Text.Json.JsonSerializer.Serialize(manifestStream, manifestModel, WebJson);
-                    cancellationToken.ThrowIfCancellationRequested();
+                        }),
+                        finishing = controls.Select(control => new
+                        {
+                            file = control.File,
+                            placement = control.Control.Placement.ToString(),
+                            pageIndex = control.Control.PageIndex
+                        })
+                    };                    System.Text.Json.JsonSerializer.Serialize(manifestStream, manifestModel, WebJson);
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();
@@ -275,21 +676,33 @@ internal static class DesignerRequestProcessor
         catch (OperationCanceledException) { throw; }
         catch (Exception error) { return Error(error); }
     }
-
     internal static IResult ElementPng(DesignerRequest request, CancellationToken cancellationToken)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var input = Prepare(request, cancellationToken);
-            var result = new TemplateRenderer().RenderWithLayoutAndPrimitives(input.Template, input.Data,
-                input.Resources, input.Options, cancellationToken);
+            TemplateRenderResult? builtinResult = null;
+            TemplateCustomRenderResult? customResult = null;
+            RenderResultView view;
+            if (input.Options.CustomProtocol != null)
+            {
+                customResult = new TemplateRenderer().RenderCustomProtocolWithLayoutAndPrimitives(
+                    input.Template, input.Data, input.Resources, input.Options, cancellationToken);
+                view = View(customResult);
+            }
+            else
+            {
+                builtinResult = new TemplateRenderer().RenderWithLayoutAndPrimitives(input.Template, input.Data,
+                    input.Resources, input.Options, cancellationToken);
+                view = View(builtinResult);
+            }
             try
             {
                 var pageIndex = request.PageIndex ?? 0;
-                if (pageIndex < 0 || pageIndex >= result.Pages.Count)
+                if (pageIndex < 0 || pageIndex >= view.Pages.Count)
                     throw new DesignerOptionException("InvalidPageIndex", "pageIndex 超出预览页范围。", "pageIndex");
-                var page = result.Pages[pageIndex];
+                var page = view.Pages[pageIndex];
                 var elementIndex = request.ElementIndex ?? -1;
                 if (elementIndex < 0 || elementIndex >= page.Elements.Count)
                     throw new DesignerOptionException("InvalidElementIndex", "elementIndex 超出当前页元素范围。",
@@ -299,10 +712,18 @@ internal static class DesignerRequestProcessor
                     !string.Equals(layout.SourcePath, request.SourcePath, StringComparison.Ordinal))
                     throw new DesignerOptionException("ElementSourcePathMismatch",
                         "sourcePath 与 elementIndex 指向的元素不一致。", "sourcePath");
-                var capabilities = TemplateProtocolCapabilities.Create(input.Options);
+                var capabilities = input.Options.CustomProtocol == null
+                    ? TemplateProtocolCapabilities.Create(input.Options) : null;
                 if (!ElementPngSupported(input.Options, layout.Type))
+                {
+                    if (input.Options.CustomProtocol != null)
+                        throw new PrintProtocolBackendException(input.Options.ProtocolId!,
+                            input.Options.CustomProtocol.Capabilities.SoftwareBitmapReason ??
+                            $"元素类型 {layout.Type} 在当前协议下没有准确的元素码图；请查看布局示意。",
+                            layout.SourcePath, null, elementIndex, true);
                     throw new NotSupportedException(
                         $"元素类型 {layout.Type} 在当前协议下没有准确的元素码图；请查看布局示意。");
+                }
                 var primitives = new List<PrintElement>();
                 for (var index = 0; index < page.RenderElements.Count; index++)
                 {
@@ -314,14 +735,16 @@ internal static class DesignerRequestProcessor
                     Math.Max(1, layout.Width), Math.Max(1, layout.Height),
                     input.Options.EscPosDevice?.RasterFonts,
                     input.Options.EscPosDevice?.RasterBarcodeHumanReadableFontSize ??
-                    capabilities.RasterBarcodeHumanReadableFontSize ?? 12, cancellationToken);
-                var png = EncodePng(preview, RasterDpiX(input.Options, capabilities),
-                    RasterDpiY(input.Options, capabilities), cancellationToken);
+                    capabilities?.RasterBarcodeHumanReadableFontSize ?? 12, cancellationToken);
+                var dpiX = input.Options.CustomProtocol?.Capabilities.Dpi ?? RasterDpiX(input.Options, capabilities!);
+                var dpiY = input.Options.CustomProtocol?.Capabilities.Dpi ?? RasterDpiY(input.Options, capabilities!);
+                var png = EncodePng(preview, dpiX, dpiY, cancellationToken);
                 return Results.File(png, "image/png", $"easyprint-element-{pageIndex + 1}-{elementIndex + 1}.png");
             }
             finally
             {
-                result.ReleaseRenderElements();
+                builtinResult?.ReleaseRenderElements();
+                customResult?.ReleaseRenderElements();
             }
         }
         catch (OperationCanceledException) { throw; }
@@ -334,6 +757,8 @@ internal static class DesignerRequestProcessor
         {
             cancellationToken.ThrowIfCancellationRequested();
             var input = Prepare(request, cancellationToken);
+            if (input.Options.CustomProtocol != null)
+                throw new NotSupportedException("新协议未声明完整页面 PNG；请使用元素码图。");
             if (input.Options.Protocol != PrintProtocol.EscPos ||
                 input.Options.EscPosLayout != EscPosLayoutMode.Raster)
                 throw new NotSupportedException(
@@ -394,6 +819,8 @@ internal static class DesignerRequestProcessor
 
     private static bool ElementPngSupported(TemplateRenderOptions options, int elementType)
     {
+        if (options.CustomProtocol != null)
+            return options.CustomProtocol.Capabilities.SupportsSoftwareBitmapElementType(elementType);
         if (elementType == 0) return true;
         if (elementType == 1 || elementType == 4)
             return options.Protocol == PrintProtocol.EscPos && options.EscPosLayout == EscPosLayoutMode.Raster;
@@ -523,17 +950,112 @@ internal static class DesignerRequestProcessor
             throw new DesignerTemplateException(error);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var data = JToken.Parse(dataJson).ToObject<object>();
+        var raw = BuildRawData(dataJson);
+        var legacy = ParseDataToken(dataJson, DateParseHandling.DateTime, FloatParseHandling.Double).ToObject<object>();
+        var data = new TemplateDataPair(legacy!, raw!);
         cancellationToken.ThrowIfCancellationRequested();
         var resources = DecodeResources(request.Resources, cancellationToken);
         return new PreparedRequest(template, data, new MemoryResources(resources), options);
     }
 
+    private static object? BuildRawData(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return ConvertRaw(document.RootElement);
+    }
+
+    private static object? ConvertRaw(JsonElement value)
+        => value.ValueKind switch
+        {
+            JsonValueKind.Object => RawObject(value),
+            JsonValueKind.Array => value.EnumerateArray().Select(ConvertRaw).ToList(),
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => new JsonRawNumber(value.GetRawText()),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null
+        };
+
+    private static Dictionary<string, object?> RawObject(JsonElement value)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject()) result[property.Name] = ConvertRaw(property.Value);
+        return result;
+    }
+
+    private static JToken ParseDataToken(string json, DateParseHandling dateParseHandling = DateParseHandling.None,
+        FloatParseHandling floatParseHandling = FloatParseHandling.Decimal)
+    {
+        using var reader = new JsonTextReader(new StringReader(json))
+        {
+            DateParseHandling = dateParseHandling,
+            FloatParseHandling = floatParseHandling
+        };
+        var token = JToken.Load(reader);
+        if (reader.Read()) throw new Newtonsoft.Json.JsonSerializationException("数据包含多个 JSON 值。");
+        return token;
+    }
     private static TemplateRenderOptions PrepareOptions(DesignerRequest request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null) throw new ArgumentNullException(nameof(request));
 
+        var protocolIdSpecified = request.ProtocolIdSpecified || request.ProtocolId != null;
+        var protocolSpecified = request.ProtocolSpecified || request.Protocol != null;
+        var protocolConfigSpecified = request.ProtocolConfigSpecified || request.ProtocolConfig.HasValue;
+        var finishingSpecified = request.FinishingSpecified || request.Finishing != null;
+        var feedSpecified = request.FeedLinesSpecified || request.FeedLines.HasValue;
+        var cutSpecified = request.CutAfterPrintSpecified || request.CutAfterPrint.HasValue;
+        if (protocolSpecified && request.Protocol == null)
+            throw new DesignerOptionException("InvalidProtocolSelection", "protocol 不能为 null。", "protocol");
+        if (protocolIdSpecified)
+        {
+            if (request.ProtocolIdIsNull || string.IsNullOrWhiteSpace(request.ProtocolId))
+                throw new DesignerOptionException("InvalidProtocolSelection", "protocolId 不能为 null 或空白。", "protocolId");
+            if (protocolSpecified)
+                throw new DesignerOptionException("ProtocolSelectionConflict",
+                    "protocol 和 protocolId 不能同时指定。", "protocolId");
+            if (protocolConfigSpecified && !request.ProtocolConfig.HasValue)
+                throw new DesignerOptionException("InvalidProtocolConfiguration", "protocolConfig 不能为 null。", "protocolConfig");
+            if (request.EscPosDevice != null || request.TsplMedia != null || request.ZplMedia != null ||
+                request.EscPosLayoutMode != null || request.Encoding != null ||
+                request.DeviceHalfCellWidthAt24.HasValue || request.DeviceFullCellWidthAt24.HasValue ||
+                request.DeviceLineHeightAt24.HasValue || request.DeviceFontCalibrations != null ||
+                request.RequireDeclaredNativeBounds || request.CutOptions != null || request.Job != null)
+                throw new DesignerOptionException("ProtocolSelectionConflict",
+                    "protocolId 不能与内置协议专用字段同时指定。", "protocolId");
+            if (finishingSpecified && request.Finishing == null)
+                throw new DesignerOptionException("InvalidProtocolConfiguration", "finishing 不能为 null。", "finishing");
+            if (finishingSpecified && (feedSpecified || cutSpecified))
+                throw new DesignerOptionException("ProtocolSelectionConflict",
+                    "finishing 不能与旧 feedLines/cutAfterPrint 同时指定。", "finishing");
+            var configurationJson = request.ProtocolConfig.HasValue
+                ? request.ProtocolConfig.Value.GetRawText() : string.Empty;
+            if (!ProtocolRegistry.TryGetAdapter(request.ProtocolId!, configurationJson,
+                    out var customAdapter, out var configurationError))
+                throw new DesignerOptionException("InvalidProtocolConfiguration",
+                    configurationError?.Message ?? "新协议配置或标识无效。", "protocolConfig");
+            var finishing = request.Finishing != null
+                ? ParseFinishing(request.Finishing)
+                : LegacyCustomFinishing(request);
+            return new TemplateRenderOptions
+            {
+                Copies = request.Copies ?? 1,
+                ImageThreshold = request.ImageThreshold ?? 128,
+                ValidateGs1Associations = request.ValidateGs1Associations,
+                ProtocolId = request.ProtocolId,
+                CustomProtocol = customAdapter,
+                CustomProtocolConfigurationJson = configurationJson,
+                ProtocolRegistry = ProtocolRegistry.CoreRegistry,
+                CustomFinishing = finishing
+            };
+        }
+        if (protocolConfigSpecified)
+            throw new DesignerOptionException("ProtocolSelectionConflict",
+                "protocolConfig 只能与 protocolId 同时指定。", "protocolConfig");
+        if (finishingSpecified)
+            throw new DesignerOptionException("ProtocolSelectionConflict",
+                "finishing 只能与 protocolId 同时指定。", "finishing");
         var protocol = ParseProtocol(request.Protocol);
         if (request.EscPosDevice != null && protocol != PrintProtocol.EscPos)
             throw new ArgumentException("escPosDevice 只能用于 ESC/POS 协议。", nameof(request.EscPosDevice));
@@ -957,6 +1479,33 @@ internal static class DesignerRequestProcessor
         CutOptions = request.CutOptions is null ? null : ParseCutOptions(request.CutOptions)
     };
 
+    private static PrintProtocolFinishingRequest ParseFinishing(DesignerProtocolFinishingRequest request)
+    {
+        var result = new PrintProtocolFinishingRequest
+        {
+            FeedAmount = request.FeedAmount ?? 0,
+            FeedUnit = ParseJobEnum(request.FeedUnit, PrintFeedUnit.Lines),
+            Cut = request.Cut ?? false,
+            Placement = ParseJobEnum(request.Placement, PrintProtocolFinishingPlacement.JobEnd),
+        };
+        result.Validate();
+        return result;
+    }
+
+    private static PrintProtocolFinishingRequest? LegacyCustomFinishing(DesignerRequest request)
+    {
+        if (!request.FeedLines.HasValue && !request.CutAfterPrint.HasValue) return null;
+        var result = new PrintProtocolFinishingRequest
+        {
+            FeedAmount = request.FeedLines ?? 0,
+            FeedUnit = PrintFeedUnit.Lines,
+            Cut = request.CutAfterPrint ?? false,
+            Placement = PrintProtocolFinishingPlacement.JobEnd,
+        };
+        result.Validate();
+        return result;
+    }
+
     private static PrintCutOptions ParseCutOptions(DesignerPrintCutRequest request) => new()
     {
         Mode = ParseJobEnum(request.Mode, PrintCutMode.Full),
@@ -1153,6 +1702,14 @@ internal static class DesignerRequestProcessor
             _ => throw new ArgumentOutOfRangeException(nameof(protocol), protocol, "不支持的打印协议。")
         };
 
+    private static string GetCustomProtocolExtension(string protocolId)
+    {
+        var builder = new StringBuilder(protocolId.Length);
+        foreach (var character in protocolId)
+            builder.Append(char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : '-');
+        return builder.Length == 0 ? "bin" : builder.ToString();
+    }
+
     private static string GetSegmentFileName(int pageIndex, int segmentIndex, string extension)
         => segmentIndex == 0
             ? $"page-{pageIndex + 1:000}.{extension}"
@@ -1292,6 +1849,37 @@ internal static class DesignerRequestProcessor
     }
 }
 
+internal sealed class RenderPageView
+{
+    public int Width { get; init; }
+    public int Height { get; init; }
+    public PrintPageOutput Output { get; init; } = null!;
+    public IReadOnlyList<PrintOutputSegment> Segments => Output.Segments;
+    public IReadOnlyList<TemplateLayoutElement> Elements { get; init; } = Array.Empty<TemplateLayoutElement>();
+    public IReadOnlyList<PrintElement> RenderElements { get; init; } = Array.Empty<PrintElement>();
+    public IReadOnlyList<TemplateLayoutElement> RenderElementOwnership { get; init; } = Array.Empty<TemplateLayoutElement>();
+    public int? SourcePageIndex { get; init; }
+    public int? CopyIndex { get; init; }
+    public bool? FeedAfterPrint { get; init; }
+    public bool? CutAfterPrint { get; init; }
+}
+
+internal sealed class RenderResultView
+{
+    public string? ProtocolId { get; init; }
+    public PrintProtocol? Protocol { get; init; }
+    public IReadOnlyList<RenderPageView> Pages { get; init; } = Array.Empty<RenderPageView>();
+    public IReadOnlyList<PrintProtocolControlOutput> FinishingFiles { get; init; } = Array.Empty<PrintProtocolControlOutput>();
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed class DesignerBatchRecord
+{
+    public int Index { get; set; }
+    public JsonElement Data { get; set; }
+    public int? Copies { get; set; }
+}
+
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 internal sealed class DesignerRequest
 {
@@ -1300,13 +1888,29 @@ internal sealed class DesignerRequest
     public long? MaxWorkingBytes { get; set; }
     public JsonElement Template { get; set; }
     public JsonElement Data { get; set; }
+    public DesignerBatchRecord[]? Records { get; set; }
+    public int? RecordOffset { get; set; }
+    public int? TotalRecords { get; set; }
+    public string? CopiesField { get; set; }
+    public int? RemainingPages { get; set; }
+    public long? RemainingBytes { get; set; }
     public Dictionary<string, string>? Resources { get; set; }
     public string? Protocol { get; set; }
+    public string? ProtocolId { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool ProtocolIdSpecified { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool ProtocolIdIsNull { get; set; }
+    public JsonElement? ProtocolConfig { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool ProtocolConfigSpecified { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool ProtocolSpecified { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool FeedLinesSpecified { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool CutAfterPrintSpecified { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] internal bool FinishingSpecified { get; set; }
     public string? EscPosLayoutMode { get; set; }
     public string? Encoding { get; set; }
     public int? Copies { get; set; }
     public int? FeedLines { get; set; }
     public bool? CutAfterPrint { get; set; }
+    public DesignerProtocolFinishingRequest? Finishing { get; set; }
     public DesignerPrintCutRequest? CutOptions { get; set; }
     public DesignerPrintJobRequest? Job { get; set; }
     public bool AllowRasterizedLines { get; set; }
@@ -1317,12 +1921,33 @@ internal sealed class DesignerRequest
     public Dictionary<string, DesignerDeviceFontCalibrationRequest>? DeviceFontCalibrations { get; set; }
     public bool RequireDeclaredNativeBounds { get; set; }
     public bool ValidateGs1Associations { get; set; }
+    public DesignerGs1ConversionRequest? Gs1Conversion { get; set; }
     public int? PageIndex { get; set; }
     public int? ElementIndex { get; set; }
+    public string[]? ExportFormats { get; set; }
+    public int[]? ImageTypes { get; set; }
     public string? SourcePath { get; set; }
     public DesignerEscPosDeviceRequest? EscPosDevice { get; set; }
     public DesignerTsplMediaRequest? TsplMedia { get; set; }
     public DesignerZplMediaRequest? ZplMedia { get; set; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed class DesignerGs1ConversionRequest
+{
+    public string? Input { get; set; }
+    public string? TargetFormat { get; set; }
+    public string? BaseUri { get; set; }
+    public string? Fragment { get; set; }
+    public bool ValidateAssociations { get; set; }
+    public DesignerGs1QueryParameter[]? QueryParameters { get; set; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed class DesignerGs1QueryParameter
+{
+    public string? Key { get; set; }
+    public string? Value { get; set; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -1344,6 +1969,15 @@ internal sealed class DesignerPrintCutRequest
     public bool? FeedToCutPosition { get; set; }
     public int? FeedBeforeCutAmount { get; set; }
     public string? FeedBeforeCutUnit { get; set; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed class DesignerProtocolFinishingRequest
+{
+    public int? FeedAmount { get; set; }
+    public string? FeedUnit { get; set; }
+    public bool? Cut { get; set; }
+    public string? Placement { get; set; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

@@ -15,17 +15,20 @@ internal sealed class BudgetedHostStream : Stream
     private readonly MemoryStream _inner;
     private readonly string _resourceName;
     private readonly CancellationToken _cancellationToken;
+    private readonly long? _maxLength;
     private IDisposable? _capacityReservation;
     private bool _disposed;
 
-    public BudgetedHostStream(string resourceName, CancellationToken cancellationToken)
+    public BudgetedHostStream(string resourceName, CancellationToken cancellationToken, long? maxLength = null)
     {
         if (string.IsNullOrWhiteSpace(resourceName))
             throw new ArgumentException("资源名称不能为空。", nameof(resourceName));
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (maxLength < 0) throw new ArgumentOutOfRangeException(nameof(maxLength));
         _resourceName = resourceName;
         _cancellationToken = cancellationToken;
+        _maxLength = maxLength;
         _inner = new MemoryStream();
     }
 
@@ -306,9 +309,11 @@ internal sealed class BudgetedHostStream : Stream
             throw new ArgumentOutOfRangeException(nameof(count));
     }
 
-    private static void ValidateLength(long value)
+    private void ValidateLength(long value)
     {
         if (value < 0 || value > int.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(value));
+        if (_maxLength is long maxLength && value > maxLength)
+            throw new PrintResourceLimitException(_resourceName, value, _inner.Length, maxLength);
     }
 }

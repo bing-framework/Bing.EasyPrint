@@ -96,6 +96,18 @@ internal static class DesignerRequestExecution
         cancellationToken.ThrowIfCancellationRequested();
         var model = JsonSerializer.Deserialize<DesignerRequest>(json, RequestJson)
             ?? throw new ArgumentException("请求必须为 JSON 对象。");
+        json.Position = 0;
+        using (var presence = JsonDocument.Parse(json))
+        {
+            var root = presence.RootElement;
+            model.ProtocolSpecified = root.TryGetProperty("protocol", out _);
+            model.ProtocolIdSpecified = root.TryGetProperty("protocolId", out var protocolId);
+            model.ProtocolIdIsNull = model.ProtocolIdSpecified && protocolId.ValueKind == JsonValueKind.Null;
+            model.ProtocolConfigSpecified = root.TryGetProperty("protocolConfig", out _);
+            model.FinishingSpecified = root.TryGetProperty("finishing", out _);
+            model.FeedLinesSpecified = root.TryGetProperty("feedLines", out _);
+            model.CutAfterPrintSpecified = root.TryGetProperty("cutAfterPrint", out _);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         model.EncodedRequestBytes = json.Length;
         return model;

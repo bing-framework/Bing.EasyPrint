@@ -54,6 +54,9 @@ internal sealed record DesignerError(string Code, string Phase, string? FieldPat
                 Newtonsoft.Json.JsonSerializationException serialization => serialization.Path,
                 _ => null
             }, 400, "模板 JSON 格式无效或包含不支持的字段。");
+        if (Find<PrintProtocolBackendException>(error) is PrintProtocolBackendException backendError)
+            return new(backendError.IsCapabilityFailure ? "UnsupportedCapability" : "InvalidProtocolConfiguration",
+                "Render", backendError.ElementPath, 400, backendError.Message);
         if (error is PrintCapabilityException || error is NotSupportedException)
             return new("UnsupportedCapability", "Render", null, 400, error.Message);
         if (error is ArgumentException argument)

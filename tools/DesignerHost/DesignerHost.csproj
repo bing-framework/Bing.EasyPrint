@@ -1,16 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
     <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);artifacts/**;output/**</DefaultItemExcludesInProjectFolder>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>DesignerHost.Tests</_Parameter1>
     </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PreviewBundleProbe</_Parameter1>
+    </AssemblyAttribute>
     <ProjectReference Include="../../src/Bing.EasyPrint.Templates/Bing.EasyPrint.Templates.csproj" />
+    <ProjectReference Include="../../samples/Protocols/DemoProtocol/DemoProtocol.csproj" />
     <Content Include="../../samples/Templates/label.json" Link="Samples/label.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../samples/Templates/receipt.json" Link="Samples/receipt.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../samples/Templates/price-label-pm0025.json" Link="Samples/price-label-pm0025.json" CopyToOutputDirectory="PreserveNewest" />
