@@ -2,6 +2,7 @@
 
 ## 执行状态
 
+- 2026-10-27 配套完善：批量案例能力协商与两处协议文档勘误已闭环，见[修复报告](../../docs/post-review-polish-2026-10-27.md)；下述阶段历史结果保留。
 - 授权日期：2026-10-25；以下为用户确认的实施范围。
 - 起点：`6c707be4092dada2dabe345a9eb92e1e907c1acb`，执行前工作区干净。
 - Goal Status：STOPPED_BLOCKED；本地实现10/10 CLOSED，OPEN_ACTIONABLE=0，停止自动修复。仅Windows/Linux外部CI尚待执行；见[最终本地验收](../../docs/optimization-expansion-final-review-2026-10-26.md)。历史首败保留。

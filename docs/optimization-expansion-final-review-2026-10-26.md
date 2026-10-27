@@ -2,6 +2,8 @@
 
 日期：2026-10-26。范围为 [十项实施计划](../ai_docs/plans/optimization-expansion-2026-10-25.md)。本报告同时记录第五阶段修正 2/3 的独立复核，不覆盖或重写此前失败记录。
 
+后续更新：2026-10-27 已完成批量案例能力协商和协议文档勘误，见[配套完善报告](post-review-polish-2026-10-27.md)。本页保留原验收日期与结果。
+
 ## 结论
 
 **本地实现 10/10 CLOSED，OPEN_ACTIONABLE=0，停止自动修复。** Windows/Linux GitHub Actions 尚无外部执行结果，保持 `BLOCKED_EXTERNAL`；依据 GOAL_RULES，整体状态为 `STOPPED_BLOCKED`，不是继续改代码的理由。实机验收按用户要求排除。
