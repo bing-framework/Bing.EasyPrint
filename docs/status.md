@@ -1,6 +1,6 @@
 # 待实现与待确认
 
-2026-10-25 O4 已建立新协议注册、模板适配、Host 目录和设计器 v2 接入，独立示例为 `demo.protocol`。它不是新增内置设备协议，也不改变 `PrintProtocol` 枚举；示例不提供像素级软件位图，未知协议和旧 Host 会保留配置并禁用对应输出。当前阶段报告见[第二阶段 O4 实施报告](optimization-expansion-phase2-2026-10-25.md)，接入步骤见[新打印协议扩展指南](protocol-extension-guide.md)。
+2026-10-25 O4 已建立新协议注册、模板适配、Host 目录和设计器 v2 接入，独立示例为 `demo.protocol`。它不是新增内置设备协议，也不改变 `PrintProtocol` 枚举；示例支持条码/QR 元素类型 `3/4` 的软件位图，不支持整页 PNG、图片或 GS1 QR，未知协议和旧 Host 会保留配置并禁用对应输出。当前阶段报告见[第二阶段 O4 实施报告](optimization-expansion-phase2-2026-10-25.md)，接入步骤见[新打印协议扩展指南](protocol-extension-guide.md)。
 
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
 

@@ -137,7 +137,7 @@ Host 使用 `TemplateCustomProtocolValidator` 校验元素类型、字号、旋�
 
 ## 示例协议
 
-`samples/Protocols/DemoProtocol` 使用 `demo.protocol`，支持元素类型 `1`（文字）、`5`（线段）、`7`（矩形），并支持可选收尾控制文件。示例配置：
+`samples/Protocols/DemoProtocol` 使用 `demo.protocol`，支持元素类型 `1`（文字）、`3`（QR）、`4`（一维码）、`5`（线段）、`7`（矩形）；类型 `3/4` 提供元素软件位图，并支持可选收尾控制文件。示例配置：
 
 ```json
 {
