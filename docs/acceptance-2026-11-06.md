@@ -4,7 +4,7 @@
 
 用户已确认：旧运行时只验收 Windows 上 `.NET 7.0.20`、`.NET 6.0.36`、`.NET Core 3.1.32` 的完整 Core 测试，零失败、零跳过，并以 testhost 诊断日志确认实际运行时。`net5.0`、`netcoreapp2.2` 不纳入本轮门禁；不删除这些可选测试目标，也不改变库的五 TFM 支持声明。
 
-Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/单元和完整 Chromium 由 `designer-cross-platform.yml` 执行。两平台必须匹配同一提交和源码范围哈希，并保留运行 URL、run ID/attempt、TRX、前端日志、Playwright JSON 和起止候选身份。当前工作树未提交，现有远端提交不能代表本轮候选；本地 Windows 测试也不能替代远端 Linux 结果。
+Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/单元和完整 Chromium 由 `designer-cross-platform.yml` 执行。两平台必须匹配同一提交和源码范围哈希，并保留运行 URL、run ID/attempt、TRX、前端日志、Playwright JSON 和起止候选身份。用户已授权将候选提交并推送到 `codex/acceptance-20261106`；本地 Windows 测试不能替代远端 Linux 结果。
 
 ## 已批准的性能契约
 
@@ -36,7 +36,7 @@ Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/�
 | Windows .NET 6.0.36 完整 Core | PASS，4714/4714，零失败/跳过 | 同上，确认实际 6.0.36 testhost |
 | Windows .NET Core 3.1.32 完整 Core | PASS，4714/4714，零失败/跳过 | 同上，确认实际 3.1.32 testhost |
 | 本机正式性能 | PASS，五负载全部通过 | `performance/formal-r1/acceptance.json` |
-| Windows/Linux 候选 CI | 已获提交/推送授权，待真实运行 | `codex/acceptance-20261106`，以同 SHA 的运行与归档结果判定 |
+| Windows/Linux 候选 CI | 真实 CI 已运行，修复 Linux 字体扫描失败后待重验 | `codex/acceptance-20261106`，以同 SHA 的运行与归档结果判定 |
 
 性能实测环境为 Windows 10.0.19045 x64、.NET 10.0.11、Release；基线/候选独立进程各 3 次预热、30 个正式样本，运行约 6.19/6.21 秒。下表的每次分配取原始样本中位数，吞吐量按操作采样耗时计算，不含显式 GC、预热或结果校验时间。
 
@@ -57,6 +57,10 @@ Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/�
 首轮 [Actions #42238007958](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42238007958) 对提交 `202d7bb46c2ffc948f9253249bc1c84ddb40524e` 的两平台结果均为失败。Linux 在身份采集阶段对隐藏 `.gitignore` 读取长度失败；改用 `FileInfo.Length`，Windows Hidden 文件端到端反例实现 RED/exit 1 → GREEN/exit 0。Windows 完整 Core 为 4713 通过/1 失败/0 跳过，固定字典哈希因 Git checkout 的 CRLF 转换失配；精确路径 `.gitattributes` 固定 LF 后，真实 `core.autocrlf=true` checkout 哈希恢复为固定值，现有嵌入资源哈希测试 1/1 通过。未改变字典内容、预期哈希或门槛。
 
 首轮日志及失败产物保留于 `remote-ci/`，隐藏文件和换行反例分别位于 `gate-fixtures/candidate-hidden-*.json`、`eol-regression/result.json`。这些修复仅影响采集工具与 checkout 字节，不改变本机正式性能测量的生产源码、固定字典字节或 harness；性能证据按未变相关范围复用。最终通过须以修复后同一候选的两平台真实结果判定，不能将首轮跳过的步骤记作通过。
+
+第二轮 [Actions #42239528357](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42239528357) 对提交 `6d0d16637f40585653d89ec636af5d4e2c54d3c9` 的 Linux 起止候选身份均通过，Core 为 4713 通过/1 失败。系统字体扫描遇到元数据可读、字形表不可读的字体时，抛出 `MissingFontTableException`，提前中断默认字体回退。新增用固定 TTF 移除 `loca` 表的反例，两用例先得到相同异常；修复仅让自动扫描跳过字体库的 `FontException`/`InvalidFontFileException`，显式字形检查保留错误，取消继续传播。受影响的 Raster/字体测试 838/838、零失败/跳过。RED、首次修复未覆盖独立异常继承链的失败及最终 GREEN 均保留于 `font-fallback/`。
+
+此次字体修复不调用性能契约中的五条路径：ASCII 文字及图片为 CPCL，日期模板为原生指令，预览和批量为不带人眼可读文字的条码。`AcceptanceProbe.cs`、相关输入及 harness 未变，按 `REUSED_UNCHANGED_RELEVANT_PATH` 复用 `formal-r1`，不宣称新程序集已经重新测量。后续真实 CI 将对修复候选执行现代及三旧运行时的完整功能门禁。
 
 ## 复验入口
 

@@ -29,13 +29,16 @@
 | C2 | 当前候选远端发布并执行 CI | OPEN_ACTIONABLE | 已获明确授权；提交并推送候选，核对两平台相同 SHA/scopeHash，下载真实运行产物 |
 | C3 | Linux 隐藏文件身份采集 | CLOSED | 首轮日志确认根因，FileInfo 长度读取；Windows Hidden 端到端 RED/exit 1 → GREEN/exit 0 |
 | C4 | Windows 固定字典 checkout 字节 | CLOSED | 精确 LF 属性；autocrlf=true 实际 checkout RED → GREEN，已有哈希测试 1/1 通过 |
+| C5 | Linux 自动系统字体扫描 | CLOSED | 损坏 loca 表反例 RED 两失败 → GREEN；Raster/字体 838/838，显式字体错误和取消保留 |
 
-Completed：C1/R1/P1/P2，详细结果见 `docs/acceptance-2026-11-06.md`。Open Actionable：C2 候选发布与 CI 取证。Blocked Approval：none。Blocked External：两平台候选 Actions 运行结果。Not Applicable：net5/netcore2.2 本轮执行、实机验收、包发布。Accepted Limitations：Host helper 进程内性能范围，不含 Kestrel/路由/准入或生产并发。Verified Boundaries：none。Deferred：未请求的产品功能。
+Completed：C1/R1/P1/P2/C3/C4/C5，详细结果见 `docs/acceptance-2026-11-06.md`。Open Actionable：C2 候选发布与 CI 取证。Blocked Approval：none。Blocked External：两平台候选 Actions 运行结果。Not Applicable：net5/netcore2.2 本轮执行、实机验收、包发布。Accepted Limitations：Host helper 进程内性能范围，不含 Kestrel/路由/准入或生产并发。Verified Boundaries：none。Deferred：未请求的产品功能。
 
-Round：3（首轮外部 CI 暴露两个新根因后做最小修复）；Implementation：6/6（原 4 项加 C3/C4）；Release Gates：旧运行时与性能 2/3，远端两平台 CI 1 项待完成。
+Round：4（第二轮真实 Linux CI 提供新的字体加载根因，符合新外部证据例外）；Implementation：7/7（原 4 项加 C3/C4/C5）；Release Gates：旧运行时与性能 2/3，远端两平台 CI 1 项待完成。
 
-Validation Run：L0 YAML/内嵌 PowerShell/工具解析与差异检查；L1 候选身份及性能门禁反例、探针 smoke；L2 三旧运行时完整 Core；L3/L4 外部 CI 待授权；L5 一次正式 before/after，五负载 PASS。Reused Evidence：上一轮现代 Core/Host/Vitest/E2E 的生产相关源码未变；固定 baseline build 复用，未重建基线测量。
+Validation Run：L0 差异检查；L1 损坏字体 RED 两失败、一取消通过；L2 Raster/字体 838/838；L3/L4 修复后相同候选两平台完整 CI；L5 复用正式五负载 PASS。Reused Evidence：baseline build/measurement 保持固定，正式性能五负载不调用自动系统字体选择，按未变相关路径复用；新候选功能以远端完整门禁为准。
 
 CI 修复影响分析：ChangedFiles 为 `.gitattributes` 与 `Write-CandidateEvidence.ps1` 及报告；ChangedProjects/PublicContracts/RuntimePaths/Providers/TFMs/BenchmarkHarness 均无；ChangedBuildPackaging 为固定资源 checkout 换行。RiskLevel LOW。L0 真 Git checkout 字节反例与 PowerShell 解析，L1 Hidden 端到端及现有字典哈希测试；L4 修复后同提交两平台完整 CI；L5 复用已测本机相同生产源码/字典字节/harness，不重复性能。
 
-No-Progress Check：CHANGED（首轮远端运行提供新根因与修复证据）；Next Action：发布最小修复并取得两平台 CI 证据；Goal Status：RUNNING。首轮 #42238007958 的失败不转写为 PASS，后续仅处理真实可执行问题。
+字体修复影响分析：ChangedFiles 为 `EscPosRasterCanvas.cs`、`EscPosRasterGlyphTests.cs` 及报告；ChangedProjects Core/Core.Tests；ChangedPublicContracts/TFMs/BuildPackaging/BenchmarkHarness 无；ChangedRuntimePaths 为 ESC/POS Raster 自动系统字体选择；ChangedProviders ESC/POS Raster；AffectedDependents 为字体/Provider 测试及最终候选 CI；RiskLevel MEDIUM。精确影响记录在 `font-fallback/impact.json`。字体库的两种异常基类相互独立，首次仅捕获 FontException 的失败保留，核对实际继承链后收敛到明确字体异常，不吞掉取消或其他系统错误。
+
+No-Progress Check：CHANGED（第二轮远端运行提供新的字体加载根因及真实 RED/GREEN）；Next Action：发布最小修复并取得两平台 CI 证据；Goal Status：RUNNING。前两轮失败和跳过不转写为 PASS，后续仅处理真实可执行问题。

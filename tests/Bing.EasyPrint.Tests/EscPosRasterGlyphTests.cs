@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Bing.EasyPrint.Printing;
 using Bing.EasyPrint.Protocols;
+using SixLabors.Fonts;
 using Xunit;
 
 namespace Bing.EasyPrint.Tests;
@@ -69,6 +72,50 @@ public sealed class EscPosRasterGlyphTests
     {
         Assert.Throws<NotSupportedException>(() =>
             EscPosRasterCanvas.ResolveFontFamilyName(char.ConvertFromUtf32(0x10FFFF)));
+    }
+
+    /// <summary>模拟系统目录中元数据可读、字形表缺失的字体，仍应继续查找或报告无覆盖。</summary>
+    [Theory]
+    [InlineData("A", true)]
+    [InlineData("\U0010FFFF", false)]
+    public void Default_font_selection_skips_unreadable_font_metrics(string text, bool expectedCoverage)
+    {
+        var bytes = FixedTestFonts.Regular();
+        var tableCount = bytes[4] * 256 + bytes[5];
+        var locaOffset = Enumerable.Range(0, tableCount)
+            .Select(index => 12 + index * 16)
+            .Single(offset => Encoding.ASCII.GetString(bytes, offset, 4) == "loca");
+        bytes[locaOffset + 3] = (byte)'x';
+        var path = Path.Combine(Path.GetTempPath(), "easyprint-missing-loca-" + Guid.NewGuid().ToString("N") + ".ttf");
+        File.WriteAllBytes(path, bytes);
+        try
+        {
+            var unreadable = new FontCollection().Add(path);
+            var readable = FixedTestFonts.LoadFamily(FixedTestFonts.Fallback());
+            // 显式字形检查仍暴露字体错误；只有自动查找允许跳过该候选。
+            Assert.Throws<MissingFontTableException>(() =>
+                EscPosRasterCanvas.HasGlyphCoverage(text, unreadable, false, out _));
+            var selected = EscPosRasterCanvas.FindFontFamily(text, false, new[] { unreadable, readable },
+                CancellationToken.None);
+            Assert.Equal(expectedCoverage ? readable : default(FontFamily), selected);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>自动字体查找不得吞掉调用方取消。</summary>
+    [Fact]
+    public void Default_font_selection_preserves_cancellation()
+    {
+        var family = FixedTestFonts.LoadFamily(FixedTestFonts.Regular());
+        using (var source = new CancellationTokenSource())
+        {
+            source.Cancel();
+            Assert.Throws<OperationCanceledException>(() =>
+                EscPosRasterCanvas.FindFontFamily("A", false, new[] { family }, source.Token));
+        }
     }
 
     [Fact]

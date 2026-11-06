@@ -4134,6 +4134,9 @@ public sealed partial class EscPosRasterCanvas
     }
 
     private static FontFamily FindFontFamily(string text, bool bold, CancellationToken cancellationToken)
+        => FindFontFamily(text, bold, GetSystemFontCandidates(text, cancellationToken), cancellationToken);
+
+    private static IEnumerable<FontFamily> GetSystemFontCandidates(string text, CancellationToken cancellationToken)
     {
         var containsNonAscii = false;
         foreach (var character in text)
@@ -4147,13 +4150,31 @@ public sealed partial class EscPosRasterCanvas
         foreach (var name in preferred)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (SystemFonts.TryGet(name, out var family) &&
-                HasGlyphCoverage(text, family, bold, out _, cancellationToken)) return family;
+            if (SystemFonts.TryGet(name, out var family)) yield return family;
         }
         foreach (var family in SystemFonts.Families)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (HasGlyphCoverage(text, family, bold, out _, cancellationToken)) return family;
+            yield return family;
+        }
+    }
+
+    /// <summary>按优先顺序选择完整覆盖文字的默认字体。</summary>
+    internal static FontFamily FindFontFamily(string text, bool bold, IEnumerable<FontFamily> candidates,
+        CancellationToken cancellationToken)
+    {
+        foreach (var family in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (HasGlyphCoverage(text, family, bold, out _, cancellationToken)) return family;
+            }
+            catch (Exception error) when (error is FontException || error is InvalidFontFileException)
+            {
+                // 系统目录可能含元数据可读、当前字体库却无法加载字形的字体；继续寻找可用候选。
+                cancellationToken.ThrowIfCancellationRequested();
+            }
         }
         return default(FontFamily);
     }
