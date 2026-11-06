@@ -1,5 +1,8 @@
 # Bing.EasyPrint 文档索引
 
+- [TDD 开发、功能测试映射与回归命令](tdd-guide.md)
+- [候选 CI、旧运行时与正式性能验收](acceptance-2026-11-06.md)
+
 - [新打印协议扩展指南](protocol-extension-guide.md)
 - [字段格式化](field-formatting.md)
 - [批量生成](batch-generation.md)

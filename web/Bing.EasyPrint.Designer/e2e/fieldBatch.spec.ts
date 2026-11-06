@@ -102,6 +102,35 @@ test('batch UI imports CSV, maps a field, renders a real Host ZIP and reports fa
   expect(Buffer.from(first).toString('latin1')).toContain('00123')
 })
 
+test('batch JSONL errors identify physical lines and corrected imports recover', async ({ page }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  await importTemplate(page)
+  await expect(page).toHaveTitle(/Bing.EasyPrint/)
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0)
+  await page.getByTestId('batch-toggle').click()
+  await page.getByTestId('batch-file-input').setInputFiles({
+    name: 'invalid.jsonl', mimeType: 'application/x-ndjson',
+    buffer: Buffer.from('{"Name":"first"}\r\n \r\nnot-json\r\n'),
+  })
+  await expect(page.getByTestId('batch-parse-error')).toContainText('JSONL 第 3 行')
+  await expect(page.getByRole('button', { name: '批量生成', exact: true })).toBeDisabled()
+  if (process.env.TDD_SCREENSHOT_PATH)
+    await page.screenshot({ path: process.env.TDD_SCREENSHOT_PATH })
+
+  const preview = page.waitForResponse((response) =>
+    response.url().includes('/api/designer/preview') && response.request().method() === 'POST')
+  await page.getByTestId('batch-file-input').setInputFiles({
+    name: 'corrected.jsonl', mimeType: 'application/x-ndjson',
+    buffer: Buffer.from('{"Name":"first"}\r\n \r\n{"Name":"second"}\r\n'),
+  })
+  await preview
+  await expect(page.getByTestId('batch-parse-error')).toHaveCount(0)
+  await expect(page.getByTestId('batch-records').locator('.batch-record')).toHaveCount(2)
+  await expect(page.getByRole('button', { name: '批量生成', exact: true })).toBeEnabled()
+  expect(runtimeErrors).toEqual([])
+})
+
 test('batch UI sends 26 records in two real chunks', async ({ page }) => {
   test.setTimeout(120_000)
   await importTemplate(page)

@@ -4,11 +4,25 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidate_commit:
+        description: Expected candidate commit (empty uses dispatched SHA)
+        required: false
+        type: string
+      candidate_scope_hash:
+        description: Expected normalized source hash
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
   CI: 'true'
+  EXPECTED_COMMIT: ${{ inputs.candidate_commit || github.sha }}
+  EXPECTED_SCOPE_HASH: ${{ inputs.candidate_scope_hash }}
 
 jobs:
   windows:
@@ -19,39 +33,53 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.402
-      - name: Verify system fonts
+      - name: Freeze Windows candidate identity
+        id: candidate
         shell: pwsh
-        run: ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/fonts
+        run: ./tools/Write-CandidateEvidence.ps1 -OutputPath artifacts/acceptance-20261106/ci-windows/candidate-start.json -ExpectedCommit $env:EXPECTED_COMMIT -ExpectedScopeHash $env:EXPECTED_SCOPE_HASH
+      - name: Verify system fonts
+        id: fonts
+        shell: pwsh
+        run: ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/acceptance-20261106/ci-windows/fonts
       - name: Prepare portable legacy runtimes
         shell: pwsh
         run: |
           $root = Join-Path $PWD 'artifacts/test-runtimes'
-          $runtimes = @{
-            '6.0.36' = 'https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-win-x64.zip'
-            '3.1.32' = 'https://builds.dotnet.microsoft.com/dotnet/Runtime/3.1.32/dotnet-runtime-3.1.32-win-x64.zip'
+          $receipts = @()
+          foreach ($version in @('7.0.20', '6.0.36', '3.1.32')) {
+            $channel = ($version.Split('.')[0..1] -join '.')
+            $metadataUrl = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/$channel/releases.json"
+            $metadata = Invoke-RestMethod -Uri $metadataUrl
+            $release = @($metadata.releases | Where-Object { $_.runtime.version -eq $version })[0]
+            $file = @($release.runtime.files | Where-Object { $_.rid -eq 'win-x64' -and $_.name.EndsWith('.zip') })[0]
+            if (!$file.url -or !$file.hash) { throw "No official runtime metadata for $version" }
+            $destination = Join-Path $root $version
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            $archive = Join-Path $root ($version + '.zip')
+            Invoke-WebRequest -Uri $file.url -OutFile $archive
+            $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash
+            if ($hash -ine $file.hash) { throw "Runtime SHA512 mismatch: $version" }
+            Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
+            $receipts += @{ version=$version; metadata=$metadataUrl; url=$file.url; sha512=$hash }
           }
-          foreach ($entry in $runtimes.GetEnumerator()) {
-            $destination = Join-Path $root $entry.Key
-            if (-not (Test-Path -LiteralPath (Join-Path $destination 'dotnet.exe'))) {
-              New-Item -ItemType Directory -Path $destination -Force | Out-Null
-              $archive = Join-Path $root ($entry.Key + '.zip')
-              Invoke-WebRequest -Uri $entry.Value -OutFile $archive
-              Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
-            }
-          }
+          $receipts | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath artifacts/acceptance-20261106/ci-windows/runtime-acquisition.json -Encoding utf8
       - name: Core net10.0 tests
+        id: core
         shell: pwsh
-        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/optimization-expansion-20261025/phase1/ci-windows/core
+        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 -m:1 -p:BuildInParallel=false -p:GenerateDocumentationFile=false --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/acceptance-20261106/ci-windows/core
       - name: Core legacy runtime tests
+        id: legacy
         shell: pwsh
-        run: ./tools/Verify-ProtocolRuntimes.ps1 -Frameworks net6.0,netcoreapp3.1 -RuntimeDirectory artifacts/test-runtimes -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/legacy-runtimes -PreferPortableRuntimes
+        run: ./tools/Verify-ProtocolRuntimes.ps1 -Frameworks net7.0,net6.0,netcoreapp3.1 -RuntimeDirectory artifacts/test-runtimes -ResultsDirectory artifacts/acceptance-20261106/ci-windows/legacy-runtimes -PreferPortableRuntimes
       - name: DesignerHost net10.0 tests
+        id: host
         shell: pwsh
-        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/host-bin -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-windows/host-tests
+        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/acceptance-20261106/ci-windows/host-bin -ResultsDirectory artifacts/acceptance-20261106/ci-windows/host-tests
       - name: Modern package consumption
+        id: consumer
         shell: pwsh
         run: |
-          $root = 'artifacts/optimization-expansion-20261025/phase1/ci-windows'
+          $root = 'artifacts/acceptance-20261106/ci-windows'
           $log = Join-Path $root 'modern-consumer.log'
           New-Item -ItemType Directory -Path $root -Force | Out-Null
           ./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0 -ResultsDirectory (Join-Path $root 'modern-consumer') 2>&1 | Tee-Object -FilePath $log
@@ -68,39 +96,48 @@ jobs:
         working-directory: web/Bing.EasyPrint.Designer
         run: npx playwright install chromium
       - name: Frontend build
+        id: build
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         run: |
-          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows/frontend-build.log'
+          $log = '../../artifacts/acceptance-20261106/ci-windows/frontend-build.log'
           New-Item -ItemType Directory -Path (Split-Path -Parent $log) -Force | Out-Null
           npm run build 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Frontend Vitest
+        id: vitest
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         run: |
-          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows/vitest.log'
+          $log = '../../artifacts/acceptance-20261106/ci-windows/vitest.log'
           npm run test 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Chromium E2E
+        id: browser
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         env:
-          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/optimization-expansion-20261025/phase1/ci-windows/playwright.json
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/acceptance-20261106/ci-windows/playwright.json
         run: |
-          $root = '../../artifacts/optimization-expansion-20261025/phase1/ci-windows'
+          $root = '../../artifacts/acceptance-20261106/ci-windows'
           $log = Join-Path $root 'playwright.log'
           New-Item -ItemType Directory -Path $root -Force | Out-Null
           npx playwright test --workers=1 --retries=0 --reporter=list,json 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Finalize Windows candidate evidence
+        if: always()
+        shell: pwsh
+        env:
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: ./tools/Complete-CiEvidence.ps1 -Platform windows -OutputDirectory artifacts/acceptance-20261106/ci-windows
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-evidence
+          name: windows-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            artifacts/optimization-expansion-20261025/phase1/ci-windows
+            artifacts/acceptance-20261106/ci-windows
             web/Bing.EasyPrint.Designer/test-results
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   linux:
     runs-on: ubuntu-22.04
@@ -110,22 +147,30 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.402
+      - name: Freeze Linux candidate identity
+        id: candidate
+        shell: pwsh
+        run: ./tools/Write-CandidateEvidence.ps1 -OutputPath artifacts/acceptance-20261106/ci-linux/candidate-start.json -ExpectedCommit $env:EXPECTED_COMMIT -ExpectedScopeHash $env:EXPECTED_SCOPE_HASH
       - name: Install and verify system fonts
+        id: fonts
         shell: pwsh
         run: |
           sudo apt-get update
           sudo apt-get install -y fontconfig fonts-dejavu-core fonts-noto-cjk
-          ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/fonts
+          ./tools/Verify-SystemFonts.ps1 -OutputDirectory artifacts/acceptance-20261106/ci-linux/fonts
       - name: Core net10.0 tests
+        id: core
         shell: pwsh
-        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/optimization-expansion-20261025/phase1/ci-linux/core
+        run: dotnet test tests/Bing.EasyPrint.Tests/Bing.EasyPrint.Tests.csproj -f net10.0 -m:1 -p:BuildInParallel=false -p:GenerateDocumentationFile=false --logger "trx;LogFileName=core-net10.trx" --results-directory artifacts/acceptance-20261106/ci-linux/core
       - name: DesignerHost net10.0 tests
+        id: host
         shell: pwsh
-        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/host-bin -ResultsDirectory artifacts/optimization-expansion-20261025/phase1/ci-linux/host-tests
+        run: ./tools/Verify-DesignerHost.ps1 -OutputDirectory artifacts/acceptance-20261106/ci-linux/host-bin -ResultsDirectory artifacts/acceptance-20261106/ci-linux/host-tests
       - name: Modern package consumption
+        id: consumer
         shell: pwsh
         run: |
-          $root = 'artifacts/optimization-expansion-20261025/phase1/ci-linux'
+          $root = 'artifacts/acceptance-20261106/ci-linux'
           $log = Join-Path $root 'modern-consumer.log'
           New-Item -ItemType Directory -Path $root -Force | Out-Null
           ./tools/Verify-ModernConsumption.ps1 -TargetFramework net10.0 -ResultsDirectory (Join-Path $root 'modern-consumer') 2>&1 | Tee-Object -FilePath $log
@@ -142,36 +187,45 @@ jobs:
         working-directory: web/Bing.EasyPrint.Designer
         run: npx playwright install --with-deps chromium
       - name: Frontend build
+        id: build
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         run: |
-          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux/frontend-build.log'
+          $log = '../../artifacts/acceptance-20261106/ci-linux/frontend-build.log'
           New-Item -ItemType Directory -Path (Split-Path -Parent $log) -Force | Out-Null
           npm run build 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Frontend Vitest
+        id: vitest
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         run: |
-          $log = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux/vitest.log'
+          $log = '../../artifacts/acceptance-20261106/ci-linux/vitest.log'
           npm run test 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Chromium E2E
+        id: browser
         shell: pwsh
         working-directory: web/Bing.EasyPrint.Designer
         env:
-          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/optimization-expansion-20261025/phase1/ci-linux/playwright.json
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ../../artifacts/acceptance-20261106/ci-linux/playwright.json
         run: |
-          $root = '../../artifacts/optimization-expansion-20261025/phase1/ci-linux'
+          $root = '../../artifacts/acceptance-20261106/ci-linux'
           $log = Join-Path $root 'playwright.log'
           New-Item -ItemType Directory -Path $root -Force | Out-Null
           npx playwright test --workers=1 --retries=0 --reporter=list,json 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Finalize Linux candidate evidence
+        if: always()
+        shell: pwsh
+        env:
+          CI_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: ./tools/Complete-CiEvidence.ps1 -Platform linux -OutputDirectory artifacts/acceptance-20261106/ci-linux
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-evidence
+          name: linux-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            artifacts/optimization-expansion-20261025/phase1/ci-linux
+            artifacts/acceptance-20261106/ci-linux
             web/Bing.EasyPrint.Designer/test-results
-          if-no-files-found: ignore
+          if-no-files-found: error

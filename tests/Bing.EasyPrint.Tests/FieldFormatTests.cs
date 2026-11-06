@@ -165,6 +165,63 @@ namespace Bing.EasyPrint.Tests
                 Text(Render(optionalOffset, new { Value = "2024-01-02T03:04:05+08:00" })));
         }
 
+        [Theory]
+        [InlineData("YYYY-MM-dd", "YYYY-02-01")]
+        [InlineData("yyyy-MM-ddd", "2024-01-Mon")]
+        [InlineData("yyyy-MM-dddd", "2024-01-Monday")]
+        public void Date_input_requires_numeric_year_and_day_instead_of_literals_or_weekdays(
+            string inputFormat, string value)
+        {
+            var template = Template("Value", new BgFieldFormat
+            {
+                Kind = BgFieldFormatKind.Date,
+                InputFormat = inputFormat,
+                Pattern = "yyyy-MM-dd",
+                Culture = "en-US"
+            });
+
+            var error = Assert.Throws<TemplateRenderException>(() => Render(template, new { Value = value }));
+
+            Assert.Equal("Value", error.FieldPath);
+            Assert.Equal("Rows[0].Cells[0].Elements[0]", error.SourcePath);
+        }
+
+        [Theory]
+        [InlineData("yyyyyyyyyyyyyyyy-MM-dd", "0000000000002024-01-02")]
+        [InlineData("yyyy-MM-dd zzz zzz zzz zzz", "2024-01-02 +08:00 +08:00 +08:00 +08:00")]
+        public void Date_output_length_preflight_accepts_valid_repeated_custom_tokens(string pattern, string expected)
+        {
+            var template = Template("Value", new BgFieldFormat
+            {
+                Kind = BgFieldFormatKind.Date,
+                Pattern = pattern,
+                Culture = "en-US"
+            });
+            template.Width = 1600;
+            template.Rows[0].Cells[0].Width = 1600;
+
+            Assert.Equal(expected, Text(Render(template, new { Value = "2024-01-02T03:04:05+08:00" })));
+        }
+
+        [Theory]
+        [InlineData("yyyy-MM-dd", "2024-01-02")]
+        [InlineData("yyyy-MM-dd ddd", "2024-01-02 Tue")]
+        [InlineData("yyyy-MM-dd 'YYYY ddd'", "2024-01-02 YYYY ddd")]
+        [InlineData("%y-%M-%d", "24-1-2")]
+        public void Date_input_with_complete_numeric_tokens_keeps_supported_literals_and_weekdays(
+            string inputFormat, string value)
+        {
+            var template = Template("Value", new BgFieldFormat
+            {
+                Kind = BgFieldFormatKind.Date,
+                InputFormat = inputFormat,
+                Pattern = "yyyy-MM-dd",
+                Culture = "en-US"
+            });
+
+            Assert.Equal("2024-01-02", Text(Render(template, new { Value = value })));
+        }
+
         [Fact]
         public void Short_formatted_result_fits_a_small_text_budget()
         {

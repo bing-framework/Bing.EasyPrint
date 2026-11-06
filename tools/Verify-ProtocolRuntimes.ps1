@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('net10.0', 'net7.0', 'net6.0', 'net5.0', 'netcoreapp3.1', 'netcoreapp2.2')]
-    [string[]] $Frameworks = @('net7.0', 'net6.0', 'net5.0', 'netcoreapp3.1', 'netcoreapp2.2'),
+    [string[]] $Frameworks = @('net7.0', 'net6.0', 'netcoreapp3.1'),
     [string] $RuntimeDirectory = 'artifacts/test-runtimes',
     [string] $ResultsDirectory = 'artifacts/protocol-runtime-verification',
     [switch] $PreferPortableRuntimes,
@@ -58,10 +58,11 @@ try {
         $trxPath = Join-Path $runPath ($framework + '.trx')
         $arguments = @('test', $project, '--framework', $framework, '--settings', $settingsPath,
             '--results-directory', $runPath, '--logger', ('trx;LogFileName=' + $framework + '.trx'),
-            '--diag', $diagnosticPath, '-m:1', '/p:BuildInParallel=false')
+            '--diag', $diagnosticPath, '-m:1', '/p:BuildInParallel=false', '/p:GenerateDocumentationFile=false')
         if ($NoBuild) { $arguments += '--no-build' }
         if ($NoRestore) { $arguments += '--no-restore' }
-        & $sdkHost @arguments
+        $consolePath = Join-Path $runPath ($framework + '.console.log')
+        & $sdkHost @arguments 2>&1 | Tee-Object -FilePath $consolePath
         $testExitCode = $LASTEXITCODE
 
         $total = 0
@@ -103,6 +104,7 @@ try {
             skipped = $notExecuted; host = $hostPath; runtimeLocation = $runtimeLocation
             runtimeVerified = $runtimeVerified; runtimeHostLog = $runtimeHostLog
             trx = $trxPath; settings = $settingsPath; diagnostic = $diagnosticPath
+            command = $sdkHost; arguments = $arguments; console = $consolePath
         })
         if (-not $pass) { $failed = $true }
     }
@@ -112,6 +114,7 @@ finally {
     $report = [pscustomobject]@{
         status = $(if (-not $failed -and $results.Count -eq $Frameworks.Count) { 'PASS' } else { 'FAIL' })
         timeoutMilliseconds = 180000; requestedFrameworks = $Frameworks; results = $results.ToArray()
+        baseCommit = (& git -C $repositoryRoot rev-parse HEAD)
     }
     $reportPath = Join-Path $runPath 'runtime-verification.json'
     [IO.File]::WriteAllText($reportPath, ($report | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))

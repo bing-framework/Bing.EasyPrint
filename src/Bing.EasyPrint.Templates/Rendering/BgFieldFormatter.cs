@@ -277,20 +277,24 @@ namespace Bing.EasyPrint.Templates
                 }
                 if (character == '%')
                 {
-                    if (++index < format.Length) RecordDateToken(result, format[index]);
+                    if (++index < format.Length) RecordDateToken(result, format[index], 1);
                     continue;
                 }
-                RecordDateToken(result, character);
+                var run = 1;
+                while (index + run < format.Length && format[index + run] == character) run++;
+                index += run - 1;
+                RecordDateToken(result, character, run);
             }
             return result;
         }
 
-        private static void RecordDateToken(DateTokenInfo result, char token)
+        private static void RecordDateToken(DateTokenInfo result, char token, int run)
         {
             result.Any = true;
-            if (token == 'y' || token == 'Y') result.Year = true;
+            // .NET 自定义日期格式区分大小写；ddd/dddd 是星期名称，不提供日号。
+            if (token == 'y') result.Year = true;
             else if (token == 'M') result.Month = true;
-            else if (token == 'd') result.Day = true;
+            else if (token == 'd' && run <= 2) result.Day = true;
             else if (token == 'z' || token == 'K') result.Offset = true;
         }
 
@@ -324,13 +328,13 @@ namespace Bing.EasyPrint.Templates
                 index += run - 1;
                 switch (character)
                 {
-                    case 'y': bound += Math.Max(2, Math.Min(4, run)); break;
+                    case 'y': bound += run <= 2 ? 2 : Math.Max(5, run); break;
                     case 'M': bound += run >= 4 ? month : Math.Min(4, run); break;
                     case 'd': bound += run >= 4 ? day : Math.Min(4, run); break;
                     case 'H': case 'h': case 'm': case 's': bound += Math.Min(2, run); break;
                     case 'f': case 'F': bound += run; break;
                     case 't': bound += designator; break;
-                    case 'z': bound += Math.Min(3, run); break;
+                    case 'z': bound += run >= 3 ? 6 : 3; break;
                     case 'K': bound += 6; break;
                     default: bound += run; break;
                 }

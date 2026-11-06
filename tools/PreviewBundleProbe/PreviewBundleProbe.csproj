@@ -6,9 +6,10 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <DesignerHostProject Condition="'$(DesignerHostProject)' == ''">../DesignerHost/DesignerHost.csproj</DesignerHostProject>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="../DesignerHost/DesignerHost.csproj" />
+    <ProjectReference Include="$(DesignerHostProject)" />
   </ItemGroup>
 </Project>

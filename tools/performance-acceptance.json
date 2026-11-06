@@ -1,0 +1,28 @@
+{
+  "contractId": "easyprint-windows-serial-v1",
+  "approvalStatus": "PROPOSED",
+  "baselineCommit": "0507b372dcd581ddb45e2c868b4403350318e0d5",
+  "environment": "Windows x64, same machine, .NET 10 Release, sequential isolated processes",
+  "scope": "In-process Core and actual Host request pipeline; excludes network, browser rendering and printer hardware",
+  "warmups": 3,
+  "samples": 30,
+  "iterationsPerSample": 1,
+  "requestedConcurrency": 1,
+  "maximumRunSeconds": 180,
+  "maximumPeakWorkingSetBytes": 536870912,
+  "maximumMedianRegressionRatio": 1.20,
+  "medianNoiseAllowanceMilliseconds": 1,
+  "maximumAllocationRegressionRatio": 1.10,
+  "allocationNoiseAllowanceBytes": 65536,
+  "workloads": [
+    { "id": "text-1000", "description": "CPCL 1000 ASCII text elements", "maximumMedianMilliseconds": 100, "maximumP95Milliseconds": 200, "maximumAllocatedBytesPerOperation": 16777216 },
+    { "id": "image-512x256", "description": "CPCL deterministic 512x256 RGBA PNG", "maximumMedianMilliseconds": 100, "maximumP95Milliseconds": 200, "maximumAllocatedBytesPerOperation": 16777216 },
+    { "id": "date-template-100", "description": "100 repeated CPCL rows with explicit en-US yyyy-MM-dd formatting", "maximumMedianMilliseconds": 100, "maximumP95Milliseconds": 200, "maximumAllocatedBytesPerOperation": 16777216 },
+    { "id": "preview-bundle", "description": "800x600 ESC/POS Raster page, exactly 8 Code128 + 2 QR, one bundle request", "maximumMedianMilliseconds": 100, "maximumP95Milliseconds": 250, "maximumAllocatedBytesPerOperation": 33554432 },
+    { "id": "batch-25-pdf-svg", "description": "25 distinct records, 400x120 page and one Code128 each, ESC/POS Raster + PDF + SVG", "maximumMedianMilliseconds": 2000, "maximumP95Milliseconds": 5000, "maximumAllocatedBytesPerOperation": 268435456 }
+  ],
+  "correctness": "Every operation is validated; deterministic Core output byte equality; bundle image count 10; batch completed=25, failed=0 and 25 PDF/25 SVG entries. Exceptions, skipped workloads or missing samples fail.",
+  "metrics": [ "raw operation latency milliseconds", "median", "nearest-rank p95", "operations per second from measured elapsed time", "GC total allocated bytes per operation", "Gen0/1/2 collection deltas", "process peak working set bytes", "output bytes" ],
+  "relativeGate": "Same harness SHA256, runtime, OS, architecture and processor count. Candidate median <= baseline*1.20 + 1ms; allocation <= baseline*1.10 + 64KiB. Also require every absolute gate. Do not compare different API paths as before/after.",
+  "approvalRule": "Requires explicit user approval of this exact contract SHA256 before formal acceptance; diagnostics alone do not grant PASS. Never tune thresholds after viewing measurements."
+}

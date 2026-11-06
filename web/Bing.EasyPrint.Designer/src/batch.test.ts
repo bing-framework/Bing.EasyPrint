@@ -44,11 +44,18 @@ describe('batch input parsing', () => {
 
   it('parses JSON arrays and JSONL while rejecting scalar or array records', () => {
     expect(parse('[{"Code":"001"}]', 'json').records).toEqual([{ index: 0, data: { Code: '001' } }])
-    expect(parse('{"A":1}\n\n{"A":2}\n', 'jsonl').records.map((record) => record.index)).toEqual([0, 1])
+    expect(parse('\r\n{"A":1}\r\n \r\n{"A":2}\n', 'jsonl').records.map((record) => record.index)).toEqual([0, 1])
     expect(() => parse('{}', 'json')).toThrow('对象数组')
     expect(() => parse('[1]', 'json')).toThrow('必须是对象')
     expect(() => parse('[[]]', 'json')).toThrow('必须是对象')
     expect(() => parse('{"A":1}\n2\n', 'jsonl')).toThrow('必须是对象')
+  })
+
+  it.each([
+    ['{"A":1}\n\nnot-json\n', 'JSONL 第 3 行的 JSON 无效'],
+    ['{"A":1}\r\n \r\n1\r\n', 'JSONL 第 3 行必须是对象'],
+  ])('reports physical JSONL lines after blank lines: %j', (input, expected) => {
+    expect(() => parse(input, 'jsonl')).toThrow(expected)
   })
 })
 

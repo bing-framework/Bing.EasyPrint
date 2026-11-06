@@ -8,6 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+if (args.Length > 0 && args[0] == "--acceptance")
+{
+    AcceptanceProbe.Run(args);
+    return;
+}
+
 var destination = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.Combine(AppContext.BaseDirectory, "results");
 var label = args.Length > 1 ? args[1] : "confirmation";
 Directory.CreateDirectory(destination);

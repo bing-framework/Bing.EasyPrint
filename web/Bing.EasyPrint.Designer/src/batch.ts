@@ -504,18 +504,17 @@ function parseJsonArray(text: string): BatchParseResult {
 
 function parseJsonLines(text: string): BatchParseResult {
   const records: BatchDataRecord[] = []
-  let index = 0
-  for (const line of text.split(/\r?\n/)) {
+  const lines = text.split(/\r?\n/)
+  for (const [lineIndex, line] of lines.entries()) {
     const trimmed = line.trim()
     if (!trimmed) continue
     let item: unknown
     try { item = parseJsonPreservingPrecision(trimmed) } catch (error) {
-      throw new Error(`JSONL 第 ${index + 1} 条记录无效：${error instanceof Error ? error.message : '解析失败'}`)
+      throw new Error(`JSONL 第 ${lineIndex + 1} 行的 JSON 无效：${error instanceof Error ? error.message : '解析失败'}`)
     }
     if (!item || typeof item !== 'object' || Array.isArray(item))
-      throw new Error(`JSONL 第 ${index + 1} 条记录必须是对象。`)
-    records.push({ index, data: item as Record<string, unknown> })
-    index++
+      throw new Error(`JSONL 第 ${lineIndex + 1} 行必须是对象。`)
+    records.push({ index: records.length, data: item as Record<string, unknown> })
   }
   if (!records.length) throw new Error('JSONL 没有有效记录。')
   return { format: 'jsonl', headers: [], rows: [], records, mapping: {} }

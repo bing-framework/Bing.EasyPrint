@@ -1,5 +1,9 @@
 # 开发与验证
 
+新增行为和修复按 [TDD 开发与回归测试](tdd-guide.md) 保存真实红绿证据；近期扩展功能的测试入口和本轮补测结果也由该指南索引。
+
+当前候选的 Windows/Linux CI 证据要求、用户确定的旧运行时范围及已批准的性能负载、指标、门槛与实测结果见 [候选验收记录](acceptance-2026-11-06.md)。正式性能入口为 `tools/Invoke-PerformanceAcceptance.ps1`，门禁复算入口为 `tools/Test-PerformanceAcceptance.ps1`。
+
 DataBar Truncated 与 Stacked Omnidirectional 已接入 Composite Auto/CC-A/CC-B；新增 `BarcodeType.Gs1DataBarStackedOmnidirectional=32` 支持普通 ESC/POS Raster。Truncated Composite 条高至少 13X；Stacked Omnidirectional 的条高为每条数据行高度、至少 33X，另有三个内部分隔行。完整输入、尺寸与旧 Host 协商见[使用说明](gs1-composite-databar-completion.md)。 本轮验证见[阶段报告](databar-completion-verification-2026-10-22.md)，旧报告保留其日期及原结果。
 
 EAN-8/EAN-13/UPC-A/UPC-E Composite 已接入四种图片协议、V2/V3 模板和设计器，支持 Auto/CC-A/CC-B 及严格 2/5 位附加码；主码校验规则不变。基础输入、尺寸和案例见[EAN/UPC Composite 使用说明](gs1-composite-ean-upc.md)，附加码约束与协商见[附加码使用说明](gs1-composite-ean-upc-addons.md)。既有基础报告与本轮附加码报告分别见[基础报告](ean-upc-composite-verification-2026-10-22.md)和[附加码报告](ean-upc-addons-verification-2026-10-22.md)。

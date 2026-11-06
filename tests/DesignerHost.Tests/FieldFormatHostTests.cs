@@ -155,6 +155,53 @@ public sealed class FieldFormatHostTests
         }
     }
 
+    [Theory]
+    [InlineData("YYYY-MM-dd", "YYYY-02-01")]
+    [InlineData("yyyy-MM-ddd", "2024-01-Mon")]
+    [InlineData("yyyy-MM-dddd", "2024-01-Monday")]
+    public async Task Preview_rejects_date_input_without_numeric_year_or_day_with_field_diagnostics(
+        string inputFormat, string value)
+    {
+        var format = JsonSerializer.Serialize(new
+        {
+            Kind = "Date", Pattern = "yyyy-MM-dd", InputFormat = inputFormat, Culture = "en-US"
+        });
+        var template = Template.Replace(
+            "{\"Kind\":\"Number\",\"Pattern\":\"N2\",\"Culture\":\"en-US\"}", format);
+        var context = CreateContext("{\"template\":" + template + ",\"data\":" +
+            JsonSerializer.Serialize(new { Amount = value }) + "}");
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        using var json = ReadJson(context);
+        var error = json.RootElement.GetProperty("errors")[0];
+        Assert.Equal("Amount", error.GetProperty("fieldPath").GetString());
+        Assert.Equal("Rows[0].Cells[0].Elements[0]", error.GetProperty("sourcePath").GetString());
+    }
+
+    [Theory]
+    [InlineData("yyyyyyyyyyyyyyyy-MM-dd", "0000000000002024-01-02")]
+    [InlineData("yyyy-MM-dd zzz zzz zzz zzz", "2024-01-02 +08:00 +08:00 +08:00 +08:00")]
+    public async Task Preview_returns_authoritative_date_text_for_repeated_custom_tokens(string pattern, string expected)
+    {
+        var format = JsonSerializer.Serialize(new { Kind = "Date", Pattern = pattern, Culture = "en-US" });
+        var template = Template.Replace(
+            "{\"Kind\":\"Number\",\"Pattern\":\"N2\",\"Culture\":\"en-US\"}", format)
+            .Replace("\"Width\":400", "\"Width\":1600");
+        var context = CreateContext("{\"template\":" + template +
+            ",\"data\":{\"Amount\":\"2024-01-02T03:04:05+08:00\"}}");
+
+        await DesignerRequestExecution.ExecuteAsync(context, DesignerRequestProcessor.Preview);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        using var json = ReadJson(context);
+        var element = json.RootElement.GetProperty("pages")[0].GetProperty("elements")
+            .EnumerateArray().First(item => item.GetProperty("type").GetInt32() == 1);
+        Assert.Equal(expected, element.GetProperty("text").GetString());
+        Assert.Equal(expected, element.GetProperty("displayText").GetString());
+    }
+
     private static DefaultHttpContext CreateContext(string json)
     {
         var services = new ServiceCollection().AddLogging().AddOptions().BuildServiceProvider();
