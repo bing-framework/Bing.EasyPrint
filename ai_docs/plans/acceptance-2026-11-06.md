@@ -11,11 +11,11 @@
 
 ## Change Impact Analysis
 
-- ChangedFiles：运行时验证脚本、候选证据脚本、两平台 workflow、性能探针/验收配置及说明。
-- ChangedProjects：仅工具/验证；生产库、Host、前端逻辑保持上一轮候选。
-- ChangedPublicContracts/Providers/TFMs：无。ChangedRuntimePaths：仅验证入口。
+- ChangedFiles：运行时/候选证据脚本、两平台 workflow、性能探针/契约、固定资源 LF 属性、Raster 字体回退、对应测试与说明。
+- ChangedProjects：Core/Core.Tests、验证工具、Designer E2E；Host/前端产品逻辑保持原 TDD 候选。
+- ChangedPublicContracts/TFMs：无。ChangedProviders：ESC/POS Raster。ChangedRuntimePaths：自动系统字体选择及验证入口。
 - ChangedBuildPackaging：CI 编排与证据身份；ChangedBenchmarkHarness：是，正式负载须两份候选使用相同 harness。
-- ChangedDocsOnly：否。AffectedDependents：CI/验收执行者。RiskLevel：MEDIUM。
+- ChangedDocsOnly：否，最终收口阶段仅文档。AffectedDependents：Core/Host/包消费/前端测试及 CI 执行者。RiskLevel：MEDIUM。
 - L0：PowerShell/YAML/契约解析、源码身份反例；L1：新探针 smoke、旧运行时真实执行；L2/L3：由两平台 CI 跑候选门禁。旧本地 Core/Host/前端回归按未变源码范围复用，不为工具编辑反复运行。L5：一次诊断与一次正式确认，阈值确认前不宣称正式验收。
 
 ## 工作项
@@ -23,20 +23,20 @@
 | ID | 工作项 | 当前状态 | 验收条件 |
 | --- | --- | --- | --- |
 | C1 | 候选身份和两平台归档工具 | CLOSED | 起止 SHA/scopeHash、必要步骤结果、按 SHA/attempt 归档；静态和反例检查完成 |
-| R1 | 三旧运行时完整 Core | CLOSED | 实际 7.0.20/6.0.36/3.1.32 各 4714/4714，零失败/跳过，保存命令/退出码/TRX/testhost |
+| R1 | 三旧运行时完整 Core | CLOSED | 最终 Windows CI 实际 7.0.20/6.0.36/3.1.32 各 4717/4717，零失败/跳过，保存命令/退出码/TRX/testhost |
 | P1 | 正式性能契约和采集 | CLOSED | 五负载、3 预热/30 样本、固定基线、源/程序集/环境身份、原始样本齐全 |
 | P2 | 性能门槛确认与正式执行 | CLOSED | 用户批准精确契约哈希；formal-r1 全部 PASS，峰值工作集 96.36 MiB |
-| C2 | 当前候选远端发布并执行 CI | OPEN_ACTIONABLE | 已获明确授权；提交并推送候选，核对两平台相同 SHA/scopeHash，下载真实运行产物 |
+| C2 | 当前候选远端发布并执行 CI | CLOSED | #42245718926 attempt1 整体/两平台 success，相同 SHA/scopeHash，下载归档及身份/实际计数核验 PASS |
 | C3 | Linux 隐藏文件身份采集 | CLOSED | 首轮日志确认根因，FileInfo 长度读取；Windows Hidden 端到端 RED/exit 1 → GREEN/exit 0 |
 | C4 | Windows 固定字典 checkout 字节 | CLOSED | 精确 LF 属性；autocrlf=true 实际 checkout RED → GREEN，已有哈希测试 1/1 通过 |
 | C5 | Linux 自动系统字体扫描 | CLOSED | 损坏 loca 表反例 RED 两失败 → GREEN；Raster/字体 838/838，显式字体错误和取消保留 |
 | C6 | 旧 Host 浏览器路由收尾 | CLOSED | 第三轮真实 Linux RED；spec 收尾等待在途 handler，定向五用例 5/5，零重试 |
 
-Completed：C1/R1/P1/P2/C3/C4/C5/C6，详细结果见 `docs/acceptance-2026-11-06.md`。Open Actionable：C2 候选发布与 CI 取证。Blocked Approval：none。Blocked External：两平台候选 Actions 运行结果。Not Applicable：net5/netcore2.2 本轮执行、实机验收、包发布。Accepted Limitations：Host helper 进程内性能范围，不含 Kestrel/路由/准入或生产并发。Verified Boundaries：none。Deferred：未请求的产品功能。
+Completed：C1/C2/R1/P1/P2/C3/C4/C5/C6，详细结果见 `docs/acceptance-2026-11-06.md`。Open Actionable：none。Blocked Approval：none。Blocked External：none。Not Applicable：net5/netcore2.2 本轮执行、实机验收、包发布。Accepted Limitations：Host helper 进程内性能范围，不含 Kestrel/路由/准入、Linux 性能或生产并发。Verified Boundaries：none。Deferred：未请求的产品功能。
 
-Round：5（第三轮真实 Linux CI 提供新的浏览器路由 teardown 根因）；Implementation：8/8（原 4 项加 C3—C6）；Release Gates：旧运行时与性能 2/3，远端两平台 CI 1 项待完成。
+Round：5 收口（四次真实 CI；后续修复均来自新的外部失败根因）；Implementation：8/8（原 4 项加 C3—C6）；Release Gates：3/3，候选两平台 CI、三旧运行时和正式性能全部完成。
 
-Validation Run：L0 差异/API 类型检查；L1/L2 字体 838/838 已完成；L3 CC-C 全文件五流程 5/5、零重试；L4 修复后相同候选两平台完整 CI；L5 复用正式五负载 PASS。Reused Evidence：baseline build/measurement 保持固定，正式性能五负载不调用自动系统字体选择，按未变相关路径复用；E2E 收尾修复不改变产品源码或 harness，新候选功能以远端完整门禁为准。
+Validation Run：L0 差异/API 类型及下载归档摘要检查；L1/L2 字体 838/838；L3 CC-C 五流程 5/5、零重试；L4 最终两平台 Core 各 4717/4717、Host 各 373/373、Vitest 各 478/478、完整 Chromium 各 231/231，三旧运行时各 4717/4717，必要门禁全部通过；L5 正式五负载 PASS。Reused Evidence：baseline build/measurement 保持固定；`ci-r3-performance-promotion.json` 与 `ci-r4-promotion.json` 逐步绑定正式性能的相关路径不变。文档收口只做差异、链接和源码身份检查，复用已通过代码候选。
 
 CI 修复影响分析：ChangedFiles 为 `.gitattributes` 与 `Write-CandidateEvidence.ps1` 及报告；ChangedProjects/PublicContracts/RuntimePaths/Providers/TFMs/BenchmarkHarness 均无；ChangedBuildPackaging 为固定资源 checkout 换行。RiskLevel LOW。L0 真 Git checkout 字节反例与 PowerShell 解析，L1 Hidden 端到端及现有字典哈希测试；L4 修复后同提交两平台完整 CI；L5 复用已测本机相同生产源码/字典字节/harness，不重复性能。
 
@@ -44,4 +44,6 @@ CI 修复影响分析：ChangedFiles 为 `.gitattributes` 与 `Write-CandidateEv
 
 浏览器修复影响分析：ChangedFiles 仅 `e2e/ccC.spec.ts` 和报告；ChangedProjects 为 Designer E2E；PublicContracts/Providers/TFMs/BuildPackaging/BenchmarkHarness 无变化；RuntimePaths 仅测试路由收尾；AffectedDependents 为 CC-C 新旧 Host 流程；RiskLevel LOW。Browser plugin not available，按技能使用仓库 Playwright，URL `http://127.0.0.1:5173`、1440×900、worker 1、retries 0；真实 Linux RED 与本地 GREEN 均保留，不宣称本地复现了该竞态。无产品界面修改。
 
-No-Progress Check：CHANGED（第三轮远端运行提供新的路由生命周期根因及本地定向验证）；Next Action：发布测试收尾修复并取得两平台 CI 证据；Goal Status：RUNNING。前轮失败和跳过不转写为 PASS，后续仅处理真实可执行问题。
+最终代码候选：`f59d2cc21e13a1e23159ae54d7f18a022e7b7fa3`；源码 SHA-256：`d0801e7ec992799012c7484bbfa3f4ea95c4f3260bb10aa422b18ca725f42fda`；[Actions #42245718926](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42245718926)，attempt 1。Windows/Linux 起止身份、必要步骤、实际 TRX/前端计数及旧运行时均由 `remote-ci/verification-r4.json` 核验；最终显式清单为 `artifacts/acceptance-20261106/final-evidence-manifest.json`。最初两份 XML 的哈希保持不变，未进入提交；artifacts 留在本地。
+
+No-Progress Check：CHANGED（最终同候选两平台 success，完整归档闭环）；Next Action：STOP；Goal Status：COMPLETED。无 Open Actionable，不再开启 Fix 或重复性能/全量测试。收口文档提交通过相同源码哈希复用已测代码候选，并以 `[skip ci]` 跳过仅文档的重复 CI。
