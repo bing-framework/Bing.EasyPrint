@@ -3,6 +3,10 @@ import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
 import { readPreviewLayout } from './previewResponse'
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' })
+})
+
 test('GS1-128 CC-C 真实 Host 编辑、输出和项目往返', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.capability-note')).toHaveClass(/ready/)

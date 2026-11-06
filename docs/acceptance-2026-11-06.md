@@ -36,7 +36,7 @@ Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/�
 | Windows .NET 6.0.36 完整 Core | PASS，4714/4714，零失败/跳过 | 同上，确认实际 6.0.36 testhost |
 | Windows .NET Core 3.1.32 完整 Core | PASS，4714/4714，零失败/跳过 | 同上，确认实际 3.1.32 testhost |
 | 本机正式性能 | PASS，五负载全部通过 | `performance/formal-r1/acceptance.json` |
-| Windows/Linux 候选 CI | 真实 CI 已运行，修复 Linux 字体扫描失败后待重验 | `codex/acceptance-20261106`，以同 SHA 的运行与归档结果判定 |
+| Windows/Linux 候选 CI | Windows 已全过；Linux 旧 Host 浏览器用例路由收尾修复后待同候选重验 | `codex/acceptance-20261106`，以同 SHA 的运行与归档结果判定 |
 
 性能实测环境为 Windows 10.0.19045 x64、.NET 10.0.11、Release；基线/候选独立进程各 3 次预热、30 个正式样本，运行约 6.19/6.21 秒。下表的每次分配取原始样本中位数，吞吐量按操作采样耗时计算，不含显式 GC、预热或结果校验时间。
 
@@ -61,6 +61,8 @@ Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/�
 第二轮 [Actions #42239528357](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42239528357) 对提交 `6d0d16637f40585653d89ec636af5d4e2c54d3c9` 的 Linux 起止候选身份均通过，Core 为 4713 通过/1 失败。系统字体扫描遇到元数据可读、字形表不可读的字体时，抛出 `MissingFontTableException`，提前中断默认字体回退。新增用固定 TTF 移除 `loca` 表的反例，两用例先得到相同异常；修复仅让自动扫描跳过字体库的 `FontException`/`InvalidFontFileException`，显式字形检查保留错误，取消继续传播。受影响的 Raster/字体测试 838/838、零失败/跳过。RED、首次修复未覆盖独立异常继承链的失败及最终 GREEN 均保留于 `font-fallback/`。
 
 此次字体修复不调用性能契约中的五条路径：ASCII 文字及图片为 CPCL，日期模板为原生指令，预览和批量为不带人眼可读文字的条码。`AcceptanceProbe.cs`、相关输入及 harness 未变，按 `REUSED_UNCHANGED_RELEVANT_PATH` 复用 `formal-r1`，不宣称新程序集已经重新测量。后续真实 CI 将对修复候选执行现代及三旧运行时的完整功能门禁。
+
+第三轮 [Actions #42241931887](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42241931887) 对 `d1b7ca25e85690576b276662fa6e65fe8a95d058` 的 Windows 全部门禁通过，Linux Core、Host、包消费、构建、Vitest 通过，完整 Chromium 为 230 通过/1 失败/0 跳过。失败为旧 Host CC-C 用例完成业务断言后，未结束的异步路由遇到已释放响应；在该 spec 增加 `afterEach` 等待 `page.unrouteAll({ behavior: 'wait' })`，保留原断言、超时和零重试设置。本机同文件五个真实/旧 Host 浏览器流程 5/5 通过，证据在 `browser-route/`；最终 Linux 结论仍以修复后完整 CI 为准。
 
 ## 复验入口
 
