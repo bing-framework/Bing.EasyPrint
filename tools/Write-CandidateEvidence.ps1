@@ -146,7 +146,7 @@ function Get-FileIdentity([string] $RelativePath, $IndexEntry) {
             gitBlob = if ($IndexEntry) { $IndexEntry.blob } else { $null }
             stage = if ($IndexEntry) { $IndexEntry.stage } else { $null }
             fileSha256 = $fileHash
-            sizeBytes = (Get-Item -LiteralPath $fullPath).Length
+            sizeBytes = [IO.FileInfo]::new($fullPath).Length
             normalizedLineEndings = $content.normalizedLineEndings
             missingFromWorktree = $false
         }

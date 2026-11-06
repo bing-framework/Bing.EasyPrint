@@ -1,0 +1,2 @@
+# Keep the pinned embedded GS1 dictionary byte-identical on every platform.
+src/Bing.EasyPrint/Protocols/Data/gs1-syntax-dictionary-d1702ffb2fa5060f8460f7d581b01e377deaa1d6.txt text eol=lf

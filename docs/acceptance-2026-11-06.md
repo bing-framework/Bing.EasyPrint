@@ -52,7 +52,11 @@ Windows/Linux 的 Core、Host、现代包消费、字体、前端类型/构建/�
 
 正式测量绑定的本地候选源码哈希为 `6c0b8ad5526df640d9e911063a7f37c38cb68e2a29cee0ae6c66d1c61d42b887`，采集程序 SHA-256 为 `3E9F9F13A9B8CB0B2024EDF1B9AB59E67537F7D143F0108DCEF37FF17318D2FF`。`candidate-source-final.json`、`baseline-identity.json`、`build-manifest-final.json` 和每进程 `execution.json` 共同绑定源码、构建日志、落地及实际加载的三份产品程序集。起止源码范围未变时允许复用本次证据；不能把未提交身份写成某个不存在的远端提交。
 
-GitHub 仓库 API 已成功返回 200，但工作流列表为空，见 `github-repository-access.json`；此前指定 workflow API 返回 404 的原始记录保留在 `github-actions-query.json`。这表明远端当前尚未登记该工作流，不能声称两平台 CI 已完成。工作流已加入提交 SHA/源码哈希的起止校验，按 SHA 和 attempt 归档，并将失败或跳过的必要步骤判为失败。
+发布前的 GitHub 仓库 API 查询返回 200，工作流列表为空，见 `github-repository-access.json`；此前指定 workflow API 返回 404 的原始记录保留在 `github-actions-query.json`。用户授权后已发布候选，真实 CI 由 push 触发。工作流加入提交 SHA/源码哈希的起止校验，按 SHA 和 attempt 归档，并将失败或跳过的必要步骤判为失败。
+
+首轮 [Actions #42238007958](https://github.com/bing-framework/Bing.EasyPrint/actions/runs/42238007958) 对提交 `202d7bb46c2ffc948f9253249bc1c84ddb40524e` 的两平台结果均为失败。Linux 在身份采集阶段对隐藏 `.gitignore` 读取长度失败；改用 `FileInfo.Length`，Windows Hidden 文件端到端反例实现 RED/exit 1 → GREEN/exit 0。Windows 完整 Core 为 4713 通过/1 失败/0 跳过，固定字典哈希因 Git checkout 的 CRLF 转换失配；精确路径 `.gitattributes` 固定 LF 后，真实 `core.autocrlf=true` checkout 哈希恢复为固定值，现有嵌入资源哈希测试 1/1 通过。未改变字典内容、预期哈希或门槛。
+
+首轮日志及失败产物保留于 `remote-ci/`，隐藏文件和换行反例分别位于 `gate-fixtures/candidate-hidden-*.json`、`eol-regression/result.json`。这些修复仅影响采集工具与 checkout 字节，不改变本机正式性能测量的生产源码、固定字典字节或 harness；性能证据按未变相关范围复用。最终通过须以修复后同一候选的两平台真实结果判定，不能将首轮跳过的步骤记作通过。
 
 ## 复验入口
 

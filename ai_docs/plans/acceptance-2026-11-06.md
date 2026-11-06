@@ -27,11 +27,15 @@
 | P1 | 正式性能契约和采集 | CLOSED | 五负载、3 预热/30 样本、固定基线、源/程序集/环境身份、原始样本齐全 |
 | P2 | 性能门槛确认与正式执行 | CLOSED | 用户批准精确契约哈希；formal-r1 全部 PASS，峰值工作集 96.36 MiB |
 | C2 | 当前候选远端发布并执行 CI | OPEN_ACTIONABLE | 已获明确授权；提交并推送候选，核对两平台相同 SHA/scopeHash，下载真实运行产物 |
+| C3 | Linux 隐藏文件身份采集 | CLOSED | 首轮日志确认根因，FileInfo 长度读取；Windows Hidden 端到端 RED/exit 1 → GREEN/exit 0 |
+| C4 | Windows 固定字典 checkout 字节 | CLOSED | 精确 LF 属性；autocrlf=true 实际 checkout RED → GREEN，已有哈希测试 1/1 通过 |
 
 Completed：C1/R1/P1/P2，详细结果见 `docs/acceptance-2026-11-06.md`。Open Actionable：C2 候选发布与 CI 取证。Blocked Approval：none。Blocked External：两平台候选 Actions 运行结果。Not Applicable：net5/netcore2.2 本轮执行、实机验收、包发布。Accepted Limitations：Host helper 进程内性能范围，不含 Kestrel/路由/准入或生产并发。Verified Boundaries：none。Deferred：未请求的产品功能。
 
-Round：2（证据来源绑定审查后收口）；Implementation：4/4；Release Gates：旧运行时与性能 2/3，远端两平台 CI 1 项待执行。
+Round：3（首轮外部 CI 暴露两个新根因后做最小修复）；Implementation：6/6（原 4 项加 C3/C4）；Release Gates：旧运行时与性能 2/3，远端两平台 CI 1 项待完成。
 
 Validation Run：L0 YAML/内嵌 PowerShell/工具解析与差异检查；L1 候选身份及性能门禁反例、探针 smoke；L2 三旧运行时完整 Core；L3/L4 外部 CI 待授权；L5 一次正式 before/after，五负载 PASS。Reused Evidence：上一轮现代 Core/Host/Vitest/E2E 的生产相关源码未变；固定 baseline build 复用，未重建基线测量。
 
-No-Progress Check：CHANGED（用户明确授权提交与推送）；Next Action：发布已验证候选并取得两平台 CI 证据；Goal Status：RUNNING。除非真实 CI 失败暴露可执行问题，不重复本地测试或性能实验。
+CI 修复影响分析：ChangedFiles 为 `.gitattributes` 与 `Write-CandidateEvidence.ps1` 及报告；ChangedProjects/PublicContracts/RuntimePaths/Providers/TFMs/BenchmarkHarness 均无；ChangedBuildPackaging 为固定资源 checkout 换行。RiskLevel LOW。L0 真 Git checkout 字节反例与 PowerShell 解析，L1 Hidden 端到端及现有字典哈希测试；L4 修复后同提交两平台完整 CI；L5 复用已测本机相同生产源码/字典字节/harness，不重复性能。
+
+No-Progress Check：CHANGED（首轮远端运行提供新根因与修复证据）；Next Action：发布最小修复并取得两平台 CI 证据；Goal Status：RUNNING。首轮 #42238007958 的失败不转写为 PASS，后续仅处理真实可执行问题。
